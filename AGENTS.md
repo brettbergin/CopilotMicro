@@ -26,7 +26,8 @@ the repository could load it into a real session.
 - `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.
 - `make build`: compile the native arm64 executable.
 - `make package`: build/sign an app in a fresh generated output directory.
-- `make smoke-test`: package and construct hidden native UI; no visible launch.
+- `make smoke-test`: package, run hidden UI/resource and bounded accessory
+  lifecycle smoke, then safely remove its generated package directory.
 - `make lint` / `make format`: source checks / Swift formatting.
 - `make check`: lint, Node/Core tests and packaged headless smoke.
 
@@ -35,11 +36,12 @@ Existing apps are never overwritten or deleted. Do not describe headless
 checks, an emulator or a HID acknowledgement as qualified live device support.
 Use command-scoped `DEVELOPER_DIR`; never silently change global `xcode-select`.
 
-`scripts/test-core` uses app-owned SwiftPM caches/configuration, disables
-interactive credentials and strips GitHub/Copilot token variables. It keeps
-the user's global `safe.bareRepository` policy unchanged while permitting only
-SwiftPM-generated bare repositories beneath this checkout for that child test
-command. Do not replace it with a global Git configuration change.
+`scripts/swiftpm` is the shared build/test entry point. It uses app-owned
+SwiftPM caches/configuration, disables interactive credentials and strips
+GitHub/Copilot token variables. It keeps the user's global
+`safe.bareRepository` policy unchanged while permitting only SwiftPM-generated
+bare repositories beneath this checkout for that child command. Do not replace
+it with a global Git configuration change.
 
 ## Implementation rules
 

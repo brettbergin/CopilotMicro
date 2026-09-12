@@ -1,0 +1,55 @@
+#!/bin/bash
+set -euo pipefail
+
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+git_config="$root/scripts/git-swiftpm.config"
+developer_dir="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
+tooling="$root/build/tooling/swiftpm"
+
+if [[ $# -eq 0 || ! "$1" =~ ^(build|test)$ ]]; then
+    printf '%s\n' "usage: scripts/swiftpm build|test [swift options]" >&2
+    exit 2
+fi
+
+command="$1"
+shift
+mkdir -p \
+    "$tooling/cache" \
+    "$tooling/clang" \
+    "$tooling/config" \
+    "$tooling/home" \
+    "$tooling/modules" \
+    "$tooling/security" \
+    "$tooling/tmp"
+
+cd "$root"
+exec env \
+    -u COPILOT_GITHUB_TOKEN \
+    -u COPILOT_SDK_TOKEN \
+    -u GH_TOKEN \
+    -u GITHUB_TOKEN \
+    -u DYLD_FRAMEWORK_PATH \
+    -u DYLD_LIBRARY_PATH \
+    -u SDKROOT \
+    PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+    LC_ALL=C \
+    DEVELOPER_DIR="$developer_dir" \
+    HOME="$tooling/home" \
+    TMPDIR="$tooling/tmp/" \
+    CLANG_MODULE_CACHE_PATH="$tooling/clang" \
+    SWIFTPM_MODULECACHE_OVERRIDE="$tooling/modules" \
+    GIT_TERMINAL_PROMPT=0 \
+    GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0=credential.interactive \
+    GIT_CONFIG_VALUE_0=never \
+    GIT_CONFIG_KEY_1="includeIf.gitdir:$root/.path" \
+    GIT_CONFIG_VALUE_1="$git_config" \
+    /usr/bin/xcrun swift "$command" \
+    --cache-path "$tooling/cache" \
+    --config-path "$tooling/config" \
+    --security-path "$tooling/security" \
+    --disable-dependency-cache \
+    --disable-netrc \
+    --disable-keychain \
+    --jobs 2 \
+    "$@"

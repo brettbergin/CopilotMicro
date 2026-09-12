@@ -50,10 +50,13 @@ make check
 make package
 ```
 
-`make check` runs source checks, Node/Core unit tests and a packaged headless
-AppKit/SwiftUI smoke. It does not display a window, install a menu bar item,
-request permissions or touch a device/CLI session. Core tests use the pinned
-official Swift Testing dependency; first resolution downloads public packages.
+`make check` runs source checks, Node/Core unit tests, hidden AppKit/SwiftUI and
+resource smoke, and a bounded accessory startup smoke through the production
+app-delegate, main-menu and status-item wiring. It does not display a window,
+request permissions or touch a device/CLI session, and the accessory process
+exits immediately. Its generated smoke package directory is removed by an
+exact-path safety check. Core tests use the pinned official Swift Testing
+dependency; first resolution downloads public packages.
 
 `make package` prints the signed app's absolute `appPath` as JSON. Each call
 uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
@@ -72,11 +75,11 @@ with this toolchain. Do not suppress it or skip rebuilding changed tests;
 see the [toolchain notes](docs/phase-008-distribution-and-support.md).
 All nonzero build/test exits remain failures.
 
-The test dependency checkout uses app-owned caches, disables interactive
-credentials, strips GitHub/Copilot token variables and applies a command-scoped
-Git include limited to this repository. SwiftPM can inspect only its generated
-bare repositories here while your global `safe.bareRepository=explicit` policy
-remains unchanged.
+Build and test SwiftPM commands use app-owned caches, home, temporary and
+security directories, disable interactive credentials, strip GitHub/Copilot
+token variables and apply a command-scoped Git include limited to this
+repository. SwiftPM can inspect only its generated bare repositories here while
+your global `safe.bareRepository=explicit` policy remains unchanged.
 
 ## Product documentation
 

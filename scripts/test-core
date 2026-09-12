@@ -3,42 +3,10 @@ set -euo pipefail
 
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 package="$root/Packages/CopilotMicroKit"
-git_config="$root/scripts/git-swiftpm.config"
-developer_dir="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
-tooling="$root/build/tooling/swiftpm-tests"
-mkdir -p \
-    "$tooling/cache" \
-    "$tooling/clang" \
-    "$tooling/config" \
-    "$tooling/home" \
-    "$tooling/modules" \
-    "$tooling/security" \
-    "$tooling/tmp"
 
-exec env \
-    -u COPILOT_SDK_TOKEN \
-    -u GH_TOKEN \
-    -u GITHUB_TOKEN \
-    DEVELOPER_DIR="$developer_dir" \
-    HOME="$tooling/home" \
-    TMPDIR="$tooling/tmp/" \
-    CLANG_MODULE_CACHE_PATH="$tooling/clang" \
-    SWIFTPM_MODULECACHE_OVERRIDE="$tooling/modules" \
-    GIT_TERMINAL_PROMPT=0 \
-    GIT_CONFIG_COUNT=2 \
-    GIT_CONFIG_KEY_0=credential.interactive \
-    GIT_CONFIG_VALUE_0=never \
-    GIT_CONFIG_KEY_1="includeIf.gitdir:$root/.path" \
-    GIT_CONFIG_VALUE_1="$git_config" \
-    /usr/bin/xcrun swift test \
+exec "$root/scripts/swiftpm" test \
     --package-path "$package" \
     --scratch-path "$package/.build" \
-    --cache-path "$tooling/cache" \
-    --config-path "$tooling/config" \
-    --security-path "$tooling/security" \
-    --disable-netrc \
-    --disable-keychain \
-    --jobs 2 \
     --disable-xctest \
     --enable-swift-testing \
     "$@"

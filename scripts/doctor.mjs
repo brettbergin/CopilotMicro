@@ -404,7 +404,7 @@ export function collectReport(options, {
       "Apple Silicon Mac eligibility cannot be established on this platform.", { nodeArchitecture: arch }));
   }
 
-  const chosen = attempts.find((attempt) => attempt.ok) ?? attempts.find((attempt) => attempt.sdkPath);
+  const chosen = attempts.find((attempt) => attempt.ok);
   const toolchainCheck = options.phase === "xcode" ? "xcode" : "developer-toolchain";
   if (chosen) {
     developerDirectory = chosen.directory;

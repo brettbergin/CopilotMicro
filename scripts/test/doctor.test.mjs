@@ -446,9 +446,30 @@ test("discovery continues past a full Xcode with an old SDK or a failed toolchai
     assert.equal(discovered.developerDirectory, ALTERNATE);
     const explicit = report(fake, ["--developer-dir", XCODE]);
     assert.equal(explicit.status, "BLOCKED");
-    assert.equal(explicit.developerDirectory, XCODE);
+    assert.equal(explicit.developerDirectory, null);
+    assert.equal(explicit.toolchainKind, null);
+    assert.equal(check(explicit, "developer-toolchain").status, "BLOCKED");
     assert.equal(explicit.developerDirectoryAttempts.length, 1);
   }
+});
+
+test("rejected fallback attempts never produce a passing selected toolchain", () => {
+  const fake = fixture({
+    installations: [XCODE, ALTERNATE],
+    globalSelection: XCODE,
+    overrides: {
+      [`${XCODE}:/usr/bin/xcrun --sdk macosx --show-sdk-version`]: ok("25.0\n"),
+      [`${ALTERNATE}:/usr/bin/xcrun --sdk macosx --show-sdk-version`]: ok("25.0\n"),
+    },
+  });
+  const result = report(fake);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.developerDirectory, null);
+  assert.equal(result.toolchainKind, null);
+  assert.equal(check(result, "developer-toolchain").status, "BLOCKED");
+  assert.equal(check(result, "macos-sdk").status, "BLOCKED");
+  assert.equal(check(result, "swift").status, "BLOCKED");
+  assert.ok(result.developerDirectoryAttempts.every((attempt) => !attempt.ok));
 });
 
 test("Xcode and SDK real paths are checked and the actual directory is reported", () => {
@@ -583,7 +604,9 @@ test("Swift below 6 blocks an explicit selection and discovery can choose a usab
   const explicit = report(fake, ["--developer-dir", XCODE]);
   assert.equal(explicit.status, "BLOCKED");
   assert.equal(explicit.exitCode, 1);
-  assert.equal(explicit.developerDirectory, XCODE);
+  assert.equal(explicit.developerDirectory, null);
+  assert.equal(explicit.toolchainKind, null);
+  assert.equal(check(explicit, "developer-toolchain").status, "BLOCKED");
   assert.equal(check(explicit, "swift").status, "BLOCKED");
   assert.equal(explicit.developerDirectoryAttempts[0].reason, "swift_requires_6");
   assert.equal(explicit.developerDirectoryAttempts.length, 1);

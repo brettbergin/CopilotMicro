@@ -140,8 +140,11 @@ the real CLI. HID acknowledgements do not prove visible LEDs. A successful
 compile does not qualify app onboarding or permissions.
 
 Use the canonical commands as source scaffolding lands. Currently `make check`
-covers source checks, Node/Core unit tests and a packaged headless native
-smoke. `make package` produces the ad-hoc-signed app. These do not establish
+covers source checks, Node/Core unit tests, packaged hidden native smoke and a
+bounded accessory startup smoke through the production delegate, main-menu and
+status-item lifecycle wiring. The smoke opens no manager window, exits
+immediately and removes only its exact generated package directory.
+`make package` produces the retained ad-hoc-signed app. These do not establish
 complete GUI interaction, XCUITest, terminal or hardware qualification; do not
 describe unimplemented or unexercised acceptance cases as passing.
 

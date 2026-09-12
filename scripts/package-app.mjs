@@ -14,6 +14,7 @@ export const LIMITS = Object.freeze({
   commandMs: 10000,
   smokeMs: 30000,
   outputBytes: 1024 * 1024,
+  diagnosticBytes: 4096,
 });
 export const HELP = `Usage: node scripts/package-app.mjs [options]
 
@@ -27,23 +28,25 @@ No XcodeGen, asset compiler, external packages, device or CLI integration.
   --developer-dir PATH           Absolute developer tools directory. Defaults
                                  to DEVELOPER_DIR, then installed stock CLT.
                                  Applied only to child commands.
-  --smoke-test                   Construct hidden AppKit/SwiftUI UI, validate
-                                 the packaged resource and exit with JSON.
+  --smoke-test                   Run hidden AppKit/SwiftUI/resource smoke and
+                                 bounded production accessory lifecycle smoke.
   --help, -h                     Print this help without building.
 
 Existing app bundles are never overwritten or deleted. Choose a new output
 directory or explicitly move your old generated app before packaging again.
 Builds have a 180-second deadline; smoke has a 30-second deadline. Other
 commands have 10 seconds. Each command has a 1 MiB output limit, no shell,
-and a credential-free environment. The app is never visibly launched here.
+and a credential-free environment. No app window is shown; accessory smoke
+uses the production run loop briefly and exits.
 Output is JSON. Exit codes: 0 = packaged/help, 1 = failure, 2 = invalid usage.
 Ad-hoc signing does not establish notarization, Gatekeeper or live support.
 `;
 
 export class PackagingError extends Error {
-  constructor(code, message) {
+  constructor(code, message, details = {}) {
     super(message);
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -131,10 +134,43 @@ export function runCommand(command, args, env, { cwd, timeoutMs = LIMITS.command
   if (result.error || result.signal || result.status !== 0) {
     const code = result.error?.code === "ETIMEDOUT" ? "timed_out"
       : result.error?.code === "ENOBUFS" ? "output_limit" : "command_failed";
-    const detail = (result.stderr ?? "").slice(0, 4096).replace(/[\u0000-\u001f\u007f]/gu, " ").trim();
-    throw new PackagingError(code, `${path.basename(command)} failed${detail ? `: ${detail}` : "."}`);
+    const stdout = sanitizeDiagnostic(result.stdout);
+    const stderr = sanitizeDiagnostic(result.stderr);
+    const appFailure = parseStructuredFailure(result.stdout);
+    const details = {};
+    if (stdout) details.commandStdout = stdout;
+    if (stderr) details.commandStderr = stderr;
+    if (appFailure) {
+      details.appErrorCode = appFailure.errorCode;
+      if (appFailure.message) details.appMessage = appFailure.message;
+    }
+    const detail = appFailure
+      ? `${appFailure.errorCode}${appFailure.message ? `: ${appFailure.message}` : ""}`
+      : stderr || stdout;
+    throw new PackagingError(
+      code,
+      `${path.basename(command)} failed${detail ? `: ${detail}` : "."}`,
+      details,
+    );
   }
   return result.stdout ?? "";
+}
+
+function sanitizeDiagnostic(value) {
+  const bytes = Buffer.from(String(value ?? ""), "utf8").subarray(0, LIMITS.diagnosticBytes);
+  return bytes.toString("utf8").replace(/[\u0000-\u001f\u007f]/gu, " ").trim();
+}
+
+function parseStructuredFailure(value) {
+  try {
+    const parsed = JSON.parse(String(value ?? "").trim());
+    if (parsed?.outcome !== "failed" || typeof parsed.errorCode !== "string") return null;
+    const errorCode = sanitizeDiagnostic(parsed.errorCode);
+    const message = typeof parsed.message === "string" ? sanitizeDiagnostic(parsed.message) : "";
+    return errorCode ? { errorCode, message } : null;
+  } catch {
+    return null;
+  }
 }
 
 export function validateMetadata(metadata) {
@@ -157,18 +193,37 @@ export function validateConfiguration(configuration) {
   }
 }
 
-export function validateSmokeReport(report, app) {
+export function validateSmokeReport(report, app, mode = "hidden", canonicalize = path.normalize) {
+  if (!["hidden", "accessory"].includes(mode)) {
+    throw new PackagingError("smoke_failed", "Unknown smoke mode.");
+  }
+  const accessory = mode === "accessory";
   const expected = {
     schemaVersion: 1, outcome: "passed",
-    bundleIdentifier: IDENTITY.bundleIdentifier, bundlePath: app,
-    resourcePath: path.join(app, "Contents", "Resources", "foundation.json"),
-    mainThread: true, activationPolicy: "prohibited",
+    smokeMode: mode,
+    bundleIdentifier: IDENTITY.bundleIdentifier,
+    mainThread: true, activationPolicy: accessory ? "accessory" : "prohibited",
     windowCreated: true, hostingViewCreated: true,
     windowVisible: false, windowKey: false, windowMain: false,
-    statusItemInstalled: false, menuActionsValidated: true, keepsRunningAfterManagerClose: true,
+    applicationDelegateInstalled: accessory,
+    applicationDidFinishLaunching: accessory,
+    mainMenuInstalled: accessory,
+    mainMenuActionsValidated: true,
+    statusItemInstalled: accessory,
+    statusItemMenuInstalled: accessory,
+    menuActionsValidated: true,
+    keepsRunningAfterManagerClose: true,
   };
   for (const [key, value] of Object.entries(expected)) {
     if (report?.[key] !== value) throw new PackagingError("smoke_failed", `Smoke invariant failed: ${key}.`);
+  }
+  const expectedResource = path.join(app, "Contents", "Resources", "foundation.json");
+  if (typeof report.bundlePath !== "string" || canonicalize(report.bundlePath) !== canonicalize(app)) {
+    throw new PackagingError("smoke_failed", "Smoke invariant failed: bundlePath.");
+  }
+  if (typeof report.resourcePath !== "string"
+      || canonicalize(report.resourcePath) !== canonicalize(expectedResource)) {
+    throw new PackagingError("smoke_failed", "Smoke invariant failed: resourcePath.");
   }
   validateConfiguration(report.configuration);
   if (!Number.isFinite(report.fittingWidth) || !Number.isFinite(report.fittingHeight)
@@ -199,7 +254,12 @@ export function packageApplication(options, {
   }
   const tools = path.join(root, "build", "tooling");
   const scratch = path.join(root, ".build");
-  const directories = [scratch, output, ...["home", "tmp", "clang", "modules", "cache", "config"].map((part) => path.join(tools, part))];
+  const directories = [
+    scratch,
+    output,
+    ...["home", "tmp", "clang", "modules", "cache", "config", "security"]
+      .map((part) => path.join(tools, part)),
+  ];
   for (const directory of directories) assertDirectoryPath(root, directory);
   const info = path.join(root, "App", "Info.plist");
   const resource = path.join(root, "App", "Resources", "foundation.json");
@@ -214,13 +274,21 @@ export function packageApplication(options, {
     DEVELOPER_DIR: developerDir,
     CLANG_MODULE_CACHE_PATH: path.join(tools, "clang"),
     SWIFTPM_MODULECACHE_OVERRIDE: path.join(tools, "modules"),
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "credential.interactive",
+    GIT_CONFIG_VALUE_0: "never",
+    GIT_CONFIG_KEY_1: `includeIf.gitdir:${root}/.path`,
+    GIT_CONFIG_VALUE_1: path.join(root, "scripts", "git-swiftpm.config"),
   };
   const invoke = (command, args, timeoutMs = LIMITS.commandMs) => run(command, args, env, { cwd: root, timeoutMs });
   validateMetadata(JSON.parse(invoke("/usr/bin/plutil", ["-convert", "json", "-o", "-", info])));
   const buildArgs = [
     "swift", "build", "--configuration", options.configuration, "--arch", "arm64", "--jobs", "2",
     "--scratch-path", scratch, "--cache-path", path.join(tools, "cache"),
-    "--config-path", path.join(tools, "config"), "--disable-dependency-cache",
+    "--config-path", path.join(tools, "config"),
+    "--security-path", path.join(tools, "security"),
+    "--disable-dependency-cache", "--disable-netrc", "--disable-keychain",
   ];
   invoke("/usr/bin/xcrun", buildArgs, LIMITS.buildMs);
   const binDirectory = fs.realpathSync(invoke("/usr/bin/xcrun", [...buildArgs, "--show-bin-path"]).trim());
@@ -249,10 +317,14 @@ export function packageApplication(options, {
   invoke("/usr/bin/codesign", ["--verify", "--strict", "--verbose=2", app]);
   let smoke = null;
   if (options.smokeTest) {
-    smoke = JSON.parse(invoke(executable, ["--smoke-test"], LIMITS.smokeMs));
-    validateSmokeReport(smoke, app);
-    if (fs.realpathSync(smoke.resourcePath) !== smoke.resourcePath) {
-      throw new PackagingError("smoke_failed", "Packaged resource must not resolve outside the app.");
+    smoke = {};
+    for (const [mode, argument] of [
+      ["hidden", "--smoke-test"],
+      ["accessory", "--smoke-test=accessory"],
+    ]) {
+      const report = JSON.parse(invoke(executable, [argument], LIMITS.smokeMs));
+      validateSmokeReport(report, app, mode, fs.realpathSync);
+      smoke[mode] = report;
     }
   }
   return {
@@ -274,6 +346,7 @@ export function main(argv, deps = {}, io = process) {
   } catch (error) {
     io.stderr.write(`${JSON.stringify({
       outcome: "failed", errorCode: error.code ?? "packaging_failed", message: error.message,
+      ...(error.details ?? {}),
     })}\n`);
     return error.code === "usage" ? 2 : 1;
   }

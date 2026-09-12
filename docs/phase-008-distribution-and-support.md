@@ -61,10 +61,11 @@ Respect its real registered/approved status. Starting the menu bar app does
 not automatically start Copilot; offer explicit Open Copilot when disconnected.
 
 The local native build uses Swift Package Manager and Apple's installed
-Command Line Tools, which contain the macOS SDK. A SwiftUI/AppKit build,
-ad-hoc-signed `.app` and relocated-resource/headless runtime smoke were
-verified with Swift 6.3.3 and SDK 26.5 on macOS 26.6.2. This does not require
-an Apple account or downloading full Xcode.
+Command Line Tools, which contain the macOS SDK. A SwiftUI/AppKit build, ad-hoc-signed `.app`, relocated-resource hidden smoke
+and bounded production accessory-lifecycle smoke were verified with Swift
+6.3.3 and SDK 26.5 on macOS 26.6.2. These checks open no manager window and
+leave no running app. This does not require an Apple account or downloading
+full Xcode.
 
 Xcode-specific UI automation is a separate capability. A prior XCTest failure
 must not be generalized into inability to build a native app. Record the
@@ -86,10 +87,11 @@ were verified independently. Do not hide the diagnostic, accept nonzero
 build/test exits, or skip rebuilding changed tests to suppress it.
 
 SwiftPM stores source-control dependencies as package-local bare repositories.
-The checked-in test wrapper uses app-owned caches/configuration, disables
-interactive credentials, strips GitHub/Copilot token variables and applies a
-command-scoped `includeIf.gitdir` limited to this checkout. This allows those
-generated repositories without changing the user's global
+The checked-in SwiftPM wrapper uses app-owned caches, home, temporary and
+security directories for builds and tests, disables interactive credentials,
+strips GitHub/Copilot token variables and applies a command-scoped
+`includeIf.gitdir` limited to this checkout. This allows those generated
+repositories without changing the user's global
 `safe.bareRepository=explicit` policy. Do not weaken that policy globally as a
 build workaround.
 

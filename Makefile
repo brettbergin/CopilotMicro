@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
 PACKAGE_OUTPUT ?= build/package-$(shell /usr/bin/uuidgen)
+SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
+SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
 .PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-core lint format check
@@ -11,7 +13,7 @@ help:
 		'doctor        Check local Swift/macOS SDK prerequisites with CLT or Xcode' \
 		'build         Compile the native arm64 app with SwiftPM' \
 		'package       Build and ad-hoc sign an app in a fresh build/package-* directory' \
-		'smoke-test    Package the app and verify hidden native UI and resources' \
+		'smoke-test    Verify hidden UI/resources and accessory lifecycle, then clean output' \
 		'test-doctor   Run isolated prerequisite-checker tests' \
 		'test-packager Run isolated packaging safety tests' \
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
@@ -26,13 +28,17 @@ doctor-xcode:
 	node scripts/doctor.mjs --phase xcode
 
 build:
-	/usr/bin/xcrun swift build --arch arm64 --jobs 2
+	./scripts/swiftpm build --arch arm64 --scratch-path .build
 
 package:
 	node scripts/package-app.mjs --output-dir "$(PACKAGE_OUTPUT)"
 
 smoke-test:
-	node scripts/package-app.mjs --output-dir "$(PACKAGE_OUTPUT)" --smoke-test
+	@status=0; cleanup_status=0; \
+	node scripts/package-app.mjs --output-dir "$(SMOKE_OUTPUT)" --smoke-test || status=$$?; \
+	node scripts/clean-smoke-output.mjs "$(SMOKE_OUTPUT)" >/dev/null || cleanup_status=$$?; \
+	if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+	exit "$$cleanup_status"
 
 test-doctor:
 	node --test scripts/test/doctor.test.mjs
@@ -48,7 +54,9 @@ lint:
 	node --check scripts/doctor.mjs
 	node --check scripts/test/doctor.test.mjs
 	node --check scripts/package-app.mjs
+	node --check scripts/clean-smoke-output.mjs
 	node --check scripts/test/package-app.test.mjs
+	/bin/bash -n scripts/swiftpm
 	/bin/bash -n scripts/test-core
 	/usr/bin/xcrun swift format lint --configuration .swift-format --strict --recursive $(SWIFT_SOURCES)
 

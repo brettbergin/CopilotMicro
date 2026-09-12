@@ -7,6 +7,7 @@ import {
   IDENTITY, LIMITS, PackagingError, main, packageApplication, parseArguments,
   runCommand, validateConfiguration, validateMetadata, validateOutputDirectory, validateSmokeReport,
 } from "../package-app.mjs";
+import { CleanupError, removeTemporarySmokeOutput } from "../clean-smoke-output.mjs";
 
 const repository = fileURLToPath(new URL("../..", import.meta.url));
 const metadata = {
@@ -18,12 +19,20 @@ const metadata = {
   LSUIElement: true,
 };
 const configuration = { schemaVersion: 1, mode: "emulator", liveIntegrationsEnabled: false };
-const report = (app) => ({
+const report = (app, smokeMode = "hidden") => ({
   schemaVersion: 1, outcome: "passed", bundleIdentifier: IDENTITY.bundleIdentifier,
   bundlePath: app, resourcePath: path.join(app, "Contents/Resources/foundation.json"),
-  configuration, processID: 1234, mainThread: true, activationPolicy: "prohibited",
+  configuration, processID: 1234, mainThread: true, smokeMode,
+  activationPolicy: smokeMode === "accessory" ? "accessory" : "prohibited",
   windowCreated: true, hostingViewCreated: true, windowVisible: false, windowKey: false,
-  windowMain: false, statusItemInstalled: false, menuActionsValidated: true,
+  windowMain: false,
+  applicationDelegateInstalled: smokeMode === "accessory",
+  applicationDidFinishLaunching: smokeMode === "accessory",
+  mainMenuInstalled: smokeMode === "accessory",
+  mainMenuActionsValidated: true,
+  statusItemInstalled: smokeMode === "accessory",
+  statusItemMenuInstalled: smokeMode === "accessory",
+  menuActionsValidated: true,
   keepsRunningAfterManagerClose: true, fittingWidth: 600, fittingHeight: 380,
 });
 
@@ -69,8 +78,9 @@ function fixture(t) {
         return "";
       }
       if (path.basename(command) === IDENTITY.executable) {
-        assert.deepEqual(args, ["--smoke-test"]);
-        return JSON.stringify(report(path.dirname(path.dirname(path.dirname(command)))));
+        const smokeMode = args[0] === "--smoke-test=accessory" ? "accessory" : "hidden";
+        assert.deepEqual(args, [smokeMode === "accessory" ? "--smoke-test=accessory" : "--smoke-test"]);
+        return JSON.stringify(report(path.dirname(path.dirname(path.dirname(command))), smokeMode));
       }
       assert.fail(`Unexpected command: ${command}`);
     },
@@ -120,6 +130,29 @@ test("symlinked ancestors and dangling existing app links are rejected", (t) => 
   assert.throws(() => validateOutputDirectory(root, "build/package"), { code: "output_exists" });
 });
 
+test("temporary smoke cleanup removes only an exact generated direct child", (t) => {
+  const { root } = fixture(t);
+  const generated = "build/smoke-12345678-1234-1234-1234-123456789abc";
+  const output = path.join(root, generated);
+  fs.mkdirSync(output, { recursive: true });
+  fs.writeFileSync(path.join(output, "artifact"), "temporary");
+  assert.equal(removeTemporarySmokeOutput(root, generated), true);
+  assert.equal(fs.existsSync(output), false);
+  assert.equal(removeTemporarySmokeOutput(root, generated), false);
+  for (const unsafe of [
+    "build/package-12345678-1234-1234-1234-123456789abc",
+    "build/smoke-12345678-1234-1234-1234-123456789abc/nested",
+    "../build/smoke-12345678-1234-1234-1234-123456789abc",
+  ]) {
+    assert.throws(() => removeTemporarySmokeOutput(root, unsafe), CleanupError);
+  }
+  const outside = path.join(root, "outside");
+  fs.mkdirSync(outside);
+  fs.symlinkSync(outside, output);
+  assert.throws(() => removeTemporarySmokeOutput(root, generated), CleanupError);
+  assert.ok(fs.existsSync(outside));
+});
+
 test("only expected metadata and emulator-only configuration are accepted", () => {
   validateMetadata(metadata);
   validateConfiguration(configuration);
@@ -156,13 +189,50 @@ test("commands are argument arrays with deadlines, output limits, no shell and i
   }
 });
 
+test("command failures retain bounded sanitized stdout and surface app failure details", () => {
+  const failure = JSON.stringify({
+    schemaVersion: 1,
+    outcome: "failed",
+    errorCode: "missing_resource",
+    message: "Resource missing.\u001b[31m",
+  });
+  assert.throws(
+    () => runCommand("CopilotMicro", ["--smoke-test"], {}, {}, () => ({
+      status: 1,
+      stdout: `${failure}\n`,
+      stderr: "secondary\nfailure",
+    })),
+    (error) => {
+      assert.equal(error.code, "command_failed");
+      assert.equal(error.details.appErrorCode, "missing_resource");
+      assert.equal(error.details.appMessage, "Resource missing. [31m");
+      assert.equal(error.details.commandStdout, failure.replace("\u001b", " "));
+      assert.equal(error.details.commandStderr, "secondary failure");
+      assert.match(error.message, /missing_resource: Resource missing\. \[31m/u);
+      return true;
+    },
+  );
+  assert.throws(
+    () => runCommand("tool", [], {}, {}, () => ({
+      status: 1,
+      stdout: "x".repeat(LIMITS.diagnosticBytes + 100),
+      stderr: "",
+    })),
+    (error) => {
+      assert.equal(error.details.commandStdout.length, LIMITS.diagnosticBytes);
+      return true;
+    },
+  );
+});
+
 test("packaging builds arm64, seals resources and signs only the newly generated app", (t) => {
   const { root, deps, calls, developer } = fixture(t);
   const options = parseArguments(["--output-dir", "build/foundation app", "--smoke-test"]);
   const result = packageApplication(options, deps);
   const app = path.join(root, "build/foundation app/CopilotMicro.app");
   assert.equal(result.appPath, app);
-  assert.equal(result.smoke.outcome, "passed");
+  assert.equal(result.smoke.hidden.outcome, "passed");
+  assert.equal(result.smoke.accessory.outcome, "passed");
   assert.equal(fs.readFileSync(path.join(app, "Contents/MacOS/CopilotMicro"), "utf8"), "fake arm64 binary");
   for (const call of calls) {
     assert.equal(call.env.DEVELOPER_DIR, developer);
@@ -170,6 +240,11 @@ test("packaging builds arm64, seals resources and signs only the newly generated
       assert.equal(call.env[name], undefined);
     }
     assert.equal(call.env.PATH, "/usr/bin:/bin:/usr/sbin:/sbin");
+    assert.equal(call.env.GIT_TERMINAL_PROMPT, "0");
+    assert.equal(call.env.GIT_CONFIG_KEY_0, "credential.interactive");
+    assert.equal(call.env.GIT_CONFIG_VALUE_0, "never");
+    assert.equal(call.env.GIT_CONFIG_KEY_1, `includeIf.gitdir:${root}/.path`);
+    assert.equal(call.env.GIT_CONFIG_VALUE_1, path.join(root, "scripts/git-swiftpm.config"));
     assert.equal(call.options.cwd, root);
     assert.notEqual(path.basename(call.command), "copilot");
     assert.notEqual(path.basename(call.command), "xcode-select");
@@ -179,11 +254,21 @@ test("packaging builds arm64, seals resources and signs only the newly generated
   assert.equal(build.args[build.args.indexOf("--arch") + 1], "arm64");
   assert.equal(build.args[build.args.indexOf("--configuration") + 1], "release");
   assert.ok(build.args.includes("--disable-dependency-cache"));
+  assert.ok(build.args.includes("--disable-netrc"));
+  assert.ok(build.args.includes("--disable-keychain"));
+  assert.equal(
+    build.args[build.args.indexOf("--security-path") + 1],
+    path.join(root, "build/tooling/security"),
+  );
   assert.deepEqual(calls.filter((call) => call.command === "/usr/bin/codesign").map((call) => call.args), [
     ["--force", "--sign", "-", "--timestamp=none", app],
     ["--verify", "--strict", "--verbose=2", app],
   ]);
-  assert.equal(calls.at(-1).options.timeoutMs, LIMITS.smokeMs);
+  assert.deepEqual(calls.slice(-2).map((call) => call.args), [
+    ["--smoke-test"],
+    ["--smoke-test=accessory"],
+  ]);
+  assert.ok(calls.slice(-2).every((call) => call.options.timeoutMs === LIMITS.smokeMs));
   const count = calls.length;
   assert.throws(() => packageApplication(options, deps), { code: "output_exists" });
   assert.equal(calls.length, count, "a repeat cannot build or sign another existing app");
@@ -258,18 +343,27 @@ test("signing failures are failures, retain inspectable output and never delete 
   assert.throws(() => packageApplication(parseArguments([]), deps), { code: "output_exists" });
 });
 
-test("smoke invariants require real hidden UI, emulator configuration and the relocated resource path", () => {
+test("smoke invariants require hidden UI and production accessory lifecycle wiring", () => {
   const app = "/relocated/CopilotMicro.app";
-  validateSmokeReport(report(app), app);
-  for (const change of [
-    { outcome: "failed" }, { bundlePath: "/old/CopilotMicro.app" },
-    { resourcePath: "/build/foundation.json" }, { windowVisible: true }, { windowKey: true },
-    { windowMain: true }, { statusItemInstalled: true }, { activationPolicy: "regular" },
-    { windowCreated: false }, { hostingViewCreated: false }, { menuActionsValidated: false },
-    { keepsRunningAfterManagerClose: false }, { mainThread: false },
-    { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
-    { configuration: { ...configuration, liveIntegrationsEnabled: true } },
-  ]) {
-    assert.throws(() => validateSmokeReport({ ...report(app), ...change }, app), PackagingError);
+  for (const mode of ["hidden", "accessory"]) {
+    validateSmokeReport(report(app, mode), app, mode);
+    const accessory = mode === "accessory";
+    for (const change of [
+      { outcome: "failed" }, { bundlePath: "/old/CopilotMicro.app" },
+      { resourcePath: "/build/foundation.json" }, { windowVisible: true }, { windowKey: true },
+      { windowMain: true }, { statusItemInstalled: !accessory }, { activationPolicy: "regular" },
+      { applicationDelegateInstalled: !accessory }, { applicationDidFinishLaunching: !accessory },
+      { mainMenuInstalled: !accessory }, { mainMenuActionsValidated: false },
+      { statusItemMenuInstalled: !accessory },
+      { windowCreated: false }, { hostingViewCreated: false }, { menuActionsValidated: false },
+      { keepsRunningAfterManagerClose: false }, { mainThread: false },
+      { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
+      { configuration: { ...configuration, liveIntegrationsEnabled: true } },
+    ]) {
+      assert.throws(
+        () => validateSmokeReport({ ...report(app, mode), ...change }, app, mode),
+        PackagingError,
+      );
+    }
   }
 });
