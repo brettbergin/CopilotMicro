@@ -8,8 +8,9 @@ session management, model/effort, voice, input, cancellation and permission
 controls. A graphical manager provides onboarding, remapping, diagnostics and
 local configuration.
 
-**Status:** product/design foundation and developer setup tooling. The native
-application and hardware/CLI integrations are not implemented or qualified yet.
+**Status:** early native foundation. The menu bar, Open Manager/Quit actions,
+emulator-only manager window, app packaging and Core tests exist. Controls and
+lighting simulation, and live hardware/CLI integrations, are not implemented yet.
 
 ## Developer setup
 
@@ -42,8 +43,40 @@ for the local native app. `make doctor-xcode` checks that optional environment
 strictly. Such checks can later use an authorized macOS CI runner with Xcode
 preinstalled; no CI run or UI automation is claimed here.
 
-Run `make check` for the setup checker's syntax/tests. This does not build or
-qualify a native application. Missing prerequisites are reported explicitly.
+Build and check the current foundation:
+
+```sh
+make check
+make package
+```
+
+`make check` runs source checks, Node/Core unit tests and a packaged headless
+AppKit/SwiftUI smoke. It does not display a window, install a menu bar item,
+request permissions or touch a device/CLI session. Core tests use the pinned
+official Swift Testing dependency; first resolution downloads public packages.
+
+`make package` prints the signed app's absolute `appPath` as JSON. Each call
+uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
+bar item and choose Open Manager. To choose an output location explicitly:
+
+```sh
+make package PACKAGE_OUTPUT=build/my-preview
+```
+
+The output must be a new app location under `build/`; existing bundles are
+never overwritten or removed. Ad-hoc signing is not notarization. No Apple
+account is required for these local builds.
+
+Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
+with this toolchain. Do not suppress it or skip rebuilding changed tests;
+see the [toolchain notes](docs/phase-008-distribution-and-support.md).
+All nonzero build/test exits remain failures.
+
+The test dependency checkout uses app-owned caches, disables interactive
+credentials, strips GitHub/Copilot token variables and applies a command-scoped
+Git include limited to this repository. SwiftPM can inspect only its generated
+bare repositories here while your global `safe.bareRepository=explicit` policy
+remains unchanged.
 
 ## Product documentation
 

@@ -40,7 +40,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
     func hasExpectedMenuActions() -> Bool {
         guard let open = menu.item(withTitle: "Open Manager"),
-              let quit = menu.item(withTitle: "Quit Copilot Micro") else {
+            let quit = menu.item(withTitle: "Quit Copilot Micro")
+        else {
             return false
         }
         return open.action == #selector(openManager)

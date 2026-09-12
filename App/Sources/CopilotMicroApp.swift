@@ -39,11 +39,14 @@ struct CopilotMicroApp {
     static func main() {
         let arguments = Array(CommandLine.arguments.dropFirst())
         if arguments == ["--help"] {
-            FileHandle.standardOutput.write(Data(
-                "Copilot Micro: emulator-only native foundation.\n"
-                    .appending("Run the packaged app normally for its menu bar item.\n")
-                    .appending("--smoke-test constructs hidden UI, reads its bundled resource, and exits as JSON.\n").utf8
-            ))
+            FileHandle.standardOutput.write(
+                Data(
+                    "Copilot Micro: emulator-only native foundation.\n"
+                        .appending("Run the packaged app normally for its menu bar item.\n")
+                        .appending(
+                            "--smoke-test constructs hidden UI, reads its bundled resource, and exits as JSON.\n"
+                        ).utf8
+                ))
             return
         }
         do {
@@ -54,7 +57,8 @@ struct CopilotMicroApp {
         } catch {
             let code = (error as? StartupError)?.rawValue ?? "startup_failed"
             let message = "{\"schemaVersion\":1,\"outcome\":\"failed\",\"errorCode\":\"\(code)\"}\n"
-            let output = arguments == ["--smoke-test"]
+            let output =
+                arguments == ["--smoke-test"]
                 ? FileHandle.standardOutput : FileHandle.standardError
             output.write(Data(message.utf8))
             exit(EXIT_FAILURE)
@@ -65,14 +69,17 @@ struct CopilotMicroApp {
     private static func run(smoke: Bool) throws {
         let bundle = Bundle.main
         guard bundle.bundleURL.pathExtension == "app",
-              bundle.bundleIdentifier == BuildIdentity.bundleIdentifier,
-              bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == BuildIdentity.version,
-              bundle.object(forInfoDictionaryKey: "LSMinimumSystemVersion") as? String == "26.0" else {
+            bundle.bundleIdentifier == BuildIdentity.bundleIdentifier,
+            bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == BuildIdentity.version,
+            bundle.object(forInfoDictionaryKey: "LSMinimumSystemVersion") as? String == "26.0"
+        else {
             throw StartupError.invalidBundle
         }
         guard let resource = bundle.url(forResource: "foundation", withExtension: "json"),
-              resource.resolvingSymlinksInPath() == bundle.bundleURL
-                .appendingPathComponent("Contents/Resources/foundation.json") else {
+            resource.resolvingSymlinksInPath()
+                == bundle.bundleURL
+                .appendingPathComponent("Contents/Resources/foundation.json")
+        else {
             throw StartupError.missingResource
         }
         let configuration: EmulatorConfiguration
@@ -113,12 +120,13 @@ struct CopilotMicroApp {
         let menuValid = controller.hasExpectedMenuActions()
         let staysRunning = !controller.applicationShouldTerminateAfterLastWindowClosed(application)
         guard Thread.isMainThread,
-              application.activationPolicy() == .prohibited,
-              !manager.window.isVisible, !manager.window.isKeyWindow, !manager.window.isMainWindow,
-              manager.window.contentView === manager.hostingView,
-              controller.statusItem == nil, menuValid, staysRunning,
-              size.width.isFinite, size.height.isFinite,
-              size.width >= 600, size.height >= 380 else {
+            application.activationPolicy() == .prohibited,
+            !manager.window.isVisible, !manager.window.isKeyWindow, !manager.window.isMainWindow,
+            manager.window.contentView === manager.hostingView,
+            controller.statusItem == nil, menuValid, staysRunning,
+            size.width.isFinite, size.height.isFinite,
+            size.width >= 600, size.height >= 380
+        else {
             throw StartupError.smokeInvariantFailed
         }
         let report = SmokeReport(

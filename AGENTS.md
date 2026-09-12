@@ -5,9 +5,9 @@ the ten `docs/phase-00*.md` documents; start with phase 000 for ownership.
 
 ## Current implementation boundary
 
-Developer setup tooling exists. The native app, GUI/emulator and live
-CLI/device integrations are not implemented yet. Build the GUI/emulator
-before connecting live integrations.
+Developer setup tooling and an emulator-only native menu bar/manager scaffold
+exist. Controls/lighting simulation and live CLI/device integrations are not
+implemented yet. Complete the GUI/emulator before connecting live integrations.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -22,11 +22,24 @@ the repository could load it into a real session.
 - `make doctor-xcode`: optional, strict full Xcode/SDK prerequisite check.
 - `make doctor`: read-only local native developer prerequisite report.
 - `make test-doctor`: isolated Node tests for the prerequisite checker.
-- `make check`: current setup-tooling syntax and tests only.
+- `make test-packager`: isolated Node tests for safe app packaging.
+- `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.
+- `make build`: compile the native arm64 executable.
+- `make package`: build/sign an app in a fresh generated output directory.
+- `make smoke-test`: package and construct hidden native UI; no visible launch.
+- `make lint` / `make format`: source checks / Swift formatting.
+- `make check`: lint, Node/Core tests and packaged headless smoke.
 
-No native application build/test command exists yet. Do not describe setup
-checks, an emulator or a HID acknowledgement as qualified app/device support.
+Use `PACKAGE_OUTPUT=build/<new-name>` for a chosen packaging destination.
+Existing apps are never overwritten or deleted. Do not describe headless
+checks, an emulator or a HID acknowledgement as qualified live device support.
 Use command-scoped `DEVELOPER_DIR`; never silently change global `xcode-select`.
+
+`scripts/test-core` uses app-owned SwiftPM caches/configuration, disables
+interactive credentials and strips GitHub/Copilot token variables. It keeps
+the user's global `safe.bareRepository` policy unchanged while permitting only
+SwiftPM-generated bare repositories beneath this checkout for that child test
+command. Do not replace it with a global Git configuration change.
 
 ## Implementation rules
 

@@ -85,6 +85,14 @@ It appeared before build completion; actual test counts and failure exits
 were verified independently. Do not hide the diagnostic, accept nonzero
 build/test exits, or skip rebuilding changed tests to suppress it.
 
+SwiftPM stores source-control dependencies as package-local bare repositories.
+The checked-in test wrapper uses app-owned caches/configuration, disables
+interactive credentials, strips GitHub/Copilot token variables and applies a
+command-scoped `includeIf.gitdir` limited to this checkout. This allows those
+generated repositories without changing the user's global
+`safe.bareRepository=explicit` policy. Do not weaken that policy globally as a
+build workaround.
+
 The read-only `make doctor` checks local native prerequisites; optional
 `make doctor-xcode` strictly checks full Xcode/SDK. Use command-scoped
 `DEVELOPER_DIR` rather than changing global `xcode-select`. Neither command

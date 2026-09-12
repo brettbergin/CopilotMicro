@@ -17,9 +17,9 @@ let package = Package(
             name: "CopilotMicroCoreTests",
             dependencies: [
                 "CopilotMicroCore",
-                .product(name: "Testing", package: "swift-testing")
+                .product(name: "Testing", package: "swift-testing"),
             ]
-        )
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

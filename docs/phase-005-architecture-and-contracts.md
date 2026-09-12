@@ -1,7 +1,8 @@
 # Phase 005: architecture and integration contracts
 
-Status: proposed implementation architecture supporting the agreed product.
-No component described here has been implemented in this repository.
+Status: target architecture supporting the agreed product. The native
+menu bar/manager scaffold, packaging and minimal Core configuration exist;
+the bridge, device and live-session components remain unimplemented.
 
 ## Component boundaries
 

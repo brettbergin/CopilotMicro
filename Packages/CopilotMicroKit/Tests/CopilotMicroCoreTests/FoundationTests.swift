@@ -56,13 +56,15 @@ struct FoundationTests {
         }
     }
 
-    @Test("Missing or mistyped safety fields are not given permissive defaults", arguments: [
-        #"{"mode":"emulator","liveIntegrationsEnabled":false}"#,
-        #"{"schemaVersion":1,"mode":"emulator"}"#,
-        #"{"schemaVersion":1,"liveIntegrationsEnabled":false}"#,
-        #"{"schemaVersion":1,"mode":"emulator","liveIntegrationsEnabled":"false"}"#,
-        #"{"schemaVersion":"1","mode":"emulator","liveIntegrationsEnabled":false}"#,
-    ])
+    @Test(
+        "Missing or mistyped safety fields are not given permissive defaults",
+        arguments: [
+            #"{"mode":"emulator","liveIntegrationsEnabled":false}"#,
+            #"{"schemaVersion":1,"mode":"emulator"}"#,
+            #"{"schemaVersion":1,"liveIntegrationsEnabled":false}"#,
+            #"{"schemaVersion":1,"mode":"emulator","liveIntegrationsEnabled":"false"}"#,
+            #"{"schemaVersion":"1","mode":"emulator","liveIntegrationsEnabled":false}"#,
+        ])
     func malformedConfigurationIsRejected(json: String) throws {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(EmulatorConfiguration.self, from: Data(json.utf8))
