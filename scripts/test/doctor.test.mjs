@@ -338,6 +338,26 @@ test("an older SDK or Node runtime does not pass the declared tooling floor", ()
   assert.equal(check(report(fixture({ nodeVersion: "not-a-version" })), "node").status, "BLOCKED");
 });
 
+test("Swift below 6 blocks an explicit selection and discovery can choose a qualified alternate", () => {
+  const fake = fixture({
+    installations: [XCODE, ALTERNATE],
+    overrides: {
+      [`${XCODE}:/usr/bin/xcrun --sdk macosx swift --version`]:
+        ok("Apple Swift version 5.10 (swiftlang-5.10)\n"),
+    },
+  });
+  const explicit = report(fake, ["--developer-dir", XCODE]);
+  assert.equal(explicit.status, "BLOCKED");
+  assert.equal(explicit.exitCode, 1);
+  assert.equal(explicit.developerDirectory, XCODE);
+  assert.equal(check(explicit, "swift").status, "BLOCKED");
+  assert.equal(explicit.developerDirectoryAttempts[0].reason, "swift_requires_6");
+  assert.equal(explicit.developerDirectoryAttempts.length, 1);
+  const discovered = report(fake);
+  assert.equal(discovered.status, "READY");
+  assert.equal(discovered.developerDirectory, ALTERNATE);
+});
+
 test("unexpected version output is not accepted or copied into reports", () => {
   const fake = fixture({ overrides: {
     "/usr/bin/xcodebuild -version": ok("secret-token-marker"),

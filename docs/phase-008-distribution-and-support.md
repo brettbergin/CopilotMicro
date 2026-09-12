@@ -65,6 +65,12 @@ native app/XCTest workflow. The research machine's command-line-tools-only
 installation could compile the reference release but could not compile
 XCTest. Installing/updating developer tools is not part of end-user setup.
 
+The repository's read-only `make doctor-xcode` checks full Xcode and its macOS
+SDK; `make doctor` checks the broader developer prerequisites. Use
+`DEVELOPER_DIR` for a command-scoped selection rather than changing global
+`xcode-select`. Neither command installs tools, logs into Copilot or qualifies
+live integrations. See the [README setup guide](../README.md#developer-setup).
+
 ## Managed bridge lifecycle
 
 Use a uniquely named user-scoped extension in the location documented by the

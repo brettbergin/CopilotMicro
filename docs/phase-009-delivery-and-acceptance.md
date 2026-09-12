@@ -5,20 +5,23 @@ or qualified merely because it appears in this document.
 
 ## Delivery strategy
 
-Build reversible, observable vertical slices before a broad UI. Preserve the
-complete agreed scope while reporting unsupported integrations explicitly.
-Do not replace a missing capability with a dangerous shortcut.
+The implementation interview selected GUI/emulator-first: begin with guided
+full Xcode setup, then the native shell and deterministic simulated behavior.
+Introduce live integrations only after their contracts and safety gates are
+qualified. Preserve the complete agreed scope and report unsupported
+integrations explicitly; do not replace them with dangerous shortcuts.
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
-| 0. Contract probes | Exact CLI/terminal/firmware qualification and unsupported-feature ledger | Session identity, native actions, state/visibility evidence and versions recorded without touching production work |
-| 1. Session bridge | Trusted CLI-hosted extension plus private local IPC and mock receiver | Two disposable sessions demonstrate isolation, state correlation, replacement and reconnect |
-| 2. Pure model/emulator | State projection, physical control model, action guards and negative-case device simulator | Deterministic tests cover modes, attention sets, completion, focus consumption, duplicate input and malformed data |
-| 3. Real device slice | Backed-up managed map, one action and visible mode/activity lighting | USB and Bluetooth behavior, read-back and original-map restoration exercised |
-| 4. Native product shell | Guided onboarding, menu panel, manager, editor, local settings and project chooser | A teammate completes setup/recovery without a raw RPC console |
+| 0. Developer foundation | Guided full Xcode setup and reproducible native build/test tooling | Real Xcode/SDK prerequisites and scaffold checks succeed |
+| 1. Native GUI/emulator | Menu panel, manager, editor, deterministic state/input model and isolated simulator | Core journeys are accessible and clearly simulated; no HID/CLI side effects |
+| 2. Contract probes | Exact CLI/terminal/firmware qualification and unsupported-feature ledger | Session identity, native actions, state/visibility evidence and versions recorded without touching production work |
+| 3. Session bridge | Trusted CLI-hosted extension plus private local IPC and mock receiver | Two disposable sessions demonstrate isolation, state correlation, replacement and reconnect |
+| 4. Real device slice | Backed-up managed map, one action and visible mode/activity lighting | USB and Bluetooth behavior, read-back and original-map restoration exercised |
 | 5. Qualified controls | Session lifecycle, model/effort, input, voice and guarded permissions | Each enabled feature has terminal-specific evidence and safety tests |
-| 6. Internal distribution | Packaged app, compatible bridge, private diagnostics and approved updater | Install/update/uninstall/recovery exercised; gaps disclosed |
-| 7. Internal release | Polished supported subset and a complete delivery report | Every shipped feature passes its acceptance cases; remaining intended features are clearly unavailable |
+| 6. Complete product journeys | Live onboarding, settings, configuration/restore, diagnostics and optional notifications/login | A teammate completes real setup/recovery without a raw RPC console |
+| 7. Internal distribution | Packaged app, compatible bridge, private diagnostics and approved updater | Install/update/uninstall/recovery exercised; gaps disclosed |
+| 8. Internal release | Polished supported subset and a complete delivery report | Every shipped feature passes its acceptance cases; remaining intended features are clearly unavailable |
 
 Signing/notarization is a later milestone. It must not be accidentally made
 a prerequisite for the stakeholder's initial ad-hoc internal distribution,
@@ -134,9 +137,10 @@ Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
 compile does not qualify app onboarding or permissions.
 
-Use the canonical build/test/lint commands established when source scaffolding
-lands. This docs-only repository has no application build or test commands yet.
-Do not document nonexistent checks as already passing.
+Use the canonical build/test/lint commands established as source scaffolding
+lands. Currently `make check` covers developer setup tooling only; no native
+application build/test command exists yet. Do not document nonexistent checks
+as already passing or confuse prerequisite checks with application validation.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence

@@ -23,7 +23,7 @@ export const HELP = `Usage: scripts/doctor [--phase xcode|development] [--develo
 Read-only, local developer prerequisite checks for Copilot Micro.
 
   --phase xcode        I-00 setup: Apple Silicon, macOS Tahoe 26.x, full Xcode,
-                       a macOS SDK >= 26, Swift, and Node.js >= 18.
+                       a macOS SDK >= 26, Swift >= 6, and Node.js >= 18.
                        XcodeGen is reported but is not a blocker in this phase.
   --phase development  Default: the setup checks plus required XcodeGen.
   --developer-dir PATH An absolute Xcode .app or its Contents/Developer directory.
@@ -252,7 +252,8 @@ export function probeDeveloperDirectory(candidate, { run, fs, env }) {
     /^(?:Apple )?Swift version (\d+(?:\.\d+){1,2})(?:\s|$)/u);
   const reason = !sdkVersion.ok ? `sdk_${sdkVersion.reason}` :
     Number(sdkVersion.version.split(".")[0]) < 26 ? "sdk_requires_tahoe" :
-      !swift.ok ? `swift_${swift.reason}` : null;
+      !swift.ok ? `swift_${swift.reason}` :
+        Number(swift.version.split(".")[0]) < 6 ? "swift_requires_6" : null;
   return {
     ok: reason === null,
     reason,
@@ -358,11 +359,12 @@ export function collectReport(options, {
         Number(sdkVersion.version.split(".")[0]) >= 26 ? "PASS" : "BLOCKED",
         `macOS SDK ${sdkVersion.version}; SDK >= 26 is required for the Tahoe target.`,
         { version: sdkVersion.version, path: chosen.sdkPath }));
-    checks.push(swift.ok
-      ? check("swift", "native-build", true, "PASS",
-        `Swift ${swift.version} from the chosen Xcode; no shipping toolchain pin is asserted.`,
-        { version: swift.version })
-      : unavailableVersion("swift", "native-build", true, swift));
+    checks.push(!swift.ok
+      ? unavailableVersion("swift", "native-build", true, swift)
+      : check("swift", "native-build", true,
+        Number(swift.version.split(".")[0]) >= 6 ? "PASS" : "BLOCKED",
+        `Swift ${swift.version} from the chosen Xcode; Swift >= 6 is required, not a shipping pin.`,
+        { version: swift.version }));
   } else {
     checks.push(check("xcode", "native-build", true, "BLOCKED",
       "No usable full Xcode app. Install full Xcode separately, finish its setup, then rerun " +

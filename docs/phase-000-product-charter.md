@@ -1,6 +1,7 @@
 # Phase 000: product charter
 
-Status: agreed product direction; implementation not started.
+Status: agreed product direction; developer setup tooling started, native app
+not yet implemented.
 Decision date: 2026-09-11.
 Product: Copilot Micro.
 Repository: `github-app-micro2`.
