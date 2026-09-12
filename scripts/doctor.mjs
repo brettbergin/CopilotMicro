@@ -14,7 +14,10 @@ export const LIMITS = Object.freeze({
 
 export const SCOPE =
   "Developer prerequisites only. No app, CLI, terminal, emulator or hardware " +
-  "qualification. No login/authentication or extension checks are performed.";
+  "qualification. Native test runners, UI automation and signed distribution are " +
+  "not checked. No login/authentication or extension checks are performed.";
+
+const CLT_DIRECTORY = "/Library/Developer/CommandLineTools";
 
 export const HELP = `Usage: scripts/doctor [--phase xcode|development] [--developer-dir PATH] [--json]
        scripts/doctor --help
@@ -22,22 +25,29 @@ export const HELP = `Usage: scripts/doctor [--phase xcode|development] [--develo
 
 Read-only, local developer prerequisite checks for Copilot Micro.
 
-  --phase xcode        I-00 setup: Apple Silicon, macOS Tahoe 26.x, full Xcode,
-                       a macOS SDK >= 26, Swift >= 6, and Node.js >= 18.
-                       XcodeGen is reported but is not a blocker in this phase.
-  --phase development  Default: the setup checks plus required XcodeGen.
-  --developer-dir PATH An absolute Xcode .app or its Contents/Developer directory.
+  --phase development  Default: Apple Silicon, macOS Tahoe 26.x, a usable CLT or
+                       full Xcode toolchain, macOS SDK >= 26, Swift >= 6 and
+                       Node.js >= 18. Full Xcode is not required for this route.
+  --phase xcode        Strict full-Xcode prerequisites for Xcode-only tooling,
+                       with the same host, SDK, Swift and Node version floors.
+  --developer-dir PATH An absolute CommandLineTools directory, Xcode .app or
+                       its Contents/Developer directory.
                        Overrides DEVELOPER_DIR. An invalid override is BLOCKED,
                        never silently replaced by another installation.
   --json               Stable JSON report (no timestamps or raw command output).
   --help, -h           Show this help without running probes.
 
-Without an override, inspect Xcode*.app directly in /Applications and
-~/Applications, in that order. The current global xcode-select setting is
-reported, never changed. Each candidate must pass scoped xcodebuild and macOS
-SDK probes; a .app name or Command Line Tools installation is not sufficient.
+Without an override, validate the observed global xcode-select directory first.
+If unsuitable, development tries /Library/Developer/CommandLineTools, followed
+by Xcode*.app directly in /Applications and ~/Applications. The strict xcode
+phase only accepts full Xcode. The global selection is never changed.
+Every accepted candidate must pass scoped SDK path/version and Swift
+path/version probes; names alone are not proof. Full Xcode also requires a
+successful xcodebuild -version probe. SDK and Swift must belong to the selected
+developer directory. XcodeGen is optional in both phases, not a SwiftPM blocker.
 Discovery examines at most ${LIMITS.applicationEntries} entries per location and
-${LIMITS.developerCandidates} candidates. PATH lookup examines at most ${LIMITS.pathEntries} entries.
+${LIMITS.developerCandidates} candidates total, including the global selection and CLT.
+PATH lookup examines at most ${LIMITS.pathEntries} entries.
 Each subprocess has a ${LIMITS.timeoutMs} ms timeout and ${LIMITS.outputBytes}-byte output limit.
 
 Copilot and gh are optional version-only probes for later live CLI and private
@@ -123,6 +133,16 @@ export function inspectDirectory(directory, fs = nodeFS) {
   }
 }
 
+export function inspectExecutable(executable, fs = nodeFS) {
+  try {
+    fs.accessSync(executable, fs.constants.X_OK);
+    if (!fs.statSync(executable).isFile()) return { ok: false, reason: "not_file" };
+    return { ok: true, path: fs.realpathSync(executable) };
+  } catch (error) {
+    return { ok: false, reason: failureReason(error) };
+  }
+}
+
 export function listXcodeApps(directory, fs = nodeFS) {
   let handle;
   try {
@@ -162,6 +182,7 @@ export function findExecutable(name, searchPath, fs = nodeFS) {
 
 const realFilesystem = {
   directory: inspectDirectory,
+  file: inspectExecutable,
   applications: listXcodeApps,
   executable: findExecutable,
 };
@@ -178,9 +199,15 @@ export function probeEnvironment(env, home) {
   return result;
 }
 
-export function discoverDeveloperDirectories(fs, home) {
+function developerDirectoryPath(candidate) {
+  return candidate.endsWith(".app") || candidate.endsWith(".app/")
+    ? path.join(candidate, "Contents", "Developer")
+    : path.normalize(candidate).replace(/\/$/u, "");
+}
+
+export function discoverDeveloperDirectories(fs, home, { phase = "development", attempted = [] } = {}) {
   const locations = [...new Set(["/Applications", path.join(home, "Applications")])];
-  const candidates = [];
+  const candidates = phase === "development" ? [CLT_DIRECTORY] : [];
   const discovery = [];
   for (const location of locations) {
     const result = fs.applications(location);
@@ -198,10 +225,13 @@ export function discoverDeveloperDirectories(fs, home) {
       candidates.push(...apps.map((app) => path.join(app, "Contents", "Developer")));
     }
   }
+  const excluded = new Set(attempted.map(developerDirectoryPath));
+  const remaining = [...new Set(candidates)].filter((candidate) => !excluded.has(candidate));
+  const budget = Math.max(0, LIMITS.developerCandidates - attempted.length);
   return {
-    candidates: candidates.slice(0, LIMITS.developerCandidates),
+    candidates: remaining.slice(0, budget),
     discovery,
-    limited: candidates.length > LIMITS.developerCandidates || discovery.some((item) => item.limited),
+    limited: remaining.length > budget || discovery.some((item) => item.limited),
   };
 }
 
@@ -218,38 +248,42 @@ function versionProbe(run, command, args, env, pattern) {
   return match ? { ok: true, version: match[1] } : { ok: false, reason: "unrecognized_version" };
 }
 
-export function probeDeveloperDirectory(candidate, { run, fs, env }) {
+export function probeDeveloperDirectory(candidate, { run, fs, env, phase = "development" }) {
   if (!path.isAbsolute(candidate) || /[\u0000-\u001f\u007f]/u.test(candidate)) {
     return { ok: false, directory: candidate, reason: "invalid_path" };
   }
-  const directory = candidate.endsWith(".app") || candidate.endsWith(".app/")
-    ? path.join(candidate, "Contents", "Developer")
-    : path.normalize(candidate).replace(/\/$/u, "");
-  if (!/\.app\/Contents\/Developer$/u.test(directory)) {
-    return { ok: false, directory, reason: "not_full_xcode_app" };
-  }
+  const directory = developerDirectoryPath(candidate);
   const resolved = fs.directory(directory);
   if (!resolved.ok) return { ok: false, directory, reason: resolved.reason };
+  const kind = /\.app\/Contents\/Developer$/u.test(resolved.path) ? "xcode" :
+    path.basename(resolved.path) === "CommandLineTools" ? "command-line-tools" : null;
+  if (!kind || (phase === "xcode" && kind !== "xcode")) {
+    return { ok: false, directory: resolved.path, kind,
+      reason: phase === "xcode" ? "not_full_xcode_app" : "unsupported_developer_directory" };
+  }
   const scopedEnv = { ...env, DEVELOPER_DIR: resolved.path };
-  const xcode = versionProbe(run, "/usr/bin/xcodebuild", ["-version"], scopedEnv,
-    /^Xcode (\d+(?:\.\d+){1,2})(?:\n|$)/u);
-  if (!xcode.ok) return { ok: false, directory: resolved.path, reason: `xcodebuild_${xcode.reason}` };
+  let xcodeVersion = null;
+  if (kind === "xcode") {
+    const xcode = versionProbe(run, "/usr/bin/xcodebuild", ["-version"], scopedEnv,
+      /^Xcode (\d+(?:\.\d+){1,2})(?:\n|$)/u);
+    if (!xcode.ok) return { ok: false, directory: resolved.path, kind, reason: `xcodebuild_${xcode.reason}` };
+    xcodeVersion = xcode.version;
+  }
   const sdk = run("/usr/bin/xcrun", ["--sdk", "macosx", "--show-sdk-path"], scopedEnv);
-  if (!sdk.ok) return { ok: false, directory: resolved.path, reason: `sdk_${sdk.reason}` };
+  if (!sdk.ok) return { ok: false, directory: resolved.path, kind, reason: `sdk_${sdk.reason}` };
   const sdkPath = sdk.stdout.trim();
   if (!path.isAbsolute(sdkPath) || /[\u0000-\u001f\u007f]/u.test(sdkPath)) {
-    return { ok: false, directory: resolved.path, reason: "sdk_invalid_path" };
+    return { ok: false, directory: resolved.path, kind, reason: "sdk_invalid_path" };
   }
   const resolvedSDK = fs.directory(sdkPath);
-  if (!resolvedSDK.ok) return { ok: false, directory: resolved.path, reason: `sdk_${resolvedSDK.reason}` };
+  if (!resolvedSDK.ok) return { ok: false, directory: resolved.path, kind, reason: `sdk_${resolvedSDK.reason}` };
   if (!within(resolved.path, resolvedSDK.path)) {
-    return { ok: false, directory: resolved.path, reason: "sdk_outside_selected_xcode" };
+    return { ok: false, directory: resolved.path, kind,
+      reason: kind === "xcode" ? "sdk_outside_selected_xcode" : "sdk_outside_selected_clt" };
   }
   const sdkVersion = versionProbe(run, "/usr/bin/xcrun",
     ["--sdk", "macosx", "--show-sdk-version"], scopedEnv, /^(\d+(?:\.\d+){1,2})$/u);
-  const swift = versionProbe(run, "/usr/bin/xcrun",
-    ["--sdk", "macosx", "swift", "--version"], scopedEnv,
-    /^(?:Apple )?Swift version (\d+(?:\.\d+){1,2})(?:\s|$)/u);
+  const swift = probeSwift(resolved.path, { run, fs, env: scopedEnv });
   const reason = !sdkVersion.ok ? `sdk_${sdkVersion.reason}` :
     Number(sdkVersion.version.split(".")[0]) < 26 ? "sdk_requires_tahoe" :
       !swift.ok ? `swift_${swift.reason}` :
@@ -258,11 +292,28 @@ export function probeDeveloperDirectory(candidate, { run, fs, env }) {
     ok: reason === null,
     reason,
     directory: resolved.path,
-    xcodeVersion: xcode.version,
+    kind,
+    xcodeVersion,
     sdkPath: resolvedSDK.path,
     sdkVersion,
     swift,
   };
+}
+
+function probeSwift(directory, { run, fs, env }) {
+  const location = run("/usr/bin/xcrun", ["--sdk", "macosx", "--find", "swift"], env);
+  if (!location.ok) return { ok: false, reason: `path_${location.reason}` };
+  const swiftPath = location.stdout.trim();
+  if (!path.isAbsolute(swiftPath) || /[\u0000-\u001f\u007f]/u.test(swiftPath)) {
+    return { ok: false, reason: "invalid_path" };
+  }
+  const resolved = fs.file(swiftPath);
+  if (!resolved.ok) return { ok: false, reason: `path_${resolved.reason}` };
+  if (!within(directory, resolved.path)) return { ok: false, reason: "outside_selected_toolchain" };
+  const version = versionProbe(run, "/usr/bin/xcrun",
+    ["--sdk", "macosx", "swift", "--version"], env,
+    /^(?:Apple )?Swift version (\d+(?:\.\d+){1,2})(?:\s|$)/u);
+  return version.ok ? { ...version, path: resolved.path } : version;
 }
 
 function check(id, group, required, status, message, data = {}) {
@@ -290,7 +341,7 @@ export function collectReport(options, {
   let globalDeveloperDirectory = null;
   let selectionProbe = "not_macos";
   let developerDirectory = null;
-  const source = options.developerDir !== null ? "argument" :
+  let source = options.developerDir !== null ? "argument" :
     Object.hasOwn(env, "DEVELOPER_DIR") ? "environment" : "discovery";
   const attempts = [];
   let discovery = [];
@@ -325,19 +376,26 @@ export function collectReport(options, {
       selectionProbe = selected.ok ? "invalid_path" : selected.reason;
     }
 
-    let candidates;
+    const attemptCandidate = (candidate, candidateSource) => {
+      const attempt = probeDeveloperDirectory(candidate, { run, fs, env: probeEnv, phase: options.phase });
+      attempts.push({ ...attempt, source: candidateSource });
+      return attempt.ok;
+    };
     if (source !== "discovery") {
-      candidates = [options.developerDir ?? env.DEVELOPER_DIR];
+      attemptCandidate(options.developerDir ?? env.DEVELOPER_DIR, source);
     } else {
-      const found = discoverDeveloperDirectories(fs, home);
-      candidates = found.candidates;
-      discovery = found.discovery;
-      discoveryLimited = found.limited;
-    }
-    for (const candidate of candidates) {
-      const attempt = probeDeveloperDirectory(candidate, { run, fs, env: probeEnv });
-      attempts.push(attempt);
-      if (attempt.ok) break;
+      const currentUsable = globalDeveloperDirectory !== null &&
+        attemptCandidate(globalDeveloperDirectory, "global-selection");
+      if (!currentUsable) {
+        const found = discoverDeveloperDirectories(fs, home, {
+          phase: options.phase, attempted: attempts.map((attempt) => attempt.directory),
+        });
+        discovery = found.discovery;
+        discoveryLimited = found.limited;
+        for (const candidate of found.candidates) {
+          if (attemptCandidate(candidate, "discovery")) break;
+        }
+      }
     }
   } else {
     checks.push(check("macos", "host", true, "BLOCKED",
@@ -347,11 +405,15 @@ export function collectReport(options, {
   }
 
   const chosen = attempts.find((attempt) => attempt.ok) ?? attempts.find((attempt) => attempt.sdkPath);
+  const toolchainCheck = options.phase === "xcode" ? "xcode" : "developer-toolchain";
   if (chosen) {
     developerDirectory = chosen.directory;
-    checks.push(check("xcode", "native-build", true, "PASS",
-      `Full Xcode ${chosen.xcodeVersion} passed the scoped Xcode and SDK path probes.`,
-      { version: chosen.xcodeVersion, developerDirectory }));
+    source = chosen.source;
+    checks.push(check(toolchainCheck, "native-build", true, "PASS",
+      chosen.kind === "xcode"
+        ? `Full Xcode ${chosen.xcodeVersion} passed the scoped Xcode and SDK path probes.`
+        : "Command Line Tools passed the scoped SDK path probe; full Xcode is not required for development.",
+      { kind: chosen.kind, xcodeVersion: chosen.xcodeVersion, developerDirectory }));
     const { sdkVersion, swift } = chosen;
     checks.push(!sdkVersion.ok
       ? unavailableVersion("macos-sdk", "native-build", true, sdkVersion)
@@ -363,16 +425,20 @@ export function collectReport(options, {
       ? unavailableVersion("swift", "native-build", true, swift)
       : check("swift", "native-build", true,
         Number(swift.version.split(".")[0]) >= 6 ? "PASS" : "BLOCKED",
-        `Swift ${swift.version} from the chosen Xcode; Swift >= 6 is required, not a shipping pin.`,
-        { version: swift.version }));
+        `Swift ${swift.version} from the chosen toolchain; Swift >= 6 is required, not a shipping pin.`,
+        { version: swift.version, path: swift.path }));
   } else {
-    checks.push(check("xcode", "native-build", true, "BLOCKED",
-      "No usable full Xcode app. Install full Xcode separately, finish its setup, then rerun " +
-      "with --developer-dir /Applications/Xcode.app. Command Line Tools are insufficient.",
+    checks.push(check(toolchainCheck, "native-build", true, "BLOCKED",
+      options.phase === "xcode"
+        ? "No usable full Xcode app for the strict xcode phase. Command Line Tools are insufficient " +
+          "for Xcode-only tooling; use the development phase for the CLT/SwiftPM route."
+        : "No usable CLT or full Xcode developer toolchain. A scoped macOS SDK >= 26 and Swift >= 6 " +
+          "are required. Inspect the failed probes and any explicit developer-directory override.",
       { source, discoveryLimited }));
-    for (const [id, label] of [["macos-sdk", "macOS SDK"], ["swift", "Xcode Swift"]]) {
+    for (const [id, label] of [["macos-sdk", "macOS SDK"], ["swift", "Swift"]]) {
       checks.push(check(id, "native-build", true, "BLOCKED",
-        `${label} cannot be verified without a usable full Xcode selection.`, { reason: "xcode_unavailable" }));
+        `${label} cannot be verified without a usable developer selection for this phase.`,
+        { reason: options.phase === "xcode" ? "xcode_unavailable" : "toolchain_unavailable" }));
     }
   }
 
@@ -383,9 +449,9 @@ export function collectReport(options, {
     { version: node?.[1] ?? null, executable: nodeExecutable }));
 
   const tools = [
-    { id: "xcodegen", name: "xcodegen", group: "native-build", required: options.phase === "development",
+    { id: "xcodegen", name: "xcodegen", group: "optional-xcode-project", required: false,
       pattern: /^Version: (\d+\.\d+\.\d+)$/u,
-      note: options.phase === "xcode" ? " Not required during --phase xcode." : " Required for full development." },
+      note: " Optional for generated Xcode projects; not required for the SwiftPM development route." },
     { id: "copilot", name: "copilot", group: "optional-live-cli", required: false,
       pattern: /^(?:(?:GitHub )?Copilot(?: CLI)?(?: version)?\s+)?(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)\.?(?:\r?\n|$)/iu,
       note: " Optional for live CLI integration; login and extensions are not checked." },
@@ -414,6 +480,7 @@ export function collectReport(options, {
     status: blocked ? "BLOCKED" : "READY",
     exitCode: blocked ? 1 : 0,
     developerDirectory,
+    toolchainKind: chosen?.kind ?? null,
     developerDirectorySource: source,
     globalDeveloperDirectory,
     globalSelectionProbe: selectionProbe,
@@ -434,6 +501,7 @@ export function formatReport(report, json = false) {
   if (json) return `${JSON.stringify(report, null, 2)}\n`;
   const lines = [
     `${report.status}: developer prerequisites (phase: ${report.phase})`,
+    `Toolchain kind: ${report.toolchainKind ?? "none verified"}`,
     `Chosen developer directory: ${report.developerDirectory ?? "none"} (${report.developerDirectorySource})`,
     `Global xcode-select directory (unchanged): ${report.globalDeveloperDirectory ?? "unavailable"} (${report.globalSelectionProbe})`,
     ...report.checks.map((item) => `[${item.status}] ${item.id}: ${item.message}`),

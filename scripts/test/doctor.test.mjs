@@ -10,6 +10,7 @@ import {
   findExecutable,
   formatReport,
   inspectDirectory,
+  inspectExecutable,
   listXcodeApps,
   main,
   parseArguments,
@@ -22,7 +23,10 @@ const HOME = "/Users/developer";
 const XCODE = "/Applications/Xcode.app/Contents/Developer";
 const ALTERNATE = `${HOME}/Applications/Xcode-beta.app/Contents/Developer`;
 const CLT = "/Library/Developer/CommandLineTools";
-const sdkPath = (directory) => `${directory}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk`;
+const sdkPath = (directory) => directory === CLT ? `${directory}/SDKs/MacOSX26.5.sdk` :
+  `${directory}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk`;
+const swiftPath = (directory) => directory === CLT ? `${directory}/usr/bin/swift` :
+  `${directory}/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift`;
 const ok = (stdout) => ({ ok: true, stdout });
 const failed = (reason = "nonzero_exit") => ({ ok: false, reason });
 const check = (report, id) => report.checks.find((item) => item.id === id);
@@ -37,6 +41,7 @@ function fixture({
   appleSilicon = "1",
   sdk = "26.0",
   nodeVersion = "v25.8.2",
+  globalSelection = CLT,
   env = {},
 } = {}) {
   const calls = [];
@@ -44,12 +49,16 @@ function fixture({
   const directories = new Map(installations.flatMap((directory) => [
     [directory, directory], [sdkPath(directory), sdkPath(directory)],
   ]));
+  const files = new Map(installations.map((directory) => [swiftPath(directory), swiftPath(directory)]));
   const deps = {
     platform, arch, nodeVersion, nodeExecutable: "/tools/node", home: HOME,
     env: { PATH: "/tools:/usr/bin:/bin", GH_TOKEN: "secret-token-marker", ...env },
     fs: {
       directory(directory) {
         return directories.has(directory) ? { ok: true, path: directories.get(directory) } : failed("not_found");
+      },
+      file(file) {
+        return files.has(file) ? { ok: true, path: files.get(file) } : failed("not_found");
       },
       applications(directory) {
         discoveries.push(directory);
@@ -71,10 +80,11 @@ function fixture({
         case "/usr/bin/sw_vers -productVersion": return ok(`${os}\n`);
         case "/usr/bin/sw_vers -buildVersion": return ok("25G83\n");
         case "/usr/sbin/sysctl -n hw.optional.arm64": return ok(`${appleSilicon}\n`);
-        case "/usr/bin/xcode-select -p": return ok(`${CLT}\n`);
+        case "/usr/bin/xcode-select -p": return globalSelection === null ? failed("not_found") : ok(`${globalSelection}\n`);
         case "/usr/bin/xcodebuild -version": return ok("Xcode 26.0\nBuild version 17A123\n");
         case "/usr/bin/xcrun --sdk macosx --show-sdk-path": return ok(`${sdkPath(environment.DEVELOPER_DIR)}\n`);
         case "/usr/bin/xcrun --sdk macosx --show-sdk-version": return ok(`${sdk}\n`);
+        case "/usr/bin/xcrun --sdk macosx --find swift": return ok(`${swiftPath(environment.DEVELOPER_DIR)}\n`);
         case "/usr/bin/xcrun --sdk macosx swift --version":
           return ok("Apple Swift version 6.3.3 (swiftlang-6.3.3)\nTarget: arm64-apple-macosx26.0\n");
         default: {
@@ -86,7 +96,7 @@ function fixture({
       }
     },
   };
-  return { deps, calls, discoveries, directories };
+  return { deps, calls, discoveries, directories, files };
 }
 
 function report(fake, args = []) {
@@ -109,15 +119,226 @@ test("default development report records actual versions and limits its claims",
   assert.equal(result.exitCode, 0);
   assert.equal(result.phase, "development");
   assert.equal(result.developerDirectory, XCODE);
+  assert.equal(result.toolchainKind, "xcode");
+  assert.equal(check(result, "developer-toolchain").status, "PASS");
   assert.equal(result.globalDeveloperDirectory, CLT);
   assert.deepEqual(check(result, "macos").data, {
     platform: "darwin", version: "26.6.2", build: "25G83", qualificationBaseline: "26.6.2",
   });
   assert.equal(check(result, "swift").data.version, "6.3.3");
   assert.equal(check(result, "copilot").data.version, "1.0.84-5");
-  assert.equal(check(result, "xcodegen").required, true);
+  assert.equal(check(result, "xcodegen").required, false);
   assert.equal(result.scope, SCOPE);
   assert.match(result.scope, /No app, CLI, terminal, emulator or hardware qualification/u);
+  assert.match(result.scope, /Native test runners, UI automation and signed distribution are not checked/u);
+});
+
+test("default development accepts genuine CLT with SDK >= 26 and Swift >= 6 without optional tools", () => {
+  const fake = fixture({ installations: [CLT], sdk: "26.5", tools: {} });
+  const result = report(fake);
+  assert.equal(result.status, "READY");
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.developerDirectory, CLT);
+  assert.equal(result.developerDirectorySource, "global-selection");
+  assert.equal(result.toolchainKind, "command-line-tools");
+  assert.equal(check(result, "developer-toolchain").data.xcodeVersion, null);
+  assert.equal(check(result, "macos-sdk").data.version, "26.5");
+  assert.equal(check(result, "macos-sdk").data.path, sdkPath(CLT));
+  assert.equal(check(result, "swift").data.version, "6.3.3");
+  assert.equal(check(result, "swift").data.path, swiftPath(CLT));
+  assert.equal(check(result, "xcodegen").status, "DEFERRED");
+  for (const id of ["xcodegen", "copilot", "gh"]) assert.equal(check(result, id).required, false);
+  assert.deepEqual(fake.discoveries, []);
+  assert.ok(!fake.calls.some((call) => call.command === "/usr/bin/xcodebuild"));
+  assert.deepEqual(fake.calls.filter((call) => call.command === "/usr/bin/xcrun").map((call) => call.args), [
+    ["--sdk", "macosx", "--show-sdk-path"],
+    ["--sdk", "macosx", "--show-sdk-version"],
+    ["--sdk", "macosx", "--find", "swift"],
+    ["--sdk", "macosx", "swift", "--version"],
+  ]);
+  for (const call of fake.calls) {
+    if (call.command === "/usr/bin/xcrun") assert.equal(call.env.DEVELOPER_DIR, CLT);
+    assert.equal(Object.hasOwn(call.env, "GH_TOKEN"), false);
+  }
+  assert.deepEqual(fake.calls.filter((call) => call.command === "/usr/bin/xcode-select")
+    .map((call) => call.args), [["-p"]]);
+  assert.match(formatReport(result), /Toolchain kind: command-line-tools/u);
+  assert.match(formatReport(result), /Native test runners, UI automation and signed distribution are not checked/u);
+});
+
+test("explicit CLT and environment overrides take precedence over a usable global Xcode selection", () => {
+  for (const [args, env, source] of [
+    [["--developer-dir", `${CLT}/`], { DEVELOPER_DIR: XCODE }, "argument"],
+    [[], { DEVELOPER_DIR: CLT }, "environment"],
+  ]) {
+    const fake = fixture({ installations: [CLT, XCODE], globalSelection: XCODE, env });
+    const result = report(fake, args);
+    assert.equal(result.status, "READY");
+    assert.equal(result.toolchainKind, "command-line-tools");
+    assert.equal(result.developerDirectory, CLT);
+    assert.equal(result.developerDirectorySource, source);
+    assert.equal(result.globalDeveloperDirectory, XCODE);
+    assert.equal(result.developerDirectoryAttempts.length, 1);
+    assert.deepEqual(fake.discoveries, []);
+    assert.ok(!fake.calls.some((call) => call.command === "/usr/bin/xcodebuild"));
+  }
+});
+
+for (const [command, output, id, reason] of [
+  ["/usr/bin/xcrun --sdk macosx --show-sdk-path", failed("not_found"), "developer-toolchain", "sdk_not_found"],
+  ["/usr/bin/xcrun --sdk macosx --show-sdk-version", failed("not_found"), "macos-sdk", "sdk_not_found"],
+  ["/usr/bin/xcrun --sdk macosx --show-sdk-version", ok("25.0\n"), "macos-sdk", "sdk_requires_tahoe"],
+  ["/usr/bin/xcrun --sdk macosx --show-sdk-version", ok("unrecognized"), "macos-sdk", "sdk_unrecognized_version"],
+  ["/usr/bin/xcrun --sdk macosx --find swift", failed("not_found"), "swift", "swift_path_not_found"],
+  ["/usr/bin/xcrun --sdk macosx swift --version", failed("not_found"), "swift", "swift_not_found"],
+  ["/usr/bin/xcrun --sdk macosx swift --version", ok("Apple Swift version 5.10\n"), "swift", "swift_requires_6"],
+  ["/usr/bin/xcrun --sdk macosx swift --version", ok("unrecognized"), "swift", "swift_unrecognized_version"],
+]) {
+  test(`explicit CLT rejects ${reason} without falling back to installed Xcode`, () => {
+    for (const environmentOverride of [false, true]) {
+      const fake = fixture({
+        installations: [CLT, XCODE], globalSelection: XCODE,
+        env: environmentOverride ? { DEVELOPER_DIR: CLT } : {},
+        overrides: { [`${CLT}:${command}`]: output },
+      });
+      const result = report(fake, environmentOverride ? [] : ["--developer-dir", CLT]);
+      assert.equal(result.status, "BLOCKED");
+      assert.equal(result.exitCode, 1);
+      assert.equal(check(result, id).status, "BLOCKED");
+      assert.equal(result.developerDirectoryAttempts[0].reason, reason);
+      assert.equal(result.developerDirectoryAttempts.length, 1);
+      assert.deepEqual(fake.discoveries, []);
+      assert.ok(!fake.calls.some((call) => call.command === "/usr/bin/xcodebuild"));
+    }
+  });
+}
+
+test("CLT SDK and Swift paths must exist and belong to the selected developer directory", () => {
+  for (const [target, failure] of [
+    ["sdk-missing", "sdk_not_found"],
+    ["sdk-external", "sdk_outside_selected_clt"],
+    ["swift-missing", "swift_path_not_found"],
+    ["swift-external", "swift_outside_selected_toolchain"],
+  ]) {
+    const fake = fixture({ installations: [CLT, XCODE] });
+    if (target === "sdk-missing") fake.directories.delete(sdkPath(CLT));
+    if (target === "sdk-external") fake.directories.set(sdkPath(CLT), sdkPath(XCODE));
+    if (target === "swift-missing") fake.files.delete(swiftPath(CLT));
+    if (target === "swift-external") fake.files.set(swiftPath(CLT), swiftPath(XCODE));
+    const result = report(fake, ["--developer-dir", CLT]);
+    assert.equal(result.status, "BLOCKED");
+    assert.equal(result.developerDirectoryAttempts[0].reason, failure);
+    assert.equal(result.developerDirectoryAttempts.length, 1);
+  }
+});
+
+test("a usable observed global selection wins over all common CLT and Xcode discovery", () => {
+  for (const [selection, kind] of [[CLT, "command-line-tools"], [ALTERNATE, "xcode"]]) {
+    const fake = fixture({ installations: [XCODE, CLT, ALTERNATE], globalSelection: selection });
+    const result = report(fake);
+    assert.equal(result.status, "READY");
+    assert.equal(result.developerDirectory, selection);
+    assert.equal(result.developerDirectorySource, "global-selection");
+    assert.equal(result.toolchainKind, kind);
+    assert.equal(result.developerDirectoryAttempts.length, 1);
+    assert.deepEqual(fake.discoveries, []);
+  }
+});
+
+test("absent, malformed or invalid global selection falls back to the standard CLT without global changes", () => {
+  for (const selection of [null, "relative/path", "/Missing/Xcode.app/Contents/Developer"]) {
+    const fake = fixture({ installations: [CLT, XCODE], globalSelection: selection });
+    const result = report(fake);
+    assert.equal(result.status, "READY");
+    assert.equal(result.developerDirectory, CLT);
+    assert.equal(result.developerDirectorySource, "discovery");
+    assert.equal(result.toolchainKind, "command-line-tools");
+    assert.deepEqual(fake.calls.filter((call) => call.command === "/usr/bin/xcode-select")
+      .map((call) => call.args), [["-p"]]);
+  }
+});
+
+test("an unusable global CLT is reported once, then discovery can select a usable full Xcode", () => {
+  const fake = fixture({
+    installations: [CLT, XCODE],
+    overrides: { [`${CLT}:/usr/bin/xcrun --sdk macosx swift --version`]: failed("timed_out") },
+  });
+  const result = report(fake);
+  assert.equal(result.status, "READY");
+  assert.equal(result.developerDirectory, XCODE);
+  assert.equal(result.toolchainKind, "xcode");
+  assert.equal(result.developerDirectorySource, "discovery");
+  assert.deepEqual(result.developerDirectoryAttempts.map((item) => item.directory), [CLT, XCODE]);
+  assert.equal(result.developerDirectoryAttempts[0].reason, "swift_timed_out");
+  assert.equal(result.developerDirectoryAttempts[0].source, "global-selection");
+});
+
+test("an unusable globally selected Xcode falls back to CLT only in development", () => {
+  for (const phase of ["development", "xcode"]) {
+    const fake = fixture({
+      installations: [CLT, XCODE, ALTERNATE], globalSelection: XCODE,
+      overrides: { [`${XCODE}:/usr/bin/xcodebuild -version`]: failed("nonzero_exit") },
+    });
+    const result = report(fake, ["--phase", phase]);
+    assert.equal(result.status, "READY");
+    assert.equal(result.developerDirectory, phase === "development" ? CLT : ALTERNATE);
+    assert.equal(result.toolchainKind, phase === "development" ? "command-line-tools" : "xcode");
+    assert.equal(result.developerDirectoryAttempts[0].reason, "xcodebuild_nonzero_exit");
+  }
+});
+
+test("strict Xcode phase rejects otherwise usable CLT and only selects a genuine full Xcode", () => {
+  const cltOnly = fixture({ installations: [CLT], tools: {} });
+  const blocked = report(cltOnly, ["--phase", "xcode"]);
+  assert.equal(blocked.status, "BLOCKED");
+  assert.equal(check(blocked, "xcode").status, "BLOCKED");
+  assert.equal(blocked.toolchainKind, null);
+  assert.equal(blocked.developerDirectoryAttempts[0].kind, "command-line-tools");
+  assert.equal(blocked.developerDirectoryAttempts[0].reason, "not_full_xcode_app");
+  assert.ok(!cltOnly.calls.some((call) => call.command === "/usr/bin/xcrun"));
+  const full = fixture({ installations: [CLT, XCODE], tools: {} });
+  const ready = report(full, ["--phase", "xcode"]);
+  assert.equal(ready.status, "READY");
+  assert.equal(ready.toolchainKind, "xcode");
+  assert.equal(ready.developerDirectory, XCODE);
+  assert.ok(full.calls.some((call) => call.command === "/usr/bin/xcodebuild"));
+  assert.ok(full.calls.filter((call) => call.command === "/usr/bin/xcrun")
+    .every((call) => call.env.DEVELOPER_DIR === XCODE));
+});
+
+test("the candidate budget includes the global selection and standard CLT", () => {
+  const installations = Array.from({ length: 10 }, (_, index) => `/Applications/Xcode-${index}.app/Contents/Developer`);
+  const fake = fixture({
+    installations,
+    overrides: Object.fromEntries(installations.slice(0, 9).map((directory) => [
+      `${directory}:/usr/bin/xcodebuild -version`, failed("nonzero_exit"),
+    ])),
+  });
+  const result = report(fake);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.discoveryLimited, true);
+  assert.equal(result.developerDirectoryAttempts.length, LIMITS.developerCandidates);
+  assert.equal(result.developerDirectoryAttempts.filter((item) => item.directory === CLT).length, 1);
+  assert.match(formatReport(result), /Discovery limit reached/u);
+  const explicit = report(fake, ["--developer-dir", installations[9]]);
+  assert.equal(explicit.status, "READY");
+  assert.equal(explicit.developerDirectoryAttempts.length, 1);
+});
+
+test("CLT text and JSON agree on READY development versus BLOCKED strict Xcode", () => {
+  for (const phase of ["development", "xcode"]) {
+    const fake = fixture({ installations: [CLT], tools: {} });
+    const text = invoke(["--phase", phase], fake.deps);
+    const json = invoke(["--phase", phase, "--json"], fake.deps);
+    const parsed = JSON.parse(json.stdout);
+    assert.equal(parsed.status, phase === "development" ? "READY" : "BLOCKED");
+    assert.equal(parsed.toolchainKind, phase === "development" ? "command-line-tools" : null);
+    assert.equal(text.exitCode, phase === "development" ? 0 : 1);
+    assert.equal(json.exitCode, text.exitCode);
+    assert.equal(parsed.exitCode, json.exitCode);
+    assert.ok(text.stdout.startsWith(`${parsed.status}: developer prerequisites`));
+    assert.equal(json.stdout, invoke(["--phase", phase, "--json"], fake.deps).stdout);
+  }
 });
 
 test("missing Xcode blocks, even with working Node and optional CLI tools", () => {
@@ -132,8 +353,8 @@ test("missing Xcode blocks, even with working Node and optional CLI tools", () =
 
 test("CLT override is not full Xcode and does not trigger fallback discovery", () => {
   for (const explicit of [true, false]) {
-    const fake = fixture({ env: explicit ? {} : { DEVELOPER_DIR: CLT } });
-    const result = report(fake, explicit ? ["--developer-dir", CLT] : []);
+    const fake = fixture({ installations: [XCODE, CLT], env: explicit ? {} : { DEVELOPER_DIR: CLT } });
+    const result = report(fake, explicit ? ["--phase", "xcode", "--developer-dir", CLT] : ["--phase", "xcode"]);
     assert.equal(result.status, "BLOCKED");
     assert.equal(result.developerDirectoryAttempts[0].reason, "not_full_xcode_app");
     assert.deepEqual(fake.discoveries, []);
@@ -206,7 +427,7 @@ test("discovery tries an alternate full Xcode in the user's Applications directo
   assert.equal(result.status, "READY");
   assert.equal(result.developerDirectory, ALTERNATE);
   assert.equal(result.developerDirectorySource, "discovery");
-  assert.deepEqual(result.developerDirectoryAttempts.map((item) => item.ok), [false, true]);
+  assert.deepEqual(result.developerDirectoryAttempts.map((item) => item.ok), [false, false, true]);
   assert.deepEqual(fake.discoveries, ["/Applications", `${HOME}/Applications`]);
 });
 
@@ -251,7 +472,7 @@ test("SDK path must exist and remain inside the selected Xcode, not point into C
     fake.directories.set(`${CLT}/SDKs/MacOSX.sdk`, `${CLT}/SDKs/MacOSX.sdk`);
     const result = report(fake);
     assert.equal(result.status, "BLOCKED");
-    assert.equal(result.developerDirectoryAttempts[0].reason, expected);
+    assert.equal(result.developerDirectoryAttempts.find((item) => item.directory === XCODE).reason, expected);
     assert.ok(!formatReport(result, true).includes("secret-token-marker"));
   }
 });
@@ -260,11 +481,11 @@ for (const [command, id] of [
   ["/usr/bin/sw_vers -productVersion", "macos"],
   ["/usr/bin/sw_vers -buildVersion", "macos"],
   ["/usr/sbin/sysctl -n hw.optional.arm64", "apple-silicon"],
-  ["/usr/bin/xcodebuild -version", "xcode"],
-  ["/usr/bin/xcrun --sdk macosx --show-sdk-path", "xcode"],
+  ["/usr/bin/xcodebuild -version", "developer-toolchain"],
+  ["/usr/bin/xcrun --sdk macosx --show-sdk-path", "developer-toolchain"],
   ["/usr/bin/xcrun --sdk macosx --show-sdk-version", "macos-sdk"],
+  ["/usr/bin/xcrun --sdk macosx --find swift", "swift"],
   ["/usr/bin/xcrun --sdk macosx swift --version", "swift"],
-  ["/tools/xcodegen --version", "xcodegen"],
 ]) {
   for (const reason of ["nonzero_exit", "timed_out", "output_limit"]) {
     test(`required probe ${command}: ${reason} is BLOCKED`, () => {
@@ -300,16 +521,29 @@ test("optional command failures and missing global selection remain informationa
   assert.equal(check(result, "copilot").status, "OPTIONAL_UNAVAILABLE");
 });
 
-test("XcodeGen is required only in full development, not the I-00 xcode phase", () => {
+test("XcodeGen is optional in both phases, never a SwiftPM prerequisite", () => {
   const fake = fixture({ tools: {} });
   const setup = report(fake, ["--phase", "xcode"]);
   assert.equal(setup.status, "READY");
   assert.equal(check(setup, "xcodegen").required, false);
   assert.equal(check(setup, "xcodegen").status, "DEFERRED");
   const development = report(fake);
-  assert.equal(development.status, "BLOCKED");
-  assert.equal(check(development, "xcodegen").required, true);
-  assert.equal(check(development, "xcodegen").status, "BLOCKED");
+  assert.equal(development.status, "READY");
+  assert.equal(check(development, "xcodegen").required, false);
+  assert.equal(check(development, "xcodegen").status, "DEFERRED");
+});
+
+test("XcodeGen failures remain deferred and preserve reasons in both phases", () => {
+  for (const phase of ["development", "xcode"]) {
+    for (const reason of ["not_found", "nonzero_exit", "timed_out", "output_limit"]) {
+      const result = report(fixture({ overrides: { "/tools/xcodegen --version": failed(reason) } }),
+        ["--phase", phase]);
+      assert.equal(result.status, "READY");
+      assert.equal(check(result, "xcodegen").status, "DEFERRED");
+      assert.equal(check(result, "xcodegen").data.reason, reason);
+      assert.equal(check(result, "xcodegen").required, false);
+    }
+  }
 });
 
 test("macOS eligibility is Tahoe 26.x, not an exact patch match or a qualification claim", () => {
@@ -338,7 +572,7 @@ test("an older SDK or Node runtime does not pass the declared tooling floor", ()
   assert.equal(check(report(fixture({ nodeVersion: "not-a-version" })), "node").status, "BLOCKED");
 });
 
-test("Swift below 6 blocks an explicit selection and discovery can choose a qualified alternate", () => {
+test("Swift below 6 blocks an explicit selection and discovery can choose a usable alternate", () => {
   const fake = fixture({
     installations: [XCODE, ALTERNATE],
     overrides: {
@@ -489,7 +723,8 @@ test("discovery has deterministic ordering, limits and explicit read errors", ()
     },
   }, HOME);
   assert.equal(found.candidates.length, LIMITS.developerCandidates);
-  assert.equal(found.candidates[0], XCODE);
+  assert.equal(found.candidates[0], CLT);
+  assert.equal(found.candidates[1], XCODE);
   assert.equal(found.limited, true);
   assert.equal(found.discovery[1].status, "ERROR");
   const fake = fixture({ installations: [] });
@@ -509,6 +744,23 @@ test("filesystem probes distinguish absent paths and non-directories using only 
   assert.deepEqual(inspectDirectory("/Xcode", {
     statSync: () => ({ isDirectory: () => true }), realpathSync: () => "/resolved",
   }), { ok: true, path: "/resolved" });
+});
+
+test("Swift executable inspection checks file type, access and canonical location with an injected FS", () => {
+  const fs = {
+    constants: { X_OK: 1 },
+    accessSync: () => {},
+    statSync: () => ({ isFile: () => true }),
+    realpathSync: () => `${CLT}/usr/bin/swift-frontend`,
+  };
+  assert.deepEqual(inspectExecutable(swiftPath(CLT), fs),
+    { ok: true, path: `${CLT}/usr/bin/swift-frontend` });
+  assert.deepEqual(inspectExecutable(swiftPath(CLT), {
+    ...fs, statSync: () => ({ isFile: () => false }),
+  }), failed("not_file"));
+  assert.deepEqual(inspectExecutable(swiftPath(CLT), {
+    ...fs, accessSync: () => { throw Object.assign(new Error("not executable"), { code: "EACCES" }); },
+  }), failed("permission_denied"));
 });
 
 test("application enumeration is shallow and bounded, closes handles and reports failures", () => {
@@ -556,6 +808,7 @@ test("shell metacharacters in an explicit installation stay in DEVELOPER_DIR, ne
     ["/usr/bin/xcodebuild", ["-version"]],
     ["/usr/bin/xcrun", ["--sdk", "macosx", "--show-sdk-path"]],
     ["/usr/bin/xcrun", ["--sdk", "macosx", "--show-sdk-version"]],
+    ["/usr/bin/xcrun", ["--sdk", "macosx", "--find", "swift"]],
     ["/usr/bin/xcrun", ["--sdk", "macosx", "swift", "--version"]],
   ]);
   assert.ok(fake.calls.every((call) => call.env.DEVELOPER_DIR === directory));
