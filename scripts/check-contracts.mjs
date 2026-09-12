@@ -154,9 +154,13 @@ export function loadContractCatalogs(root) {
   const actions = readJSON(path.join(contracts, "actions.json"));
   const controls = readJSON(path.join(contracts, "default-controls.json"));
   const schema = readJSON(path.join(contracts, "bridge-v1.schema.json"));
+  const configurationSchema = readJSON(path.join(contracts, "configuration-v1.schema.json"));
+  const portableConfigurationSchema = readJSON(path.join(contracts, "portable-configuration-v1.schema.json"));
   assert.equal(actions.schemaVersion, 1);
   assert.equal(controls.schemaVersion, 1);
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(configurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(portableConfigurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
 
   const actionCatalog = new Map();
   for (const action of actions.actions) {
@@ -190,7 +194,33 @@ export function loadContractCatalogs(root) {
   );
   assert.equal(controls.controls.find((control) => control.id === "key.sessions")?.matrixContacts[0], 1);
   assert.equal(controls.controls.find((control) => control.id === "key.new")?.matrixContacts[0], 0);
-  return { actionCatalog, actions, controls, resultCodes, schema };
+  assert.deepEqual(configurationSchema.$defs.action.enum, actions.actions.map((action) => action.id));
+  assert.deepEqual(
+    configurationSchema.$defs.bindings.required,
+    controls.controls.map((control) => control.id),
+  );
+  assert.equal(configurationSchema.$defs.bindings.additionalProperties, false);
+  assert.equal(portableConfigurationSchema.additionalProperties, false);
+  assert.equal(
+    portableConfigurationSchema.properties.bindings.$ref,
+    "configuration-v1.schema.json#/$defs/bindings",
+  );
+  for (const forbidden of ["terminal", "recentProjectDirectories", "diagnostics", "credentials"]) {
+    assert.equal(
+      Object.hasOwn(portableConfigurationSchema.properties, forbidden),
+      false,
+      `portable configuration exposes ${forbidden}`,
+    );
+  }
+  return {
+    actionCatalog,
+    actions,
+    controls,
+    resultCodes,
+    schema,
+    configurationSchema,
+    portableConfigurationSchema,
+  };
 }
 
 export function runContractChecks(root) {
@@ -250,6 +280,7 @@ export function runContractChecks(root) {
     controlCount: 12,
     fixtureCount: manifest.cases.length,
     resultFixtureCount: resultManifest.cases.length,
+    configurationSchemaCount: 2,
   };
 }
 

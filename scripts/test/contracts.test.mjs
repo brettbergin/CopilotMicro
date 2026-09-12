@@ -21,6 +21,7 @@ test("shared contract catalogs and fixtures pass", () => {
     controlCount: 12,
     fixtureCount: 13,
     resultFixtureCount: 5,
+    configurationSchemaCount: 2,
   });
 });
 

@@ -1,6 +1,9 @@
+import AppKit
 import Combine
 import CopilotMicroCore
+import CopilotMicroStorage
 import Foundation
+import UniformTypeIdentifiers
 
 enum ManagerArea: String, CaseIterable, Identifiable {
     case overview
@@ -124,6 +127,38 @@ struct EmulatorSession: Identifiable, Equatable {
     let detail: String
 }
 
+enum LocalStorageState: Equatable {
+    case disabledForSmoke
+    case loading
+    case ready
+    case recoveryRequired(String)
+    case unavailable(String)
+
+    var label: String {
+        switch self {
+        case .disabledForSmoke:
+            "Disabled for smoke validation"
+        case .loading:
+            "Loading"
+        case .ready:
+            "Saved locally"
+        case .recoveryRequired:
+            "Recovery required"
+        case .unavailable:
+            "Unavailable"
+        }
+    }
+
+    var canEdit: Bool {
+        switch self {
+        case .disabledForSmoke, .ready:
+            true
+        case .loading, .recoveryRequired, .unavailable:
+            false
+        }
+    }
+}
+
 @MainActor
 final class EmulatorStore: ObservableObject {
     let configuration: EmulatorConfiguration
@@ -138,6 +173,7 @@ final class EmulatorStore: ObservableObject {
     @Published private(set) var isPaused = false
     @Published private(set) var brightness = Brightness.defaultValue.value
     @Published private(set) var reducedMotion = false
+    @Published private(set) var notificationsEnabled = false
     @Published private(set) var selectedControl: PhysicalControlID = .sessions
     @Published private(set) var assignments: [PhysicalControlID: ActionID]
     @Published private(set) var selectedSessionIndex = 0
@@ -145,24 +181,55 @@ final class EmulatorStore: ObservableObject {
     @Published private(set) var sessionPickerOpen = false
     @Published private(set) var completionAcknowledged = false
     @Published private(set) var eventLog: [EmulatorLogEntry] = []
+    @Published private(set) var storageState: LocalStorageState
+    @Published private(set) var configurationNotice: String?
+    @Published private(set) var pendingImport: ConfigurationImportPlan?
+    @Published private(set) var configurationMutationInProgress = false
+    @Published private(set) var diagnosticUsage: DiagnosticUsage?
+    @Published private(set) var diagnosticNotice: String?
 
     var onPresentationChange: (@MainActor () -> Void)?
 
+    private let localConfigurationStore: LocalConfigurationStore?
+    private let diagnosticStore: DiagnosticStore?
     private let identifiers: EmulatorIdentifiers?
+    private var storedConfiguration = StoredConfiguration()
+    private var persistenceRevision: UInt64 = 0
     private var nextLogID = 1
     private var simulatedMilliseconds: UInt64 = 0
     private var keyNormalizer = KeyInputNormalizer(wideKeyCoalescingMilliseconds: 50)
 
-    init(configuration: EmulatorConfiguration) {
+    init(
+        configuration: EmulatorConfiguration,
+        localConfigurationStore: LocalConfigurationStore? = nil,
+        diagnosticStore: DiagnosticStore? = nil,
+        initialStorageError: String? = nil
+    ) {
         self.configuration = configuration
-        assignments = Dictionary(
-            uniqueKeysWithValues: PhysicalLayout.creatorMicro2Pro.map { ($0.id, $0.defaultAction) }
-        )
+        self.localConfigurationStore = localConfigurationStore
+        self.diagnosticStore = diagnosticStore
+        storedConfiguration = StoredConfiguration()
+        assignments = storedConfiguration.bindings
+        brightness = storedConfiguration.lighting.brightness
+        reducedMotion = storedConfiguration.lighting.reducedMotion
+        notificationsEnabled = storedConfiguration.preferences.notificationsEnabled
+        if let initialStorageError {
+            storageState = .unavailable(initialStorageError)
+        } else if localConfigurationStore != nil {
+            storageState = .loading
+        } else {
+            storageState = .disabledForSmoke
+        }
         identifiers = try? EmulatorIdentifiers()
         appendLog(
             "Demo environment ready",
             "No HID device, Copilot CLI session, extension, terminal automation, permission or network service was opened."
         )
+        if localConfigurationStore != nil {
+            Task { [weak self] in
+                await self?.loadStoredConfiguration()
+            }
+        }
     }
 
     var selectedSession: EmulatorSession {
@@ -175,6 +242,27 @@ final class EmulatorStore: ObservableObject {
 
     var liveServicesDisabled: Bool {
         configuration.mode == .emulator && !configuration.liveIntegrationsEnabled
+    }
+
+    var canEditConfiguration: Bool {
+        storageState.canEdit && !configurationMutationInProgress
+    }
+
+    var canManagePortableConfiguration: Bool {
+        storageState == .ready && !configurationMutationInProgress
+    }
+
+    var storageStatusDetail: String {
+        switch storageState {
+        case .disabledForSmoke:
+            "Smoke validation uses no application-support files."
+        case .loading:
+            "Reading the versioned local configuration."
+        case .ready:
+            "Version 1 settings are stored atomically with user-only permissions."
+        case .recoveryRequired(let message), .unavailable(let message):
+            message
+        }
     }
 
     var runtimeState: SessionRuntimeState {
@@ -262,18 +350,42 @@ final class EmulatorStore: ObservableObject {
     }
 
     func setBrightness(_ value: Double) {
+        guard canEditConfiguration else {
+            return
+        }
         brightness = min(max(value.isFinite ? value : 0, 0), 1)
+        storedConfiguration.lighting.brightness = brightness
+        persistConfiguration(operation: "brightness")
         presentationDidChange()
     }
 
     func setReducedMotion(_ enabled: Bool) {
+        guard canEditConfiguration else {
+            return
+        }
         reducedMotion = enabled
+        storedConfiguration.lighting.reducedMotion = enabled
         appendLog(
             enabled ? "Reduced motion enabled" : "Reduced motion disabled",
             enabled
                 ? "Busy and attention states use steady colors in the preview."
                 : "Busy blink and attention pulse are enabled in the preview."
         )
+        persistConfiguration(operation: "reduced-motion")
+        presentationDidChange()
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool) {
+        guard canEditConfiguration else {
+            return
+        }
+        notificationsEnabled = enabled
+        storedConfiguration.preferences.notificationsEnabled = enabled
+        appendLog(
+            enabled ? "Notifications enabled" : "Notifications disabled",
+            "This preference is stored locally. Notification delivery is not implemented yet."
+        )
+        persistConfiguration(operation: "notifications")
         presentationDidChange()
     }
 
@@ -294,19 +406,29 @@ final class EmulatorStore: ObservableObject {
     }
 
     func assign(_ action: ActionID, to control: PhysicalControlID) {
+        guard canEditConfiguration else {
+            appendLog("Assignment blocked", storageStatusDetail)
+            return
+        }
         assignments[control] = action
+        storedConfiguration.bindings = assignments
         appendLog(
             "Assignment edited",
             "\(control.displayName) now shows \(action.displayName). No action was executed."
         )
+        persistConfiguration(operation: "assignment")
         presentationDidChange()
     }
 
     func resetAssignments() {
-        assignments = Dictionary(
-            uniqueKeysWithValues: PhysicalLayout.creatorMicro2Pro.map { ($0.id, $0.defaultAction) }
-        )
+        guard canEditConfiguration else {
+            appendLog("Reset blocked", storageStatusDetail)
+            return
+        }
+        assignments = StoredConfiguration.defaultBindings
+        storedConfiguration.bindings = assignments
         appendLog("Assignments reset", "The local demo mapping was reset. No device was written.")
+        persistConfiguration(operation: "reset-assignments")
         presentationDidChange()
     }
 
@@ -406,6 +528,406 @@ final class EmulatorStore: ObservableObject {
         eventLog.removeAll()
         appendLog("Demo diagnostics cleared", "Only the bounded in-memory demo event list was removed.")
         presentationDidChange()
+    }
+
+    func choosePortableImport() {
+        guard storageState == .ready else {
+            configurationNotice = storageStatusDetail
+            return
+        }
+        pendingImport = nil
+        let panel = NSOpenPanel()
+        panel.title = "Import Copilot Micro Configuration"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else {
+                return
+            }
+            Task { @MainActor [weak self] in
+                await self?.prepareImport(from: url)
+            }
+        }
+    }
+
+    func cancelImport() {
+        pendingImport = nil
+        configurationNotice = "Import canceled. The active configuration was not changed."
+        presentationDidChange()
+    }
+
+    func confirmImport() {
+        guard let localConfigurationStore, let plan = pendingImport else {
+            return
+        }
+        guard canManagePortableConfiguration else {
+            configurationNotice = storageStatusDetail
+            return
+        }
+        guard storedConfiguration == plan.baseConfiguration else {
+            pendingImport = nil
+            reportConfigurationOperationError(
+                .staleImportPreview,
+                operation: "import"
+            )
+            return
+        }
+        pendingImport = nil
+        let revision = nextPersistenceRevision()
+        configurationMutationInProgress = true
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            defer {
+                self.configurationMutationInProgress = false
+            }
+            do {
+                let imported = try await localConfigurationStore.applyImport(
+                    plan,
+                    revision: revision
+                )
+                guard self.persistenceRevision == revision else {
+                    self.configurationNotice =
+                        "The import was superseded by newer local settings."
+                    self.presentationDidChange()
+                    return
+                }
+                self.applyStoredConfiguration(imported)
+                self.configurationNotice =
+                    "Imported settings were saved. The previous configuration remains recoverable."
+                self.appendLog(
+                    "Portable configuration imported",
+                    "Validated settings were applied after explicit confirmation."
+                )
+                self.recordDiagnostic(
+                    component: .configuration,
+                    operation: "import",
+                    outcome: .succeeded
+                )
+                self.presentationDidChange()
+            } catch let error as ConfigurationError {
+                self.reportConfigurationOperationError(error, operation: "import")
+            } catch {
+                self.reportConfigurationOperationError(.fileSystem, operation: "import")
+            }
+        }
+    }
+
+    func choosePortableExport() {
+        guard let localConfigurationStore, storageState == .ready else {
+            configurationNotice = storageStatusDetail
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Export Copilot Micro Configuration"
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "copilot-micro-configuration.json"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else {
+                return
+            }
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+                do {
+                    try await localConfigurationStore.writePortable(
+                        self.storedConfiguration,
+                        to: url
+                    )
+                    self.configurationNotice =
+                        "Portable configuration exported. Machine paths and private diagnostics were excluded."
+                    self.appendLog(
+                        "Portable configuration exported",
+                        "Only allowlisted portable settings were written."
+                    )
+                    self.recordDiagnostic(
+                        component: .configuration,
+                        operation: "export",
+                        outcome: .succeeded
+                    )
+                    self.presentationDidChange()
+                } catch let error as ConfigurationError {
+                    self.reportConfigurationOperationError(error, operation: "export")
+                } catch {
+                    self.reportConfigurationOperationError(.fileSystem, operation: "export")
+                }
+            }
+        }
+    }
+
+    func recoverConfigurationWithDefaults() {
+        guard let localConfigurationStore else {
+            return
+        }
+        let revision = nextPersistenceRevision()
+        Task { [weak self] in
+            do {
+                let recovered =
+                    try await localConfigurationStore
+                    .replaceWithDefaultsPreservingOriginal(revision: revision)
+                self?.applyStoredConfiguration(recovered)
+                self?.storageState = .ready
+                self?.configurationNotice =
+                    "Safe defaults were restored. The malformed original remains in local recovery storage."
+                self?.appendLog(
+                    "Configuration recovered",
+                    "Defaults were activated without discarding the malformed original."
+                )
+                self?.recordDiagnostic(
+                    component: .configuration,
+                    operation: "recover",
+                    outcome: .succeeded
+                )
+                self?.presentationDidChange()
+            } catch let error as ConfigurationError {
+                self?.handleConfigurationFailure(error, recoveryRequired: true)
+            } catch {
+                self?.handleConfigurationFailure(.fileSystem, recoveryRequired: true)
+            }
+        }
+    }
+
+    func chooseDiagnosticExport() {
+        guard let diagnosticStore else {
+            diagnosticNotice = "Private diagnostics are disabled for smoke validation."
+            return
+        }
+        let panel = NSSavePanel()
+        panel.title = "Export Redacted Copilot Micro Diagnostics"
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "copilot-micro-diagnostics.json"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else {
+                return
+            }
+            Task { @MainActor [weak self] in
+                do {
+                    try await diagnosticStore.writeExport(to: url)
+                    self?.diagnosticNotice =
+                        "Redacted diagnostics exported locally. Nothing was uploaded."
+                    await self?.refreshDiagnosticUsage()
+                } catch let error as DiagnosticError {
+                    self?.diagnosticNotice = error.userMessage
+                } catch {
+                    self?.diagnosticNotice = DiagnosticError.fileSystem.userMessage
+                }
+            }
+        }
+    }
+
+    func clearPrivateDiagnostics() {
+        guard let diagnosticStore else {
+            diagnosticNotice = "Private diagnostics are disabled for smoke validation."
+            return
+        }
+        Task { [weak self] in
+            do {
+                try await diagnosticStore.clear()
+                self?.diagnosticNotice =
+                    "Private diagnostics were cleared. Configuration recovery files were preserved."
+                await self?.refreshDiagnosticUsage()
+            } catch let error as DiagnosticError {
+                self?.diagnosticNotice = error.userMessage
+            } catch {
+                self?.diagnosticNotice = DiagnosticError.fileSystem.userMessage
+            }
+        }
+    }
+
+    private func loadStoredConfiguration() async {
+        guard let localConfigurationStore else {
+            return
+        }
+        do {
+            let loaded = try await localConfigurationStore.load()
+            applyStoredConfiguration(loaded)
+            storageState = .ready
+            configurationNotice = "Local configuration loaded."
+            appendLog(
+                "Local configuration loaded",
+                "Version 1 settings are active. Live integrations remain disabled."
+            )
+            recordDiagnostic(
+                component: .configuration,
+                operation: "load",
+                outcome: .succeeded
+            )
+            await refreshDiagnosticUsage()
+            presentationDidChange()
+        } catch let error as ConfigurationError {
+            handleConfigurationFailure(error, recoveryRequired: error != .fileSystem)
+        } catch {
+            handleConfigurationFailure(.fileSystem, recoveryRequired: false)
+        }
+    }
+
+    private func prepareImport(from url: URL) async {
+        guard let localConfigurationStore else {
+            return
+        }
+        do {
+            let revision = nextPersistenceRevision()
+            _ = try await localConfigurationStore.save(
+                storedConfiguration,
+                revision: revision
+            )
+            pendingImport = try await localConfigurationStore.previewImport(
+                from: url,
+                against: storedConfiguration
+            )
+            configurationNotice =
+                pendingImport?.hasChanges == true
+                ? "Review every change before applying the import."
+                : "The imported portable settings match the active configuration."
+            recordDiagnostic(
+                component: .configuration,
+                operation: "preview-import",
+                outcome: .succeeded
+            )
+            presentationDidChange()
+        } catch let error as ConfigurationError {
+            reportConfigurationOperationError(error, operation: "preview-import")
+        } catch {
+            reportConfigurationOperationError(.fileSystem, operation: "preview-import")
+        }
+    }
+
+    private func applyStoredConfiguration(_ configuration: StoredConfiguration) {
+        storedConfiguration = configuration
+        assignments = configuration.bindings
+        brightness = configuration.lighting.brightness
+        reducedMotion = configuration.lighting.reducedMotion
+        notificationsEnabled = configuration.preferences.notificationsEnabled
+    }
+
+    private func persistConfiguration(operation: String) {
+        guard let localConfigurationStore, storageState == .ready else {
+            return
+        }
+        let snapshot = storedConfiguration
+        let revision = nextPersistenceRevision()
+        Task { [weak self] in
+            do {
+                guard
+                    try await localConfigurationStore.save(
+                        snapshot,
+                        revision: revision
+                    )
+                else {
+                    return
+                }
+                self?.configurationNotice = "Changes saved locally."
+                self?.recordDiagnostic(
+                    component: .configuration,
+                    operation: operation,
+                    outcome: .succeeded
+                )
+                self?.presentationDidChange()
+            } catch let error as ConfigurationError {
+                self?.handleConfigurationFailure(error, recoveryRequired: false)
+            } catch {
+                self?.handleConfigurationFailure(.fileSystem, recoveryRequired: false)
+            }
+        }
+    }
+
+    private func nextPersistenceRevision() -> UInt64 {
+        let (next, overflow) = persistenceRevision.addingReportingOverflow(1)
+        persistenceRevision = overflow ? 1 : next
+        return persistenceRevision
+    }
+
+    private func handleConfigurationFailure(
+        _ error: ConfigurationError,
+        recoveryRequired: Bool
+    ) {
+        storageState =
+            recoveryRequired
+            ? .recoveryRequired(error.userMessage)
+            : .unavailable(error.userMessage)
+        configurationNotice = error.userMessage
+        appendLog("Configuration error", error.userMessage)
+        recordDiagnostic(
+            component: .configuration,
+            operation: recoveryRequired ? "load" : "save",
+            outcome: .failed,
+            errorCategory: error == .messageTooLarge ? .invalidInput : .fileSystem,
+            message: error.userMessage
+        )
+        presentationDidChange()
+    }
+
+    private func reportConfigurationOperationError(
+        _ error: ConfigurationError,
+        operation: String
+    ) {
+        configurationNotice = error.userMessage
+        appendLog("Configuration operation rejected", error.userMessage)
+        recordDiagnostic(
+            component: .configuration,
+            operation: operation,
+            outcome: .failed,
+            errorCategory: error == .fileSystem ? .fileSystem : .invalidInput,
+            message: error.userMessage
+        )
+        presentationDidChange()
+    }
+
+    private func recordDiagnostic(
+        component: DiagnosticComponent,
+        operation: String,
+        outcome: DiagnosticOutcome,
+        errorCategory: DiagnosticErrorCategory? = nil,
+        message: String? = nil
+    ) {
+        guard let diagnosticStore else {
+            return
+        }
+        let event: DiagnosticEvent
+        do {
+            event = try DiagnosticEvent(
+                timestamp: Date(),
+                component: component,
+                operation: operation,
+                capabilityVersion: "storage-v1",
+                outcome: outcome,
+                errorCategory: errorCategory,
+                message: message
+            )
+        } catch let error as DiagnosticError {
+            diagnosticNotice = error.userMessage
+            return
+        } catch {
+            diagnosticNotice = DiagnosticError.invalidEvent.userMessage
+            return
+        }
+        Task { [weak self] in
+            do {
+                try await diagnosticStore.append(event)
+                await self?.refreshDiagnosticUsage()
+            } catch let error as DiagnosticError {
+                self?.diagnosticNotice = error.userMessage
+            } catch {
+                self?.diagnosticNotice = DiagnosticError.fileSystem.userMessage
+            }
+        }
+    }
+
+    private func refreshDiagnosticUsage() async {
+        guard let diagnosticStore else {
+            diagnosticUsage = nil
+            return
+        }
+        do {
+            diagnosticUsage = try await diagnosticStore.usage()
+        } catch let error as DiagnosticError {
+            diagnosticNotice = error.userMessage
+        } catch {
+            diagnosticNotice = DiagnosticError.fileSystem.userMessage
+        }
     }
 
     static func validateDemoJourney(configuration: EmulatorConfiguration) -> Bool {

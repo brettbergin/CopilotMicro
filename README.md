@@ -10,8 +10,9 @@ local configuration.
 
 **Status:** interactive GUI emulator. The menu panel, seven-area manager,
 original pad editor, session/control simulator, lighting preview, app packaging,
-versioned contracts and deterministic reducers exist. Local persistence and
-all live hardware/CLI integrations remain unavailable and clearly disabled.
+versioned contracts, deterministic reducers, atomic local settings, previewed
+portable import/export and bounded redacted diagnostics exist. All live
+hardware/CLI integrations remain unavailable and clearly disabled.
 
 ## Developer setup
 
@@ -74,6 +75,24 @@ make package PACKAGE_OUTPUT=build/my-preview
 The output must be a new app location under `build/`; existing bundles are
 never overwritten or removed. Ad-hoc signing is not notarization. No Apple
 account is required for these local builds.
+
+## Local data
+
+Ordinary app launches store versioned settings under
+`~/Library/Application Support/Copilot Micro/`. Configuration writes are
+atomic and user-only. Malformed or legacy input is preserved in bounded
+recovery copies before the user explicitly installs safe defaults or a
+migration replaces it.
+
+Portable JSON includes all twelve control bindings, brightness, reduced motion
+and the notification preference. Import validates the complete allowlist,
+shows every change and requires confirmation. Exports omit terminal and CLI
+paths, recent directories, backups, live identifiers and diagnostics.
+
+Structured diagnostics use bounded categories and redacted messages, rotate at
+three 5 MiB segments and never upload automatically. Export and clearing are
+explicit manager actions; clearing diagnostics does not remove configuration
+recovery material. Packaging smoke disables local storage entirely.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;

@@ -1,5 +1,6 @@
 import AppKit
 import CopilotMicroCore
+import CopilotMicroStorage
 
 @MainActor
 final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -15,8 +16,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let issueItem = NSMenuItem()
     private let pauseItem = NSMenuItem()
 
-    init(configuration: EmulatorConfiguration) {
-        manager = ManagerWindow(configuration: configuration)
+    init(
+        configuration: EmulatorConfiguration,
+        localConfigurationStore: LocalConfigurationStore? = nil,
+        diagnosticStore: DiagnosticStore? = nil,
+        initialStorageError: String? = nil
+    ) {
+        manager = ManagerWindow(
+            configuration: configuration,
+            localConfigurationStore: localConfigurationStore,
+            diagnosticStore: diagnosticStore,
+            initialStorageError: initialStorageError
+        )
         super.init()
         configureMainMenu()
         menu.autoenablesItems = false
@@ -181,7 +192,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         terminalItem.title = "Terminal: not configured"
         sessionItem.title = "Session: \(store.selectedSession.title) (simulated)"
         stateItem.title = "State: \(store.lighting.textualState)"
-        issueItem.title = "Issue: live CLI and HID unavailable"
+        issueItem.title =
+            store.storageState == .ready
+            ? "Issue: live CLI and HID unavailable"
+            : "Issue: storage \(store.storageState.label.lowercased())"
         pauseItem.title = store.isPaused ? "Resume Demo" : "Pause Demo"
         pauseItem.keyEquivalent = "p"
         statusItem?.button?.toolTip =

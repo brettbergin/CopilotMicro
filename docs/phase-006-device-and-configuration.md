@@ -2,6 +2,11 @@
 
 Scope: F-16 through F-20, F-22, F-23.
 
+Implementation status: the version-1 local and portable configuration schemas,
+atomic user-only settings store, bounded recovery history, strict import
+preview/confirmation flow and GUI wiring are implemented. Hardware discovery,
+device backups, managed keymap writes and restore remain unimplemented.
+
 ## Supported hardware boundary
 
 Qualify Creator Micro 2 Pro over USB and Bluetooth. Do not infer support for

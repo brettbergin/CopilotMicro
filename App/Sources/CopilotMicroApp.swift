@@ -1,5 +1,6 @@
 import AppKit
 import CopilotMicroCore
+import CopilotMicroStorage
 import Foundation
 
 private protocol StartupFailure: Error {
@@ -80,6 +81,9 @@ private struct SmokeReport: Encodable {
     let managerAreasValidated: Bool
     let emulatorJourneyValidated: Bool
     let liveServicesDisabled: Bool
+    let storageDisabledForSmoke: Bool
+    let portableConfigurationValidated: Bool
+    let diagnosticRedactionValidated: Bool
     let fittingWidth: Double
     let fittingHeight: Double
 }
@@ -164,12 +168,39 @@ struct CopilotMicroApp {
             throw StartupError.invalidConfiguration
         }
 
+        let storage: LocalConfigurationStore?
+        let diagnostics: DiagnosticStore?
+        let initialStorageError: String?
+        if smokeMode == nil {
+            do {
+                let root = try LocalConfigurationStore.defaultRootURL()
+                storage = LocalConfigurationStore(rootURL: root)
+                diagnostics = DiagnosticStore(
+                    directoryURL: root.appendingPathComponent("diagnostics", isDirectory: true)
+                )
+                initialStorageError = nil
+            } catch {
+                storage = nil
+                diagnostics = nil
+                initialStorageError = ConfigurationError.fileSystem.userMessage
+            }
+        } else {
+            storage = nil
+            diagnostics = nil
+            initialStorageError = nil
+        }
+
         let application = NSApplication.shared
         try setActivationPolicy(
             smokeMode == .hidden ? .prohibited : .accessory,
             on: application
         )
-        let controller = MenuBarController(configuration: configuration)
+        let controller = MenuBarController(
+            configuration: configuration,
+            localConfigurationStore: storage,
+            diagnosticStore: diagnostics,
+            initialStorageError: initialStorageError
+        )
         if smokeMode == .hidden {
             try smokeTest(
                 mode: .hidden,
@@ -271,6 +302,9 @@ struct CopilotMicroApp {
         let managerAreasValidated = ManagerArea.allCases.count == 7
         let emulatorJourneyValidated = EmulatorStore.validateDemoJourney(configuration: configuration)
         let liveServicesDisabled = manager.store.liveServicesDisabled
+        let storageDisabledForSmoke = manager.store.storageState == .disabledForSmoke
+        let portableConfigurationValidated = validatePortableConfiguration()
+        let diagnosticRedactionValidated = validateDiagnosticRedaction()
         let invariants: [(String, Bool)] = [
             ("main_thread", Thread.isMainThread),
             (
@@ -292,6 +326,9 @@ struct CopilotMicroApp {
             ("manager_areas", managerAreasValidated),
             ("emulator_journey", emulatorJourneyValidated),
             ("live_services_disabled", liveServicesDisabled),
+            ("storage_disabled_for_smoke", storageDisabledForSmoke),
+            ("portable_configuration", portableConfigurationValidated),
+            ("diagnostic_redaction", diagnosticRedactionValidated),
             ("finite_layout", size.width.isFinite && size.height.isFinite),
             ("minimum_layout", size.width >= 600 && size.height >= 380),
         ]
@@ -324,6 +361,9 @@ struct CopilotMicroApp {
             managerAreasValidated: managerAreasValidated,
             emulatorJourneyValidated: emulatorJourneyValidated,
             liveServicesDisabled: liveServicesDisabled,
+            storageDisabledForSmoke: storageDisabledForSmoke,
+            portableConfigurationValidated: portableConfigurationValidated,
+            diagnosticRedactionValidated: diagnosticRedactionValidated,
             fittingWidth: size.width,
             fittingHeight: size.height
         )
@@ -332,5 +372,51 @@ struct CopilotMicroApp {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         FileHandle.standardOutput.write(try encoder.encode(report))
         FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
+    private static func validatePortableConfiguration() -> Bool {
+        do {
+            var configuration = StoredConfiguration()
+            configuration.terminal = StoredTerminalPreferences(
+                preferredBundleIdentifier: "com.example.Terminal",
+                preferredApplicationPath: "/private/example/Terminal.app",
+                cliExecutableHint: "/private/example/copilot"
+            )
+            configuration.recentProjectDirectories = ["/private/example/repository"]
+            let data = try ConfigurationCodec.encodePortable(configuration)
+            let text = String(decoding: data, as: UTF8.self)
+            let plan = try ConfigurationCodec.decodePortable(
+                data,
+                against: configuration
+            )
+            return !plan.hasChanges
+                && !text.contains("/private/example")
+                && !text.contains("preferredApplicationPath")
+                && !text.contains("recentProjectDirectories")
+        } catch {
+            return false
+        }
+    }
+
+    private static func validateDiagnosticRedaction() -> Bool {
+        do {
+            let secret = "github_pat_smoke12345678"
+            let message =
+                try DiagnosticEvent(
+                    timestamp: Date(timeIntervalSince1970: 0),
+                    component: .application,
+                    operation: "smoke",
+                    outcome: .failed,
+                    errorCategory: .invalidInput,
+                    message: "Bearer abc.def \(secret) /Users/example/repo command=/bin/rm",
+                    sensitiveValues: [secret]
+                ).message ?? ""
+            return message.contains("[redacted]")
+                && !message.contains(secret)
+                && !message.contains("/Users/example")
+                && !message.contains("/bin/rm")
+        } catch {
+            return false
+        }
     }
 }

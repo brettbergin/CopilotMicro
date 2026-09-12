@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/github-app-micro2/contracts/configuration-v1.schema.json",
+  "title": "Copilot Micro local configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "product",
+    "bindings",
+    "lighting",
+    "preferences",
+    "terminal",
+    "recentProjectDirectories"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "product": {
+      "const": "Copilot Micro"
+    },
+    "bindings": {
+      "$ref": "#/$defs/bindings"
+    },
+    "lighting": {
+      "$ref": "#/$defs/lighting"
+    },
+    "preferences": {
+      "$ref": "#/$defs/preferences"
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preferredBundleIdentifier",
+        "preferredApplicationPath",
+        "cliExecutableHint"
+      ],
+      "properties": {
+        "preferredBundleIdentifier": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 255
+        },
+        "preferredApplicationPath": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "cliExecutableHint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        }
+      }
+    },
+    "recentProjectDirectories": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    }
+  },
+  "$defs": {
+    "action": {
+      "enum": [
+        "session.openList",
+        "session.create",
+        "session.previous",
+        "session.next",
+        "session.archive",
+        "session.cycleMode",
+        "session.selectModel",
+        "session.selectEffort",
+        "session.voice",
+        "session.cancelForeground",
+        "composer.submit",
+        "composer.focus",
+        "picker.confirm",
+        "picker.back",
+        "permission.approveOnce",
+        "permission.reject"
+      ]
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key.sessions",
+        "key.new",
+        "key.previous",
+        "key.next",
+        "key.archive",
+        "key.mode",
+        "key.model",
+        "key.effort",
+        "key.voice",
+        "key.cancel",
+        "key.submit",
+        "key.focus"
+      ],
+      "properties": {
+        "key.sessions": {
+          "$ref": "#/$defs/action"
+        },
+        "key.new": {
+          "$ref": "#/$defs/action"
+        },
+        "key.previous": {
+          "$ref": "#/$defs/action"
+        },
+        "key.next": {
+          "$ref": "#/$defs/action"
+        },
+        "key.archive": {
+          "$ref": "#/$defs/action"
+        },
+        "key.mode": {
+          "$ref": "#/$defs/action"
+        },
+        "key.model": {
+          "$ref": "#/$defs/action"
+        },
+        "key.effort": {
+          "$ref": "#/$defs/action"
+        },
+        "key.voice": {
+          "$ref": "#/$defs/action"
+        },
+        "key.cancel": {
+          "$ref": "#/$defs/action"
+        },
+        "key.submit": {
+          "$ref": "#/$defs/action"
+        },
+        "key.focus": {
+          "$ref": "#/$defs/action"
+        }
+      }
+    },
+    "lighting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "brightness",
+        "reducedMotion"
+      ],
+      "properties": {
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reducedMotion": {
+          "type": "boolean"
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notificationsEnabled"
+      ],
+      "properties": {
+        "notificationsEnabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

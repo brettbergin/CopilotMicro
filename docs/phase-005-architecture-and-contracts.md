@@ -2,9 +2,9 @@
 
 Status: target architecture supporting the agreed product. The native
 menu bar/manager scaffold, packaging, version-1 schema, action/control
-catalogs, shared fixtures and deterministic Core state model exist. The local
-socket, CLI-hosted bridge, device and live-session components remain
-unimplemented.
+catalogs, shared fixtures, deterministic Core state model and isolated
+configuration/diagnostics module exist. The local socket, CLI-hosted bridge,
+device and live-session components remain unimplemented.
 
 ## Component boundaries
 

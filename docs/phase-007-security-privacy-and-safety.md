@@ -3,6 +3,11 @@
 Status: design constraints and acceptance requirements, not a security audit
 or claim that an implementation has been reviewed.
 
+Implementation status: local configuration and diagnostics now use user-only
+paths, bounded schemas, atomic replacement, recovery copies, deterministic
+diagnostic rotation and explicit redacted export. IPC, live credentials,
+device writes and updater boundaries remain design requirements.
+
 ## Trust boundaries
 
 | Boundary | Risk | Required control |

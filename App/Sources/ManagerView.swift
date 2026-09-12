@@ -1,5 +1,6 @@
 import AppKit
 import CopilotMicroCore
+import CopilotMicroStorage
 import SwiftUI
 
 @MainActor
@@ -74,8 +75,18 @@ final class ManagerWindow {
     let window: NSWindow
     let hostingView: NSHostingView<ManagerView>
 
-    init(configuration: EmulatorConfiguration) {
-        store = EmulatorStore(configuration: configuration)
+    init(
+        configuration: EmulatorConfiguration,
+        localConfigurationStore: LocalConfigurationStore? = nil,
+        diagnosticStore: DiagnosticStore? = nil,
+        initialStorageError: String? = nil
+    ) {
+        store = EmulatorStore(
+            configuration: configuration,
+            localConfigurationStore: localConfigurationStore,
+            diagnosticStore: diagnosticStore,
+            initialStorageError: initialStorageError
+        )
         hostingView = NSHostingView(rootView: ManagerView(store: store))
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_060, height: 720),
@@ -229,6 +240,7 @@ private struct ControlsView: View {
                                 ForEach(ActionID.allCases, id: \.self) { action in
                                     Text(action.displayName).tag(action)
                                 }
+                                .disabled(!store.canEditConfiguration)
                             }
                             Text(
                                 "Editing changes the demo configuration only. It does not run the action or write device flash."
@@ -243,6 +255,7 @@ private struct ControlsView: View {
                                 Button("Reset all defaults") {
                                     store.resetAssignments()
                                 }
+                                .disabled(!store.canEditConfiguration)
                             }
                         }
                         .padding(8)
@@ -326,10 +339,12 @@ private struct LightingView: View {
                             } maximumValueLabel: {
                                 Text("100")
                             }
+                            .disabled(!store.canEditConfiguration)
                             Text("Brightness \(Int(store.brightness * 100)) percent")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Toggle("Reduce motion", isOn: reducedMotionBinding)
+                                .disabled(!store.canEditConfiguration)
                             Text("At zero brightness, the textual state remains available.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -404,9 +419,9 @@ private struct ConnectionSettingsView: View {
                     Text("Unavailable until persistent settings are implemented.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Toggle("Show notifications", isOn: .constant(false))
-                        .disabled(true)
-                    Text("Notifications remain opt-in and will omit prompt or tool content.")
+                    Toggle("Show notifications", isOn: notificationsBinding)
+                        .disabled(!store.canEditConfiguration)
+                    Text("The preference is stored locally. Delivery remains unavailable in this milestone.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button(store.isPaused ? "Resume demo" : "Pause demo") {
@@ -423,6 +438,13 @@ private struct ConnectionSettingsView: View {
             )
         }
     }
+
+    private var notificationsBinding: Binding<Bool> {
+        Binding(
+            get: { store.notificationsEnabled },
+            set: { store.setNotificationsEnabled($0) }
+        )
+    }
 }
 
 private struct ConfigurationView: View {
@@ -432,30 +454,62 @@ private struct ConfigurationView: View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
                 title: "Configuration",
-                subtitle: "One personal configuration is planned. This milestone keeps changes in memory."
+                subtitle: "One personal configuration is stored locally with private, recoverable writes."
             )
             GroupBox("Current demo mapping") {
                 VStack(alignment: .leading, spacing: 12) {
                     LabeledContent("Assigned controls", value: "\(store.assignments.count)")
-                    LabeledContent("Persistence", value: "Unavailable in this milestone")
+                    LabeledContent("Persistence", value: store.storageState.label)
+                    Text(store.storageStatusDetail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Button("Reset local demo assignments") {
                         store.resetAssignments()
+                    }
+                    .disabled(!store.canEditConfiguration)
+                    if case .recoveryRequired = store.storageState {
+                        Button("Preserve malformed file and restore safe defaults") {
+                            store.recoverConfigurationWithDefaults()
+                        }
                     }
                 }
                 .padding(8)
             }
             GroupBox("Portable JSON") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Import will validate, preview and request confirmation before changing active settings.")
+                    Text(
+                        "Import validates every control and preference, previews changes and requires confirmation."
+                    )
                     HStack {
-                        Button("Import JSON") {}
-                            .disabled(true)
-                        Button("Export JSON") {}
-                            .disabled(true)
+                        Button("Import JSON") {
+                            store.choosePortableImport()
+                        }
+                        Button("Export JSON") {
+                            store.choosePortableExport()
+                        }
                     }
-                    Text("Unavailable until atomic storage and the portable schema land.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .disabled(!store.canManagePortableConfiguration)
+                    Text(
+                        "Exports exclude terminal paths, CLI hints, recent directories, backups, live IDs and diagnostics."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    if let notice = store.configurationNotice {
+                        Text(notice)
+                            .font(.caption)
+                    }
+                    if let plan = store.pendingImport {
+                        ImportPreview(plan: plan)
+                        HStack {
+                            Button("Apply imported settings") {
+                                store.confirmImport()
+                            }
+                            .disabled(!plan.hasChanges)
+                            Button("Cancel") {
+                                store.cancelImport()
+                            }
+                        }
+                    }
                 }
                 .padding(8)
             }
@@ -510,7 +564,8 @@ private struct DiagnosticsView: View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
                 title: "Diagnostics",
-                subtitle: "Only a bounded in-memory list of demo events is shown. No telemetry is sent."
+                subtitle:
+                    "Demo activity stays in memory; structured operational diagnostics stay local and bounded."
             )
             HStack {
                 LabeledContent("Stored demo events", value: "\(store.eventLog.count) of 40 maximum")
@@ -520,14 +575,83 @@ private struct DiagnosticsView: View {
                 }
             }
             EventList(entries: store.eventLog, emptyText: "No demo events.")
-            HStack {
-                Button("Export redacted diagnostics") {}
-                    .disabled(true)
-                Text("Export arrives with the private storage milestone.")
+            GroupBox("Private local diagnostics") {
+                VStack(alignment: .leading, spacing: 12) {
+                    LabeledContent(
+                        "Retention",
+                        value: store.diagnosticUsage.map {
+                            "\($0.segmentCount) of \($0.maximumSegmentCount) segments, \($0.bytes) bytes"
+                        } ?? "No stored segments"
+                    )
+                    Text("Each segment is limited to 5 MiB. No telemetry or automatic upload is active.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(
+                        "Export includes timestamps, component, operation, bounded outcome/error categories and redacted messages."
+                    )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    HStack {
+                        Button("Export redacted diagnostics") {
+                            store.chooseDiagnosticExport()
+                        }
+                        Button("Clear private diagnostics") {
+                            store.clearPrivateDiagnostics()
+                        }
+                    }
+                    if let notice = store.diagnosticNotice {
+                        Text(notice)
+                            .font(.caption)
+                    }
+                }
+                .padding(8)
             }
         }
+    }
+}
+
+private struct ImportPreview: View {
+    let plan: ConfigurationImportPlan
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Import preview")
+                .font(.headline)
+            if !plan.hasChanges {
+                Text("No portable settings would change.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(plan.bindingChanges, id: \.control) { change in
+                Text(
+                    "\(change.control.displayName): \(change.currentAction.displayName) -> \(change.importedAction.displayName)"
+                )
+            }
+            if plan.brightnessChanged {
+                Text(
+                    "Brightness: \(percent(plan.baseConfiguration.lighting.brightness)) -> \(percent(plan.portableConfiguration.lighting.brightness))"
+                )
+            }
+            if plan.reducedMotionChanged {
+                Text(
+                    "Reduced motion: \(yesNo(plan.baseConfiguration.lighting.reducedMotion)) -> \(yesNo(plan.portableConfiguration.lighting.reducedMotion))"
+                )
+            }
+            if plan.notificationsChanged {
+                Text(
+                    "Notifications: \(yesNo(plan.baseConfiguration.preferences.notificationsEnabled)) -> \(yesNo(plan.portableConfiguration.preferences.notificationsEnabled))"
+                )
+            }
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func percent(_ value: Double) -> String {
+        "\(Int(value * 100))%"
+    }
+
+    private func yesNo(_ value: Bool) -> String {
+        value ? "On" : "Off"
     }
 }
 

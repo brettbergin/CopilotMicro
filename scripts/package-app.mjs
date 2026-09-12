@@ -216,6 +216,9 @@ export function validateSmokeReport(report, app, mode = "hidden", canonicalize =
     managerAreasValidated: true,
     emulatorJourneyValidated: true,
     liveServicesDisabled: true,
+    storageDisabledForSmoke: true,
+    portableConfigurationValidated: true,
+    diagnosticRedactionValidated: true,
   };
   for (const [key, value] of Object.entries(expected)) {
     if (report?.[key] !== value) throw new PackagingError("smoke_failed", `Smoke invariant failed: ${key}.`);

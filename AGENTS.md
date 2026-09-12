@@ -6,9 +6,10 @@ the ten `docs/phase-00*.md` documents; start with phase 000 for ownership.
 ## Current implementation boundary
 
 Developer setup tooling, a complete interactive GUI emulator and the
-deterministic controls/session/lighting contract layer exist. Local storage
-and all live CLI/device integrations remain unimplemented. Preserve the
-emulator/live boundary while adding persistence next.
+deterministic controls/session/lighting contract layer exist. Versioned local
+settings, portable import/export and bounded redacted diagnostics are
+implemented. All live CLI/device integrations remain unimplemented. Preserve
+the emulator/live boundary while adding authenticated local IPC next.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
