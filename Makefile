@@ -5,7 +5,7 @@ SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
 SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
-.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-core lint format check
+.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-core lint format check
 
 help:
 	@printf '%s\n' \
@@ -17,6 +17,7 @@ help:
 		'test-doctor   Run isolated prerequisite-checker tests' \
 		'test-packager Run isolated packaging safety tests' \
 		'test-contracts Validate shared native/bridge schemas, catalogs and fixtures' \
+		'test-bridge  Run isolated Node IPC protocol and client tests' \
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
 		'lint          Check JavaScript syntax and Swift formatting' \
 		'format        Apply the repository Swift formatting configuration' \
@@ -51,6 +52,9 @@ test-contracts:
 	node scripts/check-contracts.mjs
 	node --test scripts/test/contracts.test.mjs
 
+test-bridge:
+	node --test Bridge/test/*.test.mjs
+
 test-core:
 	./scripts/test-core
 
@@ -63,6 +67,10 @@ lint:
 	node --check scripts/check-contracts.mjs
 	node --check scripts/test/package-app.test.mjs
 	node --check scripts/test/contracts.test.mjs
+	node --check Bridge/src/protocol.mjs
+	node --check Bridge/src/client.mjs
+	node --check Bridge/test/protocol.test.mjs
+	node --check Bridge/test/client.test.mjs
 	/bin/bash -n scripts/swiftpm
 	/bin/bash -n scripts/test-core
 	/usr/bin/xcrun swift format lint --configuration .swift-format --strict --recursive $(SWIFT_SOURCES)
@@ -74,5 +82,6 @@ check: lint
 	$(MAKE) test-doctor
 	$(MAKE) test-packager
 	$(MAKE) test-contracts
+	$(MAKE) test-bridge
 	$(MAKE) test-core
 	$(MAKE) smoke-test

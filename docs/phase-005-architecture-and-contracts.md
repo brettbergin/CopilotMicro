@@ -3,8 +3,11 @@
 Status: target architecture supporting the agreed product. The native
 menu bar/manager scaffold, packaging, version-1 schema, action/control
 catalogs, shared fixtures, deterministic Core state model and isolated
-configuration/diagnostics module exist. The local socket, CLI-hosted bridge,
-device and live-session components remain unimplemented.
+configuration/diagnostics module exist. The authenticated local socket,
+source-only Node client and shared negative IPC fixtures now exist. They are
+not started by the app and are not installed or loaded as a CLI extension.
+The CLI-hosted session bridge, device and live-session components remain
+unimplemented.
 
 ## Component boundaries
 
@@ -86,6 +89,16 @@ The channel must provide:
 - Action requests and explicit accepted/completed/rejected/failed outcomes.
 - Liveness/heartbeat information and bounded reconnect behavior.
 - Correlation and replay protection, without forwarding arbitrary SDK RPC.
+
+Implementation status: `CopilotMicroBridge` and `Bridge/src/` implement the
+transport-only portion of this contract with a 64 KiB big-endian length prefix,
+mode `0700` runtime directories, mode `0600` socket/bootstrap files, macOS peer
+UID checks, a private 256-bit bootstrap token, strict peer roles, connection
+generations, monotonic sequences and a 64-request in-flight bound. Swift and
+Node consume the same `Contracts/fixtures/ipc-v1/manifest.json` negative cases.
+This is mock transport evidence only: the native app does not start the server,
+the source is not installed under `.github/extensions/`, and no real CLI
+session has been joined.
 
 ### Registration
 

@@ -5,8 +5,12 @@ or claim that an implementation has been reviewed.
 
 Implementation status: local configuration and diagnostics now use user-only
 paths, bounded schemas, atomic replacement, recovery copies, deterministic
-diagnostic rotation and explicit redacted export. IPC, live credentials,
-device writes and updater boundaries remain design requirements.
+diagnostic rotation and explicit redacted export. The isolated local IPC layer
+now enforces private filesystem modes, same-user peer checks, bootstrap
+authentication, strict roles, bounded frames, generations and ordered
+sequences. It is not started by the app and has not joined a CLI session.
+Live extension authority, device writes and updater boundaries remain design
+requirements.
 
 ## Trust boundaries
 

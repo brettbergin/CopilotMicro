@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "CopilotMicroCore", targets: ["CopilotMicroCore"]),
+        .library(name: "CopilotMicroBridge", targets: ["CopilotMicroBridge"]),
         .library(name: "CopilotMicroStorage", targets: ["CopilotMicroStorage"]),
     ],
     dependencies: [
@@ -15,6 +16,10 @@ let package = Package(
     targets: [
         .target(name: "CopilotMicroCore"),
         .target(
+            name: "CopilotMicroBridge",
+            dependencies: ["CopilotMicroCore"]
+        ),
+        .target(
             name: "CopilotMicroStorage",
             dependencies: ["CopilotMicroCore"]
         ),
@@ -22,6 +27,13 @@ let package = Package(
             name: "CopilotMicroCoreTests",
             dependencies: [
                 "CopilotMicroCore",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
+        ),
+        .testTarget(
+            name: "CopilotMicroBridgeTests",
+            dependencies: [
+                "CopilotMicroBridge",
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),

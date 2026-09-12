@@ -3,6 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  ACTION_TYPES as IPC_ACTION_TYPES,
+  RESULT_CODES as IPC_RESULT_CODES,
+} from "../Bridge/src/protocol.mjs";
+
 export const MAXIMUM_ACTION_BYTES = 65_536;
 export const MAXIMUM_CONTEXT_REVISION = 9_007_199_254_740_991;
 export const MAXIMUM_RESULT_MESSAGE_CHARACTERS = 512;
@@ -154,11 +159,13 @@ export function loadContractCatalogs(root) {
   const actions = readJSON(path.join(contracts, "actions.json"));
   const controls = readJSON(path.join(contracts, "default-controls.json"));
   const schema = readJSON(path.join(contracts, "bridge-v1.schema.json"));
+  const ipcSchema = readJSON(path.join(contracts, "ipc-v1.schema.json"));
   const configurationSchema = readJSON(path.join(contracts, "configuration-v1.schema.json"));
   const portableConfigurationSchema = readJSON(path.join(contracts, "portable-configuration-v1.schema.json"));
   assert.equal(actions.schemaVersion, 1);
   assert.equal(controls.schemaVersion, 1);
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(ipcSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(configurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(portableConfigurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
 
@@ -170,9 +177,18 @@ export function loadContractCatalogs(root) {
     actionCatalog.set(action.id, action);
   }
   assert.deepEqual(schema.$defs.actionType.enum, actions.actions.map((action) => action.id));
+  assert.deepEqual(IPC_ACTION_TYPES, actions.actions.map((action) => action.id));
   assert.equal(schema.$defs.actionRequest.properties.contextRevision.maximum, MAXIMUM_CONTEXT_REVISION);
   assert.equal(schema.$defs.actionResult.properties.message.maxLength, MAXIMUM_RESULT_MESSAGE_CHARACTERS);
+  assert.equal(ipcSchema.$defs.frame.properties.payload.$ref, "bridge-v1.schema.json");
+  assert.equal(ipcSchema.$defs.frame.properties.sequence.maximum, MAXIMUM_CONTEXT_REVISION);
+  assert.deepEqual(ipcSchema.$defs.role.enum, ["nativeApp", "cliBridge"]);
   const resultCodes = new Set(schema.$defs.actionResult.properties.code.enum);
+  assert.deepEqual(IPC_RESULT_CODES, schema.$defs.actionResult.properties.code.enum);
+  assert.equal(
+    schema.$defs.sessionSnapshot.properties.capabilities.propertyNames.$ref,
+    "#/$defs/actionType",
+  );
 
   const contacts = [];
   const controlIDs = new Set();
@@ -218,6 +234,7 @@ export function loadContractCatalogs(root) {
     controls,
     resultCodes,
     schema,
+    ipcSchema,
     configurationSchema,
     portableConfigurationSchema,
   };
@@ -275,12 +292,18 @@ export function runContractChecks(root) {
     const decoded = validateActionResult(data, resultCodes);
     assert.equal(decoded.error ?? "valid", fixture.decode, fixture.name);
   }
+  const ipcManifest = readJSON(
+    path.join(root, "Contracts", "fixtures", "ipc-v1", "manifest.json"),
+  );
+  assert.equal(ipcManifest.schemaVersion, 1);
+  assert.match(ipcManifest.bootstrapToken, /^[a-f0-9]{64}$/u);
   return {
     actionCount: actionCatalog.size,
     controlCount: 12,
     fixtureCount: manifest.cases.length,
     resultFixtureCount: resultManifest.cases.length,
     configurationSchemaCount: 2,
+    ipcFixtureCount: ipcManifest.cases.length,
   };
 }
 

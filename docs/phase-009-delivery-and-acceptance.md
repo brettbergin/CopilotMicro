@@ -4,8 +4,11 @@ Status: implementation plan and acceptance contract. No feature is implemented
 or qualified merely because it appears in this document.
 
 Current evidence: stage 0, the isolated stage-1 GUI/emulator milestone and the
-local configuration/diagnostic foundation are implemented. This does not
-qualify any live CLI, terminal, HID or updater feature, and it does not convert
+local configuration/diagnostic foundation are implemented. The transport-only
+part of stage 3 also has native/Node mock evidence for private authenticated
+IPC, bounded frames, roles, generations, sequences and rejection cases. The app
+does not start it and no extension has joined Copilot CLI. This does not qualify
+any live CLI, terminal, HID or updater feature, and it does not convert
 simulated acceptance journeys into hardware or integration evidence.
 
 ## Delivery strategy
@@ -136,19 +139,22 @@ Cases must include:
 ## Evidence and test layers
 
 Use unit tests for deterministic state/actions/configuration and byte framing.
-Use contract/integration tests with owned disposable CLI sessions for bridge
-and terminal behavior. Use real-device qualification for physical geometry,
-lighting, transport and restore.
+The current native/Node IPC tests cover only temporary local sockets and shared
+negative fixtures; they provide partial A-29 transport evidence, not live
+session isolation. Use contract/integration tests with owned disposable CLI
+sessions for bridge and terminal behavior. Use real-device qualification for
+physical geometry, lighting, transport and restore.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
 compile does not qualify app onboarding or permissions.
 
 Use the canonical commands as source scaffolding lands. Currently `make check`
-covers source checks, Node/Core unit tests, packaged hidden native smoke and a
-bounded accessory startup smoke through the production delegate, main-menu and
-status-item lifecycle wiring. The smoke opens no manager window, exits
-immediately and removes only its exact generated package directory.
+covers source checks, shared native/Node IPC fixtures, isolated Node client
+tests, Swift package tests, packaged hidden native smoke and a bounded accessory
+startup smoke through the production delegate, main-menu and status-item
+lifecycle wiring. The smoke opens no manager window or production listener,
+exits immediately and removes only its exact generated package directory.
 `make package` produces the retained ad-hoc-signed app. These do not establish
 complete GUI interaction, XCUITest, terminal or hardware qualification; do not
 describe unimplemented or unexercised acceptance cases as passing.

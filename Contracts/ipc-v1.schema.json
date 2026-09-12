@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://copilot-micro.local/contracts/ipc-v1.schema.json",
+  "title": "Copilot Micro authenticated local IPC protocol version 1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/registration"
+    },
+    {
+      "$ref": "#/$defs/registrationResult"
+    },
+    {
+      "$ref": "#/$defs/frame"
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]+$"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "nativeApp",
+        "cliBridge"
+      ]
+    },
+    "bootstrapToken": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "role",
+        "bootstrapToken",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "bridgeVersion",
+        "cliVersion",
+        "sdkVersion"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "registration"
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "bootstrapToken": {
+          "$ref": "#/$defs/bootstrapToken"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "generation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "bridgeVersion": {
+          "$ref": "#/$defs/identifier"
+        },
+        "cliVersion": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sdkVersion": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "registrationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "outcome",
+        "connectionId",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "registrationResult"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        "connectionId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "oneOf": [
+            {
+              "enum": [
+                "invalidToken",
+                "wrongPeer",
+                "wrongRole",
+                "protocolViolation"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "role",
+        "generation",
+        "sequence",
+        "payload"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "frame"
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "generation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "payload": {
+          "$ref": "bridge-v1.schema.json"
+        }
+      }
+    }
+  }
+}

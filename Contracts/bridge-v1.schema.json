@@ -330,6 +330,9 @@
         "capabilities": {
           "type": "object",
           "maxProperties": 64,
+          "propertyNames": {
+            "$ref": "#/$defs/actionType"
+          },
           "additionalProperties": {
             "$ref": "#/$defs/capability"
           }

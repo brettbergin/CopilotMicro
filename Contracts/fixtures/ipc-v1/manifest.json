@@ -1,0 +1,397 @@
+{
+  "schemaVersion": 1,
+  "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "cases": [
+    {
+      "name": "valid-registration",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "accepted"
+    },
+    {
+      "name": "wrong-registration-role",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "nativeApp",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "wrongRole"
+    },
+    {
+      "name": "wrong-bootstrap-token",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "invalidToken"
+    },
+    {
+      "name": "wrong-peer-identity",
+      "kind": "registration",
+      "peer": "different",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "wrongPeer"
+    },
+    {
+      "name": "registration-extra-field",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided",
+        "command": "not-allowed"
+      },
+      "decode": "unexpectedField"
+    },
+    {
+      "name": "registration-unsupported-version",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 2,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "unsupportedProtocol"
+    },
+    {
+      "name": "valid-native-action-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "nativeApp",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "action",
+          "requestId": "action-cancel-1",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 42,
+          "action": {
+            "type": "session.cancelForeground"
+          }
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "cliBridge",
+      "direction": "allowed",
+      "sequence": "accepted"
+    },
+    {
+      "name": "wrong-role-action-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "action",
+          "requestId": "action-cancel-1",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 42,
+          "action": {
+            "type": "session.cancelForeground"
+          }
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "wrongRole"
+    },
+    {
+      "name": "valid-bridge-result-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "actionResult",
+          "requestId": "action-cancel-1",
+          "outcome": "completed",
+          "message": "Foreground work stopped."
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "accepted"
+    },
+    {
+      "name": "wrong-role-result-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "nativeApp",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "actionResult",
+          "requestId": "action-cancel-1",
+          "outcome": "completed",
+          "message": "Foreground work stopped."
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "cliBridge",
+      "direction": "wrongRole"
+    },
+    {
+      "name": "stale-generation-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-old",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "actionResult",
+          "requestId": "action-cancel-1",
+          "outcome": "rejected",
+          "code": "staleGeneration",
+          "message": "The connection generation changed."
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "staleGeneration"
+    },
+    {
+      "name": "duplicate-sequence-frame",
+      "kind": "frame",
+      "replay": "duplicate",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "actionResult",
+          "requestId": "action-cancel-1",
+          "outcome": "completed",
+          "message": "Foreground work stopped."
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "staleSequence"
+    },
+    {
+      "name": "out-of-order-sequence-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 2,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "actionResult",
+          "requestId": "action-cancel-1",
+          "outcome": "completed",
+          "message": "Foreground work stopped."
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "sequenceGap"
+    },
+    {
+      "name": "unknown-payload-type",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "shell.execute",
+          "command": "not-allowed"
+        }
+      },
+      "decode": "invalidPayload"
+    },
+    {
+      "name": "malformed-allowlisted-payload",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "nativeApp",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "action",
+          "action": {
+            "type": "shell.execute",
+            "command": "not-allowed"
+          }
+        }
+      },
+      "decode": "invalidPayload"
+    },
+    {
+      "name": "valid-session-snapshot-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "sessionSnapshot",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 42,
+          "connection": "ready",
+          "paused": false,
+          "mode": "default",
+          "work": {
+            "known": true,
+            "foregroundActive": false,
+            "backgroundCount": 0,
+            "queuedCount": 0
+          },
+          "pendingAttention": [],
+          "capabilities": {
+            "composer.focus": {
+              "status": "supported"
+            }
+          },
+          "visiblePermissionRequestId": null,
+          "failure": null,
+          "completionId": null
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "accepted"
+    },
+    {
+      "name": "snapshot-with-unknown-capability",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "sessionSnapshot",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 42,
+          "connection": "ready",
+          "paused": false,
+          "mode": "default",
+          "work": {
+            "known": true,
+            "foregroundActive": false,
+            "backgroundCount": 0,
+            "queuedCount": 0
+          },
+          "pendingAttention": [],
+          "capabilities": {
+            "shell.execute": {
+              "status": "supported"
+            }
+          }
+        }
+      },
+      "decode": "invalidPayload"
+    },
+    {
+      "name": "oversized-wire-message",
+      "kind": "frame",
+      "generator": "oversized",
+      "decode": "messageTooLarge"
+    }
+  ]
+}

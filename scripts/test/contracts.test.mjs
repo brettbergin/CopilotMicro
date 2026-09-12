@@ -22,6 +22,7 @@ test("shared contract catalogs and fixtures pass", () => {
     fixtureCount: 13,
     resultFixtureCount: 5,
     configurationSchemaCount: 2,
+    ipcFixtureCount: 18,
   });
 });
 

@@ -12,7 +12,11 @@ local configuration.
 original pad editor, session/control simulator, lighting preview, app packaging,
 versioned contracts, deterministic reducers, atomic local settings, previewed
 portable import/export and bounded redacted diagnostics exist. All live
-hardware/CLI integrations remain unavailable and clearly disabled.
+hardware/CLI integrations remain unavailable and clearly disabled. An
+owner-restricted Unix-domain IPC package and isolated Node client now share
+bounded authentication, framing, role, generation and sequence contracts, but
+the app does not start that listener and no CLI extension is installed or
+loaded.
 
 ## Developer setup
 
@@ -52,13 +56,15 @@ make check
 make package
 ```
 
-`make check` runs source checks, shared contract fixtures, Node/Core unit tests,
-hidden AppKit/SwiftUI and resource smoke, and a bounded accessory startup smoke
-through the production app-delegate, main-menu and status-item wiring. It does
-not display a window, request permissions or touch a device/CLI session, and
-the accessory process exits immediately. Its generated smoke package directory
-is removed by an exact-path safety check. Core tests use the pinned official
-Swift Testing dependency; first resolution downloads public packages.
+`make check` runs source checks, shared contract fixtures, isolated Node IPC
+tests, Swift package unit tests, hidden AppKit/SwiftUI and resource smoke, and a
+bounded accessory startup smoke through the production app-delegate, main-menu
+and status-item wiring. It does not display a window, open the production IPC
+listener, load a CLI extension, request permissions or touch a device/CLI
+session, and the accessory process exits immediately. Its generated smoke
+package directory is removed by an exact-path safety check. Swift tests use the
+pinned official Swift Testing dependency; first resolution downloads public
+packages.
 
 `make package` prints the signed app's absolute `appPath` as JSON. Each call
 uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
@@ -93,6 +99,22 @@ Structured diagnostics use bounded categories and redacted messages, rotate at
 three 5 MiB segments and never upload automatically. Export and clearing are
 explicit manager actions; clearing diagnostics does not remove configuration
 recovery material. Packaging smoke disables local storage entirely.
+
+## Local IPC foundation
+
+`CopilotMicroBridge` implements a 64 KiB length-prefixed Unix-domain protocol,
+same-user peer checks, a private bootstrap token, strict native/bridge roles,
+connection generations, monotonic per-direction sequences and bounded
+in-flight request tracking. Runtime directories are mode `0700`; token and
+socket files are mode `0600`. Unknown existing socket paths and symlinked
+private directories fail closed.
+
+The source-only Node client uses the same registration and frame contract.
+`make test-bridge` exercises it against isolated temporary sockets; nothing
+under `Bridge/` is placed in `.github/extensions/` or loaded into a real
+Copilot CLI session. Production listener startup, bridge installation and
+session behavior remain intentionally blocked until disposable capability
+probes qualify the actual installed CLI.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;
