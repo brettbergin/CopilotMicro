@@ -71,7 +71,7 @@ public struct DeviceBackup: Equatable, Sendable {
     }
 }
 
-public enum DeviceBackupError: Error, Equatable, Sendable {
+public enum DeviceBackupError: Error, Equatable, LocalizedError, Sendable {
     case invalidDeviceAssociationID
     case unsupportedProductID
     case invalidFirmwareVersion
@@ -88,13 +88,50 @@ public enum DeviceBackupError: Error, Equatable, Sendable {
     case keymapSchemaMismatch
     case unsafeFileSystemEntry
     case fileSystem
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidDeviceAssociationID:
+            "The device does not expose a valid private association identifier."
+        case .unsupportedProductID:
+            "The backup product identifier is not supported."
+        case .invalidFirmwareVersion:
+            "The backup firmware version is invalid."
+        case .invalidKeymapSchemaVersion:
+            "The backup keymap schema version is invalid."
+        case .invalidTimestamp:
+            "The backup timestamp is invalid."
+        case .invalidPayload:
+            "The backup keymap is empty or invalid."
+        case .payloadTooLarge:
+            "The backup exceeds the keymap safety limit."
+        case .unsupportedBackupSchemaVersion(let version):
+            "Backup schema \(version) is not supported."
+        case .missingOriginalBackup:
+            "No verified original keymap backup exists for this device."
+        case .originalBackupAlreadyExists:
+            "The original keymap backup already exists and was not overwritten."
+        case .corruptBackup:
+            "The device backup failed its integrity check."
+        case .deviceAssociationMismatch:
+            "The backup belongs to a different physical device."
+        case .productMismatch:
+            "The backup belongs to a different device product."
+        case .keymapSchemaMismatch:
+            "The backup uses a different keymap schema."
+        case .unsafeFileSystemEntry:
+            "The backup path contains an unsafe file-system entry."
+        case .fileSystem:
+            "The device backup could not be read or written."
+        }
+    }
 }
 
 public actor DeviceBackupStore {
     public static let originalFilename = "original.json"
     public static let recoveryDirectoryName = "recovery"
     public static let maximumRecoverySnapshots = 5
-    public static let maximumKeymapBytes = 1_048_576
+    public static let maximumKeymapBytes = 524_288
     public static let maximumEnvelopeBytes =
         ((maximumKeymapBytes + 2) / 3 * 4) + 4_096
 

@@ -195,6 +195,34 @@ terminal running the probe, wake the device and retry. `make check` never opens
 HID. The packaged GUI remains emulator-only until the later live service
 assembly is complete.
 
+## Reversible device mapping preview
+
+The guarded setup tool stores the full original keymap in a user-only,
+device-associated integrity envelope before it can authorize a configuration
+write. It never prints the raw serial or full keymap. Generate the exact
+non-mutating preview with:
+
+```sh
+make preview-device-mapping CONSENT=I-own-this-device-read
+```
+
+The current USB preview verified the persisted original backup and proposed 19
+changes: keys `AG00` through `AG12` and dial directions `AG13`/`AG14` on active
+layer `2`, plus cardinal joystick events `AG15` through `AG18` in the unique
+layer containing the radial sectors. Encoder press, joystick diagonals,
+lighting, macros, other layers and unknown fields are preserved.
+
+Applying or restoring requires the exact transaction digest printed by a fresh
+preview and the corresponding full consent phrase. The digest binds the
+operation, private device association, source and target configurations,
+verified backup, active profile/layer and normalized change set. A mutating
+command opens the HID interface exclusively, rechecks the source, saves a
+pre-change snapshot, writes the full keymap once and verifies a complete
+read-back. These commands are intentionally not part of `make check`.
+
+No device mapping has been applied yet. Physical input and lighting remain
+unqualified until the reviewed mapping is explicitly approved and exercised.
+
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;
 see the [toolchain notes](docs/phase-008-distribution-and-support.md).

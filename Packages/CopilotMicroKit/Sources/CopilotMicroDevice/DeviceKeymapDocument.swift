@@ -1,12 +1,42 @@
 import CryptoKit
 import Foundation
 
-public enum DeviceKeymapDocumentError: Error, Equatable, Sendable {
+public enum DeviceKeymapDocumentError: Error, Equatable, LocalizedError, Sendable {
+    case ambiguousJoystickLayers([Int])
     case invalidActiveLayer
     case invalidBinding
     case invalidContact
     case malformed
+    case missingCardinalJoystickBindings([Double], [DeviceLayerCapabilitySummary])
+    case missingEncoderBindings([String])
+    case missingJoystickBindings([String])
     case tooLarge
+    case unexpectedKeyLayout([Int])
+
+    public var errorDescription: String? {
+        switch self {
+        case .ambiguousJoystickLayers(let indices):
+            "Multiple layers expose complete joystick sectors: \(indices)."
+        case .invalidActiveLayer:
+            "The active device layer is not available."
+        case .invalidBinding:
+            "A managed hardware event binding is invalid."
+        case .invalidContact:
+            "A managed key contact is outside the active layout."
+        case .malformed:
+            "The device keymap is malformed."
+        case .missingCardinalJoystickBindings(let centers, let layers):
+            "The active layer is missing cardinal joystick sectors; observed centers: \(centers); layer shapes: \(layers)."
+        case .missingEncoderBindings(let keys):
+            "The active layer has no supported encoder binding array; layout fields: \(keys)."
+        case .missingJoystickBindings(let keys):
+            "The active layer has no supported joystick sectors; layout fields: \(keys)."
+        case .tooLarge:
+            "The device keymap exceeds the 512 KiB safety limit."
+        case .unexpectedKeyLayout(let lengths):
+            "The active key layout is \(lengths), not the qualified [2, 4, 4, 3] layout."
+        }
+    }
 }
 
 public struct DeviceKeymapCoordinate: Codable, Equatable, Sendable {
@@ -25,6 +55,20 @@ public struct DevicePeripheralChange: Codable, Equatable, Sendable {
     public let location: String
     public let previousValue: String
     public let replacementValue: String
+
+    public init(location: String, previousValue: String, replacementValue: String) {
+        self.location = location
+        self.previousValue = previousValue
+        self.replacementValue = replacementValue
+    }
+}
+
+public struct DeviceLayerCapabilitySummary: Codable, Equatable, Sendable {
+    public let index: Int
+    public let keyRowLengths: [Int]
+    public let encoderSlotCounts: [Int]
+    public let joystickSectorCount: Int
+    public let joystickSectorCenters: [Double]
 }
 
 public struct DeviceKeymapPlan: Equatable, Sendable {
@@ -50,6 +94,7 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
     public let profileCount: Int
     public let activeProfileLayerCount: Int
     public let activeLayerKeyRowLengths: [Int]
+    public let layerCapabilities: [DeviceLayerCapabilitySummary]
 
     public init(rpcResult: Any?, activeLayerIndex: Int) throws {
         guard
@@ -78,6 +123,7 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
         profileCount = parsed.profiles.count
         activeProfileLayerCount = parsed.layers.count
         activeLayerKeyRowLengths = parsed.keymap.map(\.count)
+        layerCapabilities = Self.layerCapabilities(parsed.layers)
     }
 
     public var summary: DeviceKeymapSummary {
@@ -105,7 +151,7 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
 
     public func planForCopilotMicro() throws -> DeviceKeymapPlan {
         guard activeLayerKeyRowLengths == [2, 4, 4, 3] else {
-            throw DeviceKeymapDocumentError.malformed
+            throw DeviceKeymapDocumentError.unexpectedKeyLayout(activeLayerKeyRowLengths)
         }
         return try replacing(
             keyBindings: Dictionary(
@@ -168,7 +214,9 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
                 !encoders.isEmpty,
                 encoders[0].count >= 3
             else {
-                throw DeviceKeymapDocumentError.malformed
+                throw DeviceKeymapDocumentError.missingEncoderBindings(
+                    Array(layout.keys.sorted().prefix(32))
+                )
             }
             for (slot, replacement) in encoderBindings.sorted(by: { $0.key < $1.key }) {
                 try Self.validateBinding(replacement)
@@ -188,14 +236,53 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
             }
             layout["encoders"] = encoders
         }
+        layer["layout"] = layout
+        layers[activeLayerIndex] = layer
         if !joystickBindings.isEmpty {
-            guard
-                var joystick = layout["joystick"] as? [String: Any],
-                var sectors = joystick["sectors"] as? [[String: Any]]
-            else {
+            let joystickCandidates = layers.indices.filter { index in
+                guard
+                    let candidateLayout = layers[index]["layout"] as? [String: Any],
+                    let joystick = candidateLayout["joystick"] as? [String: Any],
+                    let sectors = joystick["sectors"] as? [[String: Any]]
+                else {
+                    return false
+                }
+                let centers: [Double] = sectors.compactMap {
+                    guard
+                        let start = HIDJSONNumber.finiteDouble($0["a1"]),
+                        let end = HIDJSONNumber.finiteDouble($0["a2"])
+                    else {
+                        return nil
+                    }
+                    return Self.sectorCenter(start: start, end: end)
+                }
+                return joystickBindings.keys.allSatisfy { target in
+                    centers.contains { Self.anglesEqual($0, target) }
+                }
+            }
+            guard joystickCandidates.count <= 1 else {
+                throw DeviceKeymapDocumentError.ambiguousJoystickLayers(joystickCandidates)
+            }
+            guard let joystickLayerIndex = joystickCandidates.first else {
+                throw DeviceKeymapDocumentError.missingCardinalJoystickBindings(
+                    [],
+                    layerCapabilities
+                )
+            }
+            var joystickLayer = layers[joystickLayerIndex]
+            guard var joystickLayout = joystickLayer["layout"] as? [String: Any] else {
                 throw DeviceKeymapDocumentError.malformed
             }
+            guard
+                var joystick = joystickLayout["joystick"] as? [String: Any],
+                var sectors = joystick["sectors"] as? [[String: Any]]
+            else {
+                throw DeviceKeymapDocumentError.missingJoystickBindings(
+                    Array(joystickLayout.keys.sorted().prefix(32))
+                )
+            }
             var matchedCenters: Set<Double> = []
+            var observedCenters: [Double] = []
             for index in sectors.indices {
                 guard
                     let start = HIDJSONNumber.finiteDouble(sectors[index]["a1"]),
@@ -204,6 +291,7 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
                 else {
                     throw DeviceKeymapDocumentError.malformed
                 }
+                observedCenters.append(center)
                 guard
                     let target = joystickBindings.keys.first(where: {
                         Self.anglesEqual(center, $0)
@@ -220,7 +308,11 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
                 guard !Self.jsonValuesEqual(previous, replacement) else { continue }
                 peripheralChanges.append(
                     DevicePeripheralChange(
-                        location: String(format: "joystick.center.%.2f", target),
+                        location: String(
+                            format: "layer[%d].joystick.center.%.2f",
+                            joystickLayerIndex,
+                            target
+                        ),
                         previousValue: Self.boundedDescription(previous),
                         replacementValue: replacement
                     )
@@ -228,14 +320,17 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
                 sectors[index]["k"] = replacement
             }
             guard matchedCenters.count == joystickBindings.count else {
-                throw DeviceKeymapDocumentError.malformed
+                throw DeviceKeymapDocumentError.missingCardinalJoystickBindings(
+                    observedCenters.sorted(),
+                    layerCapabilities
+                )
             }
             joystick["sectors"] = sectors
-            layout["joystick"] = joystick
+            joystickLayout["joystick"] = joystick
+            joystickLayer["layout"] = joystickLayout
+            layers[joystickLayerIndex] = joystickLayer
         }
         peripheralChanges.sort { $0.replacementValue < $1.replacementValue }
-        layer["layout"] = layout
-        layers[activeLayerIndex] = layer
         profile["layers"] = layers
         profiles[parsed.profileIndex] = profile
         root["profiles"] = profiles
@@ -368,6 +463,34 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
         return (start + (distance / 2)).truncatingRemainder(dividingBy: 1)
     }
 
+    private static func layerCapabilities(
+        _ layers: [[String: Any]]
+    ) -> [DeviceLayerCapabilitySummary] {
+        layers.enumerated().map { index, layer in
+            let layout = layer["layout"] as? [String: Any]
+            let rows = layout?["keymap"] as? [[Any]] ?? []
+            let encoders = layout?["encoders"] as? [[Any]] ?? []
+            let joystick = layout?["joystick"] as? [String: Any]
+            let sectors = joystick?["sectors"] as? [[String: Any]] ?? []
+            let centers: [Double] = sectors.compactMap {
+                guard
+                    let start = HIDJSONNumber.finiteDouble($0["a1"]),
+                    let end = HIDJSONNumber.finiteDouble($0["a2"])
+                else {
+                    return nil
+                }
+                return sectorCenter(start: start, end: end)
+            }
+            return DeviceLayerCapabilitySummary(
+                index: index,
+                keyRowLengths: rows.map(\.count),
+                encoderSlotCounts: encoders.map(\.count),
+                joystickSectorCount: sectors.count,
+                joystickSectorCenters: centers
+            )
+        }
+    }
+
     private static func anglesEqual(_ lhs: Double, _ rhs: Double) -> Bool {
         let difference = abs(lhs - rhs)
         return min(difference, 1 - difference) <= 0.000_001
@@ -385,7 +508,7 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
         return String(String(decoding: data, as: UTF8.self).prefix(128))
     }
 
-    static func digest(_ data: Data) -> String {
+    public static func digest(_ data: Data) -> String {
         SHA256.hash(data: data)
             .map { String(format: "%02x", $0) }
             .joined()

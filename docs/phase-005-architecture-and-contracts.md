@@ -9,8 +9,11 @@ capability probe now exist. The app does not start the socket and no production
 extension is installed. The probe has joined owned CLI sessions, but the
 production CLI-hosted session bridge and live-session components remain
 unimplemented. The device boundary now has read-only IOKit discovery, bounded
-HID JSON-RPC framing and one qualified USB tuple; no app-owned device service,
-input, lighting or configuration write is enabled.
+HID JSON-RPC framing and one qualified USB tuple. The guarded developer setup
+path now implements device-associated original backup, exact mapping preview,
+exclusive one-write authorization and complete read-back verification. No
+mapping write has been authorized or performed, and no app-owned device
+service, physical input or lighting is enabled.
 
 ## Component boundaries
 

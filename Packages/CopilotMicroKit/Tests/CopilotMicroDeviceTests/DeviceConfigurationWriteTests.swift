@@ -13,9 +13,12 @@ struct DeviceConfigurationWriteTests {
         let backupSHA256 = String(repeating: "b", count: 64)
         let authorization = try DeviceWriteAuthorization.authorize(
             plan: plan,
-            associationID: associationID,
+            associationID: Self.associationID,
             verifiedBackupSHA256: backupSHA256,
-            expectedPlanSHA256: plan.resultSHA256,
+            expectedTransactionSHA256: plan.transactionSHA256(
+                associationID: Self.associationID,
+                verifiedBackupSHA256: backupSHA256
+            ),
             consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
         )
         #expect(authorization.associationID == associationID)
@@ -24,21 +27,60 @@ struct DeviceConfigurationWriteTests {
         #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
             _ = try DeviceWriteAuthorization.authorize(
                 plan: plan,
-                associationID: associationID,
+                associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256,
-                expectedPlanSHA256: plan.sourceSHA256,
+                expectedTransactionSHA256: plan.sourceSHA256,
                 consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
             )
         }
         #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
             _ = try DeviceWriteAuthorization.authorize(
                 plan: plan,
-                associationID: associationID,
+                associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256,
-                expectedPlanSHA256: plan.resultSHA256,
+                expectedTransactionSHA256: plan.transactionSHA256(
+                    associationID: Self.associationID,
+                    verifiedBackupSHA256: backupSHA256
+                ),
                 consent: "yes"
             )
         }
+    }
+
+    @Test("A reviewed transaction cannot authorize a different source or device")
+    func transactionDigestBindsCompleteContext() throws {
+        let reviewedSource = try keymapDocument(valuePrefix: "reviewed")
+        let reviewedPlan = try DeviceConfigurationWritePlan(
+            managedMapping: reviewedSource.planForCopilotMicro()
+        )
+        let backupSHA256 = reviewedSource.sha256
+        let reviewedTransaction = reviewedPlan.transactionSHA256(
+            associationID: Self.associationID,
+            verifiedBackupSHA256: backupSHA256
+        )
+
+        let changedSource = try keymapDocument(valuePrefix: "changed")
+        let changedPlan = try DeviceConfigurationWritePlan(
+            managedMapping: changedSource.planForCopilotMicro()
+        )
+        #expect(changedPlan.resultSHA256 == reviewedPlan.resultSHA256)
+        #expect(changedPlan.sourceSHA256 != reviewedPlan.sourceSHA256)
+        #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
+            _ = try DeviceWriteAuthorization.authorize(
+                plan: changedPlan,
+                associationID: Self.associationID,
+                verifiedBackupSHA256: backupSHA256,
+                expectedTransactionSHA256: reviewedTransaction,
+                consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+            )
+        }
+        #expect(
+            reviewedTransaction
+                != reviewedPlan.transactionSHA256(
+                    associationID: String(repeating: "b", count: 64),
+                    verifiedBackupSHA256: backupSHA256
+                )
+        )
     }
 
     @Test("Restore requires compatible original data and its verified checksum")
@@ -58,7 +100,10 @@ struct DeviceConfigurationWriteTests {
             plan: restore,
             associationID: associationID,
             verifiedBackupSHA256: original.sha256,
-            expectedPlanSHA256: restore.resultSHA256,
+            expectedTransactionSHA256: restore.transactionSHA256(
+                associationID: associationID,
+                verifiedBackupSHA256: original.sha256
+            ),
             consent: "I-reviewed-the-original-backup-and-authorize-one-restore"
         )
         #expect(authorization.operation == .restoreOriginal)
@@ -69,10 +114,90 @@ struct DeviceConfigurationWriteTests {
                 plan: restore,
                 associationID: associationID,
                 verifiedBackupSHA256: String(repeating: "b", count: 64),
-                expectedPlanSHA256: restore.resultSHA256,
+                expectedTransactionSHA256: restore.transactionSHA256(
+                    associationID: associationID,
+                    verifiedBackupSHA256: String(repeating: "b", count: 64)
+                ),
                 consent: "I-reviewed-the-original-backup-and-authorize-one-restore"
             )
         }
+    }
+
+    @Test("Executor rejects stale state before writing")
+    func staleStateDoesNotWrite() throws {
+        let preview = try keymapDocument(valuePrefix: "preview")
+        let plan = try DeviceConfigurationWritePlan(
+            managedMapping: preview.planForCopilotMicro()
+        )
+        let authorization = try authorize(plan: plan, backupSHA256: preview.sha256)
+        let changed = try keymapDocument(valuePrefix: "changed")
+        var writeCount = 0
+
+        #expect(throws: DeviceConfigurationWriteError.stalePlan) {
+            _ = try DeviceConfigurationExecutor.apply(
+                plan: plan,
+                authorization: authorization,
+                associationID: Self.associationID,
+                readKeymap: { Self.rpcResult(changed.data) },
+                writeKeymap: { _ in
+                    writeCount += 1
+                    return ["ok": 1]
+                }
+            )
+        }
+        #expect(writeCount == 0)
+    }
+
+    @Test("Executor requires read-back rather than trusting acknowledgement")
+    func acknowledgementIsNotVerification() throws {
+        let preview = try keymapDocument(valuePrefix: "preview")
+        let plan = try DeviceConfigurationWritePlan(
+            managedMapping: preview.planForCopilotMicro()
+        )
+        let authorization = try authorize(plan: plan, backupSHA256: preview.sha256)
+        var reads = 0
+
+        #expect(throws: DeviceConfigurationWriteError.readBackMismatch) {
+            _ = try DeviceConfigurationExecutor.apply(
+                plan: plan,
+                authorization: authorization,
+                associationID: Self.associationID,
+                readKeymap: {
+                    defer { reads += 1 }
+                    return Self.rpcResult(preview.data)
+                },
+                writeKeymap: { _ in ["ok": 1] }
+            )
+        }
+        #expect(reads == 2)
+    }
+
+    @Test("Executor verifies a successful semantic read-back")
+    func verifiedWriteReturnsReceipt() throws {
+        let preview = try keymapDocument(valuePrefix: "preview")
+        let plan = try DeviceConfigurationWritePlan(
+            managedMapping: preview.planForCopilotMicro()
+        )
+        let authorization = try authorize(plan: plan, backupSHA256: preview.sha256)
+        var reads = 0
+        let receipt = try DeviceConfigurationExecutor.apply(
+            plan: plan,
+            authorization: authorization,
+            associationID: Self.associationID,
+            readKeymap: {
+                defer { reads += 1 }
+                return Self.rpcResult(reads == 0 ? preview.data : plan.resultData)
+            },
+            writeKeymap: { data in
+                #expect(data == plan.resultData)
+                return ["ok": 1]
+            }
+        )
+        #expect(receipt.readBackVerified)
+        #expect(receipt.expectedResultSHA256 == plan.resultSHA256)
+        #expect(receipt.observedResultSHA256 == plan.resultSHA256)
+        #expect(receipt.activeProfileID == plan.activeProfileID)
+        #expect(receipt.activeLayerIndex == plan.activeLayerIndex)
     }
 
     private func keymapDocument(valuePrefix: String) throws -> DeviceKeymapDocument {
@@ -119,4 +244,26 @@ struct DeviceConfigurationWriteTests {
             activeLayerIndex: 0
         )
     }
+
+    private func authorize(
+        plan: DeviceConfigurationWritePlan,
+        backupSHA256: String
+    ) throws -> DeviceWriteAuthorization {
+        try DeviceWriteAuthorization.authorize(
+            plan: plan,
+            associationID: Self.associationID,
+            verifiedBackupSHA256: backupSHA256,
+            expectedTransactionSHA256: plan.transactionSHA256(
+                associationID: Self.associationID,
+                verifiedBackupSHA256: backupSHA256
+            ),
+            consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+        )
+    }
+
+    private static func rpcResult(_ data: Data) -> [String: Any] {
+        ["data": String(decoding: data, as: UTF8.self)]
+    }
+
+    private static let associationID = String(repeating: "a", count: 64)
 }

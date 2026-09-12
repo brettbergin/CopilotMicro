@@ -3,6 +3,20 @@ import Foundation
 import IOKit
 import IOKit.hid
 
+public enum HIDAccessMode: Equatable, Sendable {
+    case exclusiveConfiguration
+    case sharedReadOnly
+
+    var options: IOOptionBits {
+        switch self {
+        case .exclusiveConfiguration:
+            IOOptionBits(kIOHIDOptionsTypeSeizeDevice)
+        case .sharedReadOnly:
+            IOOptionBits(kIOHIDOptionsTypeNone)
+        }
+    }
+}
+
 public enum HIDReadMethod: Sendable {
     case deviceStatus
     case keymap
@@ -31,6 +45,7 @@ public enum HIDConnectionError: Error, LocalizedError {
     case candidateUnsupported(String)
     case configuration(DeviceConfigurationWriteError)
     case deviceRemoved
+    case exclusiveAccessFailed(UInt32)
     case malformedResponse
     case openFailed(UInt32)
     case requestFailed(String)
@@ -47,6 +62,12 @@ public enum HIDConnectionError: Error, LocalizedError {
             return error.localizedDescription
         case .deviceRemoved:
             return "The device disconnected while a read-only request was active."
+        case .exclusiveAccessFailed(let code):
+            return String(
+                format:
+                    "Exclusive configuration access failed with 0x%08X. Close other device configurators and retry.",
+                code
+            )
         case .malformedResponse:
             return "The device returned malformed JSON-RPC data."
         case .openFailed(let code):
@@ -83,6 +104,7 @@ public final class HIDRPCConnection {
 
     private let manager: IOHIDManager
     private let device: IOHIDDevice
+    private let accessMode: HIDAccessMode
     private let inputBuffer: UnsafeMutablePointer<UInt8>
     private var allocator = HIDRequestIDAllocator()
     private var responses: [Int: PendingRequest] = [:]
@@ -90,7 +112,10 @@ public final class HIDRPCConnection {
     private var closed = false
     private var removed = false
 
-    public static func connect(to registryID: UInt64) throws -> HIDRPCConnection {
+    public static func connect(
+        to registryID: UInt64,
+        accessMode: HIDAccessMode = .sharedReadOnly
+    ) throws -> HIDRPCConnection {
         let manager = try HIDNativeDiscovery.makeManager()
         let records = HIDNativeDiscovery.records(from: manager)
         guard let record = records.first(where: { $0.descriptor.registryID == registryID }) else {
@@ -101,26 +126,32 @@ public final class HIDRPCConnection {
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             throw HIDConnectionError.candidateUnsupported(record.descriptor.qualificationReason)
         }
-        let result = IOHIDDeviceOpen(record.device, IOOptionBits(kIOHIDOptionsTypeNone))
+        let result = IOHIDDeviceOpen(record.device, accessMode.options)
         guard result == kIOReturnSuccess else {
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            if accessMode == .exclusiveConfiguration {
+                throw HIDConnectionError.exclusiveAccessFailed(UInt32(bitPattern: result))
+            }
             throw HIDConnectionError.openFailed(UInt32(bitPattern: result))
         }
         return HIDRPCConnection(
             manager: manager,
             device: record.device,
-            descriptor: record.descriptor
+            descriptor: record.descriptor,
+            accessMode: accessMode
         )
     }
 
     private init(
         manager: IOHIDManager,
         device: IOHIDDevice,
-        descriptor: HIDDeviceDescriptor
+        descriptor: HIDDeviceDescriptor,
+        accessMode: HIDAccessMode
     ) {
         self.manager = manager
         self.device = device
         self.descriptor = descriptor
+        self.accessMode = accessMode
         self.inputBuffer = .allocate(capacity: CreatorMicro2Hardware.reportBytes)
         let context = Unmanaged.passUnretained(self).toOpaque()
         IOHIDDeviceRegisterInputReportCallback(
@@ -173,7 +204,7 @@ public final class HIDRPCConnection {
             CFRunLoopGetMain(),
             CFRunLoopMode.defaultMode.rawValue
         )
-        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
+        IOHIDDeviceClose(device, accessMode.options)
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
     }
 
@@ -186,54 +217,34 @@ public final class HIDRPCConnection {
         authorization: DeviceWriteAuthorization,
         timeoutSeconds: Double = 8
     ) throws -> DeviceWriteReceipt {
-        guard
-            descriptor.associationID == authorization.associationID,
-            plan.operation == authorization.operation,
-            plan.sourceSHA256 == authorization.sourceSHA256,
-            plan.resultSHA256 == authorization.resultSHA256
-        else {
-            throw HIDConnectionError.configuration(.authorizationMismatch)
+        guard accessMode == .exclusiveConfiguration else {
+            throw HIDConnectionError.configuration(.exclusiveAccessRequired)
         }
-        let current = try DeviceKeymapDocument(
-            rpcResult: read(.keymap, timeoutSeconds: timeoutSeconds),
-            activeLayerIndex: plan.activeLayerIndex
-        )
-        guard current.sha256 == plan.sourceSHA256 else {
-            throw HIDConnectionError.configuration(.stalePlan)
+        do {
+            return try DeviceConfigurationExecutor.apply(
+                plan: plan,
+                authorization: authorization,
+                associationID: descriptor.associationID,
+                readKeymap: {
+                    try self.read(.keymap, timeoutSeconds: timeoutSeconds)
+                },
+                writeKeymap: { data in
+                    guard let encoded = String(data: data, encoding: .utf8) else {
+                        throw DeviceConfigurationWriteError.writeRejected
+                    }
+                    return try self.request(
+                        method: "fs.write",
+                        params: [
+                            "file": "keymap.json",
+                            "data": encoded,
+                        ],
+                        timeoutSeconds: timeoutSeconds
+                    )
+                }
+            )
+        } catch let error as DeviceConfigurationWriteError {
+            throw HIDConnectionError.configuration(error)
         }
-        guard let encoded = String(data: plan.resultData, encoding: .utf8) else {
-            throw HIDConnectionError.configuration(.writeRejected)
-        }
-        let response = try request(
-            method: "fs.write",
-            params: [
-                "file": "keymap.json",
-                "data": encoded,
-            ],
-            timeoutSeconds: timeoutSeconds
-        )
-        guard
-            let object = response as? [String: Any],
-            HIDJSONNumber.integer(object["ok"]) == 1
-        else {
-            throw HIDConnectionError.configuration(.writeRejected)
-        }
-        let readBack = try DeviceKeymapDocument(
-            rpcResult: read(.keymap, timeoutSeconds: timeoutSeconds),
-            activeLayerIndex: plan.activeLayerIndex
-        )
-        guard
-            readBack.sha256 == plan.resultSHA256
-                || readBack.isSemanticallyEqual(to: plan.resultData)
-        else {
-            throw HIDConnectionError.configuration(.readBackMismatch)
-        }
-        return DeviceWriteReceipt(
-            operation: plan.operation,
-            sourceSHA256: plan.sourceSHA256,
-            resultSHA256: readBack.sha256,
-            readBackVerified: true
-        )
     }
 
     private func request(

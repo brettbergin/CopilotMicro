@@ -9,8 +9,11 @@ part of stage 3 also has native/Node mock evidence for private authenticated
 IPC, bounded frames, roles, generations, sequences and rejection cases. The app
 does not start it. A separate source-only probe joined owned disposable Copilot
 CLI `1.0.84-5` sessions and produced a conservative compatibility report.
-This does not qualify the production bridge, terminal, HID or updater, and it
-does not convert simulated acceptance journeys into hardware evidence.
+USB HID discovery/read and the original-backup/mapping-preview path now have
+real-device evidence. No device mapping write has been performed. This does
+not qualify the production bridge, terminal, physical input, lighting,
+Bluetooth or updater, and it does not convert simulated acceptance journeys
+into hardware evidence.
 
 ## Delivery strategy
 
@@ -56,7 +59,7 @@ contract was not.
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
 | U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | Partial | USB read-only transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; Bluetooth, exact Pro behavior, input, lighting and writes remain unproven | Visible LED/input behavior and reversible map on exact hardware |
+| U-09 | Current Pro firmware and both transports | Partial | USB read-only transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; the original keymap is durably backed up and a 19-change map is previewed, but Bluetooth, exact Pro behavior, input, lighting, a real write and restore remain unproven | Visible LED/input behavior and reversible map on exact hardware |
 | U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
 Qualification probes must not authorize production tools, alter real work, flash

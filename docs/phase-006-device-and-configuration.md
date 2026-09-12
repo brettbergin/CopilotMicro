@@ -6,8 +6,12 @@ Implementation status: the version-1 local and portable configuration schemas,
 atomic user-only settings store, bounded recovery history, strict import
 preview/confirmation flow and GUI wiring are implemented. Native IOKit
 discovery, bounded HID framing/reassembly and an explicit read-only hardware
-probe are implemented. Device backups, managed keymap writes, physical input,
-lighting and restore remain unimplemented.
+probe are implemented. The guarded setup tool now implements durable original
+backup, bounded recovery history, exact mapping/restore previews, exclusive
+one-write authorization and complete read-back verification. The original USB
+keymap has been backed up and a managed mapping preview generated; no mapping
+write has been authorized or performed. Physical input, lighting, Bluetooth
+and a real restore remain unqualified.
 
 ## Supported hardware boundary
 
@@ -59,6 +63,34 @@ The OS product string does not include `Pro`; exact Pro feature qualification
 therefore still depends on reversible mapping, input and lighting behavior.
 Bluetooth remains untested.
 
+### Initial mapping preview and backup
+
+The first USB preview stored the original 2,078-byte keymap in a user-only
+atomic envelope associated with a SHA-256-derived device identifier. The
+envelope stores product, firmware, keymap schema, timestamp, base64 payload and
+payload checksum; it contains no raw serial field. A second preview loaded and
+verified the existing backup rather than replacing it.
+
+The exact preview contains 19 changes:
+
+- Active layer `2`: 13 key contacts become `KV_OAI_AG00` through
+  `KV_OAI_AG12`.
+- Active layer `2`: encoder clockwise/counter-clockwise become
+  `KV_OAI_AG13` and `KV_OAI_AG14`; encoder press is preserved.
+- Layer `0`: the unique radial joystick layer's four cardinal sectors become
+  `KV_OAI_AG15` through `KV_OAI_AG18`; diagonals are preserved.
+
+The current configuration has radial joystick sectors only on layer `0`, while
+the active key/encoder layer is `2`. The implementation therefore selects the
+active layer for keys/encoder and requires exactly one structurally complete
+joystick layer rather than assuming all controls occupy layer zero.
+
+The preview transaction digest binds the operation, private device
+association, source and target hashes, verified backup hash, active
+profile/layer and normalized changes. Apply/restore reacquire the HID device
+exclusively, regenerate that digest from a fresh read, save a pre-change
+snapshot, write the complete keymap once and verify a complete read-back.
+
 ## Managed bindings
 
 The reference stock-firmware path assigns `KV_OAI_AG*` bindings on an active
@@ -98,6 +130,11 @@ automatically overwrite the original backup with the managed mapping.
 Before later configuration writes, keep a bounded pre-change recovery
 snapshot. Detect external changes made by Input or another configurator;
 do not overwrite them silently with a stale cached copy.
+
+Mutating transactions must seize exclusive access to the vendor HID interface.
+If another configurator prevents exclusive ownership, stop before the backup
+snapshot or write and ask the user to close it. Non-exclusive read access is
+used only for discovery and preview.
 
 Ordinary light changes and local action reassignment must not rewrite the
 device keymap when its event bindings are already correct.

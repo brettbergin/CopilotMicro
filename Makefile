@@ -5,7 +5,7 @@ SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
 SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
-.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-hardware lint format check
+.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-hardware preview-device-mapping apply-device-mapping preview-device-restore restore-device-mapping lint format check
 
 help:
 	@printf '%s\n' \
@@ -22,6 +22,10 @@ help:
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
 		'qualify-cli   Explicitly launch an owned disposable CLI capability probe' \
 		'qualify-hardware Run the read-only Creator Micro 2 hardware probe with exact consent' \
+		'preview-device-mapping Save/verify the original backup and print the exact non-mutating mapping plan' \
+		'apply-device-mapping Apply one reviewed mapping plan, then verify read-back' \
+		'preview-device-restore Print the exact non-mutating original-map restore plan' \
+		'restore-device-mapping Restore one reviewed original backup, then verify read-back' \
 		'lint          Check JavaScript syntax and Swift formatting' \
 		'format        Apply the repository Swift formatting configuration' \
 		'check         Run local tooling, Core and headless native checks; no live integrations'
@@ -72,6 +76,24 @@ qualify-cli:
 qualify-hardware:
 	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi
 	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroHardwareProbe
+
+preview-device-mapping:
+	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup preview --consent="$(CONSENT)"
+
+apply-device-mapping:
+	@if [ -z "$(PLAN_SHA)" ]; then printf '%s\n' 'PLAN_SHA is required from preview-device-mapping' >&2; exit 2; fi
+	@if [ "$(CONSENT)" != "I-reviewed-the-device-mapping-and-authorize-one-write" ]; then printf '%s\n' 'CONSENT must be I-reviewed-the-device-mapping-and-authorize-one-write' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup apply --plan-sha="$(PLAN_SHA)" --consent="$(CONSENT)"
+
+preview-device-restore:
+	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup preview-restore --consent="$(CONSENT)"
+
+restore-device-mapping:
+	@if [ -z "$(PLAN_SHA)" ]; then printf '%s\n' 'PLAN_SHA is required from preview-device-restore' >&2; exit 2; fi
+	@if [ "$(CONSENT)" != "I-reviewed-the-original-backup-and-authorize-one-restore" ]; then printf '%s\n' 'CONSENT must be I-reviewed-the-original-backup-and-authorize-one-restore' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup restore --plan-sha="$(PLAN_SHA)" --consent="$(CONSENT)"
 
 lint:
 	node --check scripts/doctor
