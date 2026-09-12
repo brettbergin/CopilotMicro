@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "hardware": "creator-micro-2-pro",
+  "controls": [
+    {
+      "id": "key.sessions",
+      "visualPosition": "top-left",
+      "matrixContacts": [
+        1
+      ],
+      "defaultAction": "session.openList",
+      "oneShot": true
+    },
+    {
+      "id": "key.new",
+      "visualPosition": "top-right",
+      "matrixContacts": [
+        0
+      ],
+      "defaultAction": "session.create",
+      "oneShot": true
+    },
+    {
+      "id": "key.previous",
+      "visualPosition": "second-row-first",
+      "matrixContacts": [
+        2
+      ],
+      "defaultAction": "session.previous",
+      "oneShot": true
+    },
+    {
+      "id": "key.next",
+      "visualPosition": "second-row-second",
+      "matrixContacts": [
+        3
+      ],
+      "defaultAction": "session.next",
+      "oneShot": true
+    },
+    {
+      "id": "key.archive",
+      "visualPosition": "second-row-third",
+      "matrixContacts": [
+        4
+      ],
+      "defaultAction": "session.archive",
+      "oneShot": true
+    },
+    {
+      "id": "key.mode",
+      "visualPosition": "second-row-fourth",
+      "matrixContacts": [
+        5
+      ],
+      "defaultAction": "session.cycleMode",
+      "oneShot": true
+    },
+    {
+      "id": "key.model",
+      "visualPosition": "third-row-first",
+      "matrixContacts": [
+        6
+      ],
+      "defaultAction": "session.selectModel",
+      "oneShot": true
+    },
+    {
+      "id": "key.effort",
+      "visualPosition": "third-row-second",
+      "matrixContacts": [
+        7
+      ],
+      "defaultAction": "session.selectEffort",
+      "oneShot": true
+    },
+    {
+      "id": "key.voice",
+      "visualPosition": "third-row-third",
+      "matrixContacts": [
+        8
+      ],
+      "defaultAction": "session.voice",
+      "oneShot": true
+    },
+    {
+      "id": "key.cancel",
+      "visualPosition": "third-row-fourth",
+      "matrixContacts": [
+        9
+      ],
+      "defaultAction": "session.cancelForeground",
+      "oneShot": true
+    },
+    {
+      "id": "key.submit",
+      "visualPosition": "bottom-wide",
+      "matrixContacts": [
+        10,
+        11
+      ],
+      "defaultAction": "composer.submit",
+      "oneShot": true
+    },
+    {
+      "id": "key.focus",
+      "visualPosition": "bottom-right",
+      "matrixContacts": [
+        12
+      ],
+      "defaultAction": "composer.focus",
+      "oneShot": true
+    }
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://copilot-micro.local/contracts/bridge-v1.schema.json",
+  "title": "Copilot Micro local bridge protocol version 1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/actionRequest"
+    },
+    {
+      "$ref": "#/$defs/actionResult"
+    },
+    {
+      "$ref": "#/$defs/sessionSnapshot"
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]+$"
+    },
+    "actionType": {
+      "type": "string",
+      "enum": [
+        "session.openList",
+        "session.create",
+        "session.previous",
+        "session.next",
+        "session.archive",
+        "session.cycleMode",
+        "session.selectModel",
+        "session.selectEffort",
+        "session.voice",
+        "session.cancelForeground",
+        "composer.submit",
+        "composer.focus",
+        "picker.confirm",
+        "picker.back",
+        "permission.approveOnce",
+        "permission.reject"
+      ]
+    },
+    "actionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "requestId",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+        "action"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "action"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "generation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "$ref": "#/$defs/actionType"
+            },
+            "permissionRequestId": {
+              "$ref": "#/$defs/identifier"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "permission.approveOnce",
+                      "permission.reject"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "permissionRequestId"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "permissionRequestId"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "actionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "requestId",
+        "outcome",
+        "message"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "actionResult"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "completed",
+            "rejected",
+            "failed"
+          ]
+        },
+        "code": {
+          "enum": [
+            "focusConsumed",
+            "disconnected",
+            "unsynchronized",
+            "staleInstance",
+            "staleSession",
+            "staleGeneration",
+            "staleContext",
+            "capabilityUnavailable",
+            "capabilityBlocked",
+            "capabilityUnknown",
+            "invalidRequest",
+            "permissionRequestNotPending",
+            "permissionRequestNotVisible",
+            "timedOut",
+            "hostRejected",
+            "transportFailure",
+            "alreadyResolved"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "supported",
+            "unavailable",
+            "blocked",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "gapReference": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "recoveryAction": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "pendingAttention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestId",
+        "kind"
+      ],
+      "properties": {
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": [
+            "permission",
+            "question",
+            "elicitation",
+            "planDecision"
+          ]
+        }
+      }
+    },
+    "sessionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "messageType",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+        "connection",
+        "mode",
+        "work",
+        "pendingAttention",
+        "capabilities"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": 1
+        },
+        "messageType": {
+          "const": "sessionSnapshot"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "generation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "contextRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connection": {
+          "enum": [
+            "connecting",
+            "synchronizing",
+            "ready",
+            "reconnecting",
+            "paused",
+            "shuttingDown"
+          ]
+        },
+        "mode": {
+          "oneOf": [
+            {
+              "enum": [
+                "default",
+                "plan",
+                "autopilot"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "work": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "known",
+            "foregroundActive",
+            "backgroundCount",
+            "queuedCount"
+          ],
+          "properties": {
+            "known": {
+              "type": "boolean"
+            },
+            "foregroundActive": {
+              "type": "boolean"
+            },
+            "backgroundCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "queuedCount": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "pendingAttention": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/pendingAttention"
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "visiblePermissionRequestId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "category"
+              ],
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "category": {
+                  "enum": [
+                    "host",
+                    "integration",
+                    "protocolViolation",
+                    "device"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completionId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

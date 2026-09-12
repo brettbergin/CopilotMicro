@@ -5,9 +5,10 @@ the ten `docs/phase-00*.md` documents; start with phase 000 for ownership.
 
 ## Current implementation boundary
 
-Developer setup tooling and an emulator-only native menu bar/manager scaffold
-exist. Controls/lighting simulation and live CLI/device integrations are not
-implemented yet. Complete the GUI/emulator before connecting live integrations.
+Developer setup tooling, an emulator-only native menu bar/manager scaffold and
+the deterministic controls/session/lighting contract layer exist. The complete
+GUI simulator and live CLI/device integrations are not implemented yet.
+Complete the GUI/emulator before connecting live integrations.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -23,6 +24,8 @@ the repository could load it into a real session.
 - `make doctor`: read-only local native developer prerequisite report.
 - `make test-doctor`: isolated Node tests for the prerequisite checker.
 - `make test-packager`: isolated Node tests for safe app packaging.
+- `make test-contracts`: shared schema, action, control and negative-fixture
+  checks used by both the native model and future JavaScript bridge.
 - `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.
 - `make build`: compile the native arm64 executable.
 - `make package`: build/sign an app in a fresh generated output directory.

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "actions": [
+    {
+      "id": "session.openList",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.create",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.previous",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.next",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.archive",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.cycleMode",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.selectModel",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.selectEffort",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.voice",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "session.cancelForeground",
+      "category": "session",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "composer.submit",
+      "category": "composer",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "composer.focus",
+      "category": "composer",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "picker.confirm",
+      "category": "picker",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "picker.back",
+      "category": "picker",
+      "permissionRequestArgument": "forbidden"
+    },
+    {
+      "id": "permission.approveOnce",
+      "category": "permission",
+      "permissionRequestArgument": "required"
+    },
+    {
+      "id": "permission.reject",
+      "category": "permission",
+      "permissionRequestArgument": "required"
+    }
+  ]
+}

@@ -9,8 +9,9 @@ controls. A graphical manager provides onboarding, remapping, diagnostics and
 local configuration.
 
 **Status:** early native foundation. The menu bar, Open Manager/Quit actions,
-emulator-only manager window, app packaging and Core tests exist. Controls and
-lighting simulation, and live hardware/CLI integrations, are not implemented yet.
+emulator-only manager window, app packaging, versioned contracts and
+deterministic controls/session/lighting reducers exist. The complete GUI
+simulator and live hardware/CLI integrations are not implemented yet.
 
 ## Developer setup
 
@@ -50,13 +51,13 @@ make check
 make package
 ```
 
-`make check` runs source checks, Node/Core unit tests, hidden AppKit/SwiftUI and
-resource smoke, and a bounded accessory startup smoke through the production
-app-delegate, main-menu and status-item wiring. It does not display a window,
-request permissions or touch a device/CLI session, and the accessory process
-exits immediately. Its generated smoke package directory is removed by an
-exact-path safety check. Core tests use the pinned official Swift Testing
-dependency; first resolution downloads public packages.
+`make check` runs source checks, shared contract fixtures, Node/Core unit tests,
+hidden AppKit/SwiftUI and resource smoke, and a bounded accessory startup smoke
+through the production app-delegate, main-menu and status-item wiring. It does
+not display a window, request permissions or touch a device/CLI session, and
+the accessory process exits immediately. Its generated smoke package directory
+is removed by an exact-path safety check. Core tests use the pinned official
+Swift Testing dependency; first resolution downloads public packages.
 
 `make package` prints the signed app's absolute `appPath` as JSON. Each call
 uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu

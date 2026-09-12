@@ -3,6 +3,11 @@
 Scope: F-02, F-03, F-05, F-08 through F-17.
 Status: agreed UX; exact wire behavior requires hardware qualification.
 
+Implementation status: `CopilotMicroCore` now contains the deterministic
+physical-contact normalization, session reducer and all-key lighting
+projection used by the emulator. This is model-level evidence only; no HID
+device has been opened and no physical color/effect is qualified yet.
+
 ## Physical model
 
 Creator Micro 2 Pro reference evidence describes 13 switch/LED positions under

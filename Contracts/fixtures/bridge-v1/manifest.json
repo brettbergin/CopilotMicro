@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "valid-cancel",
+      "file": "valid-cancel.json",
+      "decode": "valid",
+      "guard": "allowed"
+    },
+    {
+      "name": "valid-visible-permission",
+      "file": "valid-visible-permission.json",
+      "decode": "valid",
+      "guard": "allowed"
+    },
+    {
+      "name": "extra-top-level-field",
+      "file": "invalid-extra-field.json",
+      "decode": "unexpectedField"
+    },
+    {
+      "name": "unsupported-version",
+      "file": "invalid-unsupported-version.json",
+      "decode": "unsupportedProtocol"
+    },
+    {
+      "name": "unknown-action",
+      "file": "invalid-unknown-action.json",
+      "decode": "unsupportedAction"
+    },
+    {
+      "name": "missing-permission-request",
+      "file": "invalid-permission-missing-request.json",
+      "decode": "invalidArguments"
+    },
+    {
+      "name": "stale-generation",
+      "file": "valid-stale-generation.json",
+      "decode": "valid",
+      "guard": "staleGeneration"
+    },
+    {
+      "name": "stale-context",
+      "file": "valid-stale-context.json",
+      "decode": "valid",
+      "guard": "staleContext"
+    },
+    {
+      "name": "stale-permission-request",
+      "file": "valid-stale-permission.json",
+      "decode": "valid",
+      "guard": "permissionRequestNotPending"
+    },
+    {
+      "name": "oversized-message",
+      "generator": "oversized",
+      "decode": "messageTooLarge"
+    }
+  ]
+}
