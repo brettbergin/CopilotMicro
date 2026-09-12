@@ -9,7 +9,7 @@ public struct EmulatorConfiguration: Codable, Equatable, Sendable {
         case emulator
     }
 
-    public enum ValidationError: Error {
+    public enum ValidationError: Error, Equatable {
         case unsupportedSchema
         case liveIntegrationsForbidden
     }
