@@ -12,8 +12,10 @@ implemented. The authenticated local IPC package and isolated Node client now
 exist, but the app does not start a socket and no production CLI extension is
 installed. A passive source-only probe has qualified bounded surfaces in owned
 disposable Copilot CLI `1.0.84-5` sessions. Its evidence does not enable live
-app control. All production CLI/device integrations remain unimplemented.
-Preserve the emulator/live boundary while promoting only qualified behavior.
+app control. Native read-only Creator Micro 2 discovery and bounded HID
+JSON-RPC qualification now exist as an explicit developer probe; the app does
+not open HID and no configuration/lighting writes exist. Preserve the
+emulator/live boundary while promoting only qualified behavior.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -45,13 +47,17 @@ the repository could load it into a real session.
 - `make qualify-cli CONSENT=I-own-this-disposable-session`: explicitly launch
   the passive probe in an owned disposable project. Add `ACTIVE=1` only for
   the fixed reversible mode/effort probes.
+- `make qualify-hardware CONSENT=I-own-this-device-read`: explicitly discover,
+  open non-exclusively and read bounded identity/status/keymap metadata from
+  one Creator Micro 2 candidate. It performs no configuration or lighting
+  mutation.
 
 Use `PACKAGE_OUTPUT=build/<new-name>` for a chosen packaging destination.
 Existing apps are never overwritten or deleted. Do not describe headless
 checks, an emulator or a HID acknowledgement as qualified live device support.
 Use command-scoped `DEVELOPER_DIR`; never silently change global `xcode-select`.
 
-`scripts/swiftpm` is the shared build/test entry point. It uses app-owned
+`scripts/swiftpm` is the shared build/run/test entry point. It uses app-owned
 SwiftPM caches/configuration, disables interactive credentials and strips
 GitHub/Copilot token variables. It keeps the user's global
 `safe.bareRepository` policy unchanged while permitting only SwiftPM-generated

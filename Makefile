@@ -5,7 +5,7 @@ SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
 SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
-.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli lint format check
+.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-hardware lint format check
 
 help:
 	@printf '%s\n' \
@@ -21,6 +21,7 @@ help:
 		'test-cli-probe Run disposable CLI probe staging and evidence tests' \
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
 		'qualify-cli   Explicitly launch an owned disposable CLI capability probe' \
+		'qualify-hardware Run the read-only Creator Micro 2 hardware probe with exact consent' \
 		'lint          Check JavaScript syntax and Swift formatting' \
 		'format        Apply the repository Swift formatting configuration' \
 		'check         Run local tooling, Core and headless native checks; no live integrations'
@@ -67,6 +68,10 @@ qualify-cli:
 	@if [ -n "$(ACTIVE)" ] && [ "$(ACTIVE)" != "1" ]; then printf '%s\n' 'ACTIVE must be exactly 1 when set' >&2; exit 2; fi
 	@if [ -n "$(PERMISSION_EVENTS)" ] && [ "$(PERMISSION_EVENTS)" != "1" ]; then printf '%s\n' 'PERMISSION_EVENTS must be exactly 1 when set' >&2; exit 2; fi
 	node scripts/qualify-cli.mjs --consent "$(CONSENT)" $(if $(ACTIVE),--active,) $(if $(PERMISSION_EVENTS),--permission-events,)
+
+qualify-hardware:
+	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroHardwareProbe
 
 lint:
 	node --check scripts/doctor

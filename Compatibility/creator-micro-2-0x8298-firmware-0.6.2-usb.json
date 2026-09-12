@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-12T21:49:55Z",
+  "outcome": "read-only-qualified",
+  "product": "Creator Micro 2",
+  "productID": "0x8298",
+  "transport": "usb",
+  "vendorCollection": "0xFF00/1",
+  "inputReportBytes": 64,
+  "outputReportBytes": 64,
+  "serialPresent": true,
+  "firmwareVersion": "0.6.2",
+  "status": {
+    "activeLayerIndex": 2,
+    "battery": 99,
+    "charging": true
+  },
+  "keymap": {
+    "activeLayerAvailable": true,
+    "activeLayerKeyRowLengths": [
+      2,
+      4,
+      4,
+      3
+    ],
+    "activeProfileID": 0,
+    "activeProfileLayerCount": 3,
+    "activeProfileMatched": true,
+    "byteCount": 2078,
+    "profileCount": 1,
+    "schemaVersion": 1
+  },
+  "unexpectedResponseCount": 0,
+  "notificationCount": 0,
+  "mutatingOperationsPerformed": false
+}

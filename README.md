@@ -11,8 +11,10 @@ local configuration.
 **Status:** interactive GUI emulator. The menu panel, seven-area manager,
 original pad editor, session/control simulator, lighting preview, app packaging,
 versioned contracts, deterministic reducers, atomic local settings, previewed
-portable import/export and bounded redacted diagnostics exist. All live
-hardware/CLI integrations remain unavailable and clearly disabled. An
+portable import/export and bounded redacted diagnostics exist. Live product
+hardware/CLI control remains unavailable and clearly disabled. A read-only
+developer hardware probe can now discover and inspect an explicitly owned
+Creator Micro 2 without changing its configuration or lighting. An
 owner-restricted Unix-domain IPC package and isolated Node client now share
 bounded authentication, framing, role, generation and sequence contracts, but
 the app does not start that listener and no production CLI extension is
@@ -162,6 +164,36 @@ owned session. The qualifier does not pass a synthetic session ID, strips
 GitHub/Copilot token environment variables and removes only its marker-verified
 workspace unless explicitly kept. Normal `make check` stages/tests the probe
 but never launches Copilot CLI.
+
+## Read-only hardware qualification
+
+`CopilotMicroDevice` implements native IOKit discovery and a bounded,
+byte-oriented 64-byte HID JSON-RPC transport. Candidate selection requires
+Work Louder vendor ID `0x303A`, product ID `0x8297` or `0x8298`, a Creator
+Micro 2 product name, vendor usage page `0xFF00` usage `1`, and 64-byte input
+and output reports. The transport opens non-exclusively and exposes only three
+read methods: `sys.version`, `device.status`, and `fs.read` for
+`keymap.json`.
+
+Run the explicit developer probe:
+
+```sh
+make qualify-hardware CONSENT=I-own-this-device-read
+```
+
+The output omits the serial number and full keymap. It reports bounded identity,
+firmware, status and keymap-shape metadata. The initial USB qualification found
+product `Creator Micro 2`, PID `0x8298`, firmware `0.6.2`, active layer index
+`2`, three layers and key rows `[2,4,4,3]`; see
+[`Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json`](Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json).
+This proves read-only transport and explicitly disproves any assumption that
+the active layer is the first layer. It does not yet qualify Bluetooth, Pro
+marketing identity, physical input, lighting or keymap writes.
+
+If opening the vendor collection is denied, grant Input Monitoring to the
+terminal running the probe, wake the device and retry. `make check` never opens
+HID. The packaged GUI remains emulator-only until the later live service
+assembly is complete.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;

@@ -265,6 +265,9 @@ export function loadContractCatalogs(root) {
   const cliCapabilityEvidenceSchema = readJSON(
     path.join(contracts, "cli-capability-evidence-v1.schema.json"),
   );
+  const hardwareCapabilityEvidenceSchema = readJSON(
+    path.join(contracts, "hardware-capability-evidence-v1.schema.json"),
+  );
   assert.equal(actions.schemaVersion, 1);
   assert.equal(controls.schemaVersion, 1);
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
@@ -272,6 +275,7 @@ export function loadContractCatalogs(root) {
   assert.equal(configurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(portableConfigurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(cliCapabilityEvidenceSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(hardwareCapabilityEvidenceSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
 
   const actionCatalog = new Map();
   for (const action of actions.actions) {
@@ -351,6 +355,7 @@ export function loadContractCatalogs(root) {
     configurationSchema,
     portableConfigurationSchema,
     cliCapabilityEvidenceSchema,
+    hardwareCapabilityEvidenceSchema,
   };
 }
 
@@ -358,6 +363,7 @@ export function runContractChecks(root) {
   const {
     actionCatalog,
     cliCapabilityEvidenceSchema,
+    hardwareCapabilityEvidenceSchema,
     resultCodes,
   } = loadContractCatalogs(root);
   const fixtureDirectory = path.join(root, "Contracts", "fixtures", "bridge-v1");
@@ -425,6 +431,16 @@ export function runContractChecks(root) {
       readJSON(path.join(root, "Compatibility", report)),
     );
   }
+  const hardwareReports = fs.readdirSync(path.join(root, "Compatibility"))
+    .filter((file) => /^creator-micro-2-.+\.json$/u.test(file))
+    .sort();
+  assert.ok(hardwareReports.length > 0, "missing hardware compatibility report");
+  for (const report of hardwareReports) {
+    validateJsonSchema(
+      hardwareCapabilityEvidenceSchema,
+      readJSON(path.join(root, "Compatibility", report)),
+    );
+  }
   return {
     actionCount: actionCatalog.size,
     controlCount: 12,
@@ -433,6 +449,8 @@ export function runContractChecks(root) {
     configurationSchemaCount: 2,
     cliCapabilityEvidenceSchemaCount: 1,
     cliCompatibilityReportCount: compatibilityReports.length,
+    hardwareCapabilityEvidenceSchemaCount: 1,
+    hardwareCompatibilityReportCount: hardwareReports.length,
     ipcFixtureCount: ipcManifest.cases.length,
   };
 }

@@ -56,7 +56,7 @@ contract was not.
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
 | U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | Unproven | No hardware probe in this work package | Visible LED/input behavior and reversible map on exact hardware |
+| U-09 | Current Pro firmware and both transports | Partial | USB read-only transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; Bluetooth, exact Pro behavior, input, lighting and writes remain unproven | Visible LED/input behavior and reversible map on exact hardware |
 | U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
 Qualification probes must not authorize production tools, alter real work, flash
@@ -150,6 +150,11 @@ through U-08 only; it does not use the production bridge. Use further
 contract/integration tests with owned disposable CLI sessions for bridge and
 terminal behavior. Use real-device qualification for physical geometry,
 lighting, transport and restore.
+
+The read-only hardware probe provides partial U-09 evidence and validates
+byte-fragment reassembly, request bounds, active profile identity and a
+non-first active layer. It does not count as A-22, A-24, A-30 or A-33 because
+no mapping, physical input, light output, reconnect or restore was exercised.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful

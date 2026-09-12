@@ -7,8 +7,10 @@ configuration/diagnostics module exist. The authenticated local socket,
 source-only Node client, shared negative IPC fixtures and disposable CLI
 capability probe now exist. The app does not start the socket and no production
 extension is installed. The probe has joined owned CLI sessions, but the
-production CLI-hosted session bridge, device and live-session components remain
-unimplemented.
+production CLI-hosted session bridge and live-session components remain
+unimplemented. The device boundary now has read-only IOKit discovery, bounded
+HID JSON-RPC framing and one qualified USB tuple; no app-owned device service,
+input, lighting or configuration write is enabled.
 
 ## Component boundaries
 

@@ -11,7 +11,10 @@ authentication, strict roles, bounded frames, generations and ordered
 sequences. It is not started by the app and has not joined a CLI session.
 A separate passive probe has joined owned disposable CLI sessions without
 using the production IPC path. Live production extension authority, device
-writes and updater boundaries remain design requirements.
+writes and updater boundaries remain design requirements. The read-only
+hardware qualifier now opens one exact candidate non-exclusively and allowlists
+only version, status and keymap reads. Its evidence excludes the serial number
+and full configuration.
 
 ## Trust boundaries
 

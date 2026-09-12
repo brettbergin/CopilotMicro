@@ -7,7 +7,9 @@ let package = Package(
     products: [
         .library(name: "CopilotMicroCore", targets: ["CopilotMicroCore"]),
         .library(name: "CopilotMicroBridge", targets: ["CopilotMicroBridge"]),
+        .library(name: "CopilotMicroDevice", targets: ["CopilotMicroDevice"]),
         .library(name: "CopilotMicroStorage", targets: ["CopilotMicroStorage"]),
+        .executable(name: "CopilotMicroHardwareProbe", targets: ["CopilotMicroHardwareProbe"]),
     ],
     dependencies: [
         // Keep the verified CLT-compatible runtime pinned and confined to the test target.
@@ -22,6 +24,14 @@ let package = Package(
         .target(
             name: "CopilotMicroStorage",
             dependencies: ["CopilotMicroCore"]
+        ),
+        .target(
+            name: "CopilotMicroDevice",
+            linkerSettings: [.linkedFramework("IOKit")]
+        ),
+        .executableTarget(
+            name: "CopilotMicroHardwareProbe",
+            dependencies: ["CopilotMicroDevice"]
         ),
         .testTarget(
             name: "CopilotMicroCoreTests",
@@ -41,6 +51,13 @@ let package = Package(
             name: "CopilotMicroStorageTests",
             dependencies: [
                 "CopilotMicroStorage",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
+        ),
+        .testTarget(
+            name: "CopilotMicroDeviceTests",
+            dependencies: [
+                "CopilotMicroDevice",
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),

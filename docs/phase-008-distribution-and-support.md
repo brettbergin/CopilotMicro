@@ -48,6 +48,11 @@ An unknown CLI/OS/terminal build gets a compatibility explanation, not a blind
 attempt at sensitive actions. Do not downgrade/update the user's CLI silently.
 New macOS major versions require separate qualification.
 
+The initial hardware tuple is read-only USB evidence for macOS-reported
+`Creator Micro 2`, VID/PID `0x303A/0x8298`, firmware `0.6.2`, 64-byte reports
+and vendor usage `0xFF00`/`1`. Bluetooth, input, lighting, managed mapping and
+the marketing `Pro` distinction are not yet qualified.
+
 ## Dependencies and onboarding
 
 Discover the preferred terminal and Copilot executable before launching work.

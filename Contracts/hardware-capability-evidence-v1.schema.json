@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://copilot-micro.local/contracts/hardware-capability-evidence-v1.schema.json",
+  "title": "Copilot Micro hardware capability evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "outcome",
+    "product",
+    "productID",
+    "transport",
+    "vendorCollection",
+    "inputReportBytes",
+    "outputReportBytes",
+    "serialPresent",
+    "firmwareVersion",
+    "status",
+    "keymap",
+    "unexpectedResponseCount",
+    "notificationCount",
+    "mutatingOperationsPerformed"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "outcome": {
+      "const": "read-only-qualified"
+    },
+    "product": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "productID": {
+      "enum": [
+        "0x8297",
+        "0x8298"
+      ]
+    },
+    "transport": {
+      "enum": [
+        "usb",
+        "bluetooth"
+      ]
+    },
+    "vendorCollection": {
+      "const": "0xFF00/1"
+    },
+    "inputReportBytes": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 4096
+    },
+    "outputReportBytes": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 4096
+    },
+    "serialPresent": {
+      "type": "boolean"
+    },
+    "firmwareVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activeLayerIndex",
+        "battery",
+        "charging"
+      ],
+      "properties": {
+        "activeLayerIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "battery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "charging": {
+          "type": "boolean"
+        }
+      }
+    },
+    "keymap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activeLayerAvailable",
+        "activeLayerKeyRowLengths",
+        "activeProfileID",
+        "activeProfileLayerCount",
+        "activeProfileMatched",
+        "byteCount",
+        "profileCount",
+        "schemaVersion"
+      ],
+      "properties": {
+        "activeLayerAvailable": {
+          "const": true
+        },
+        "activeLayerKeyRowLengths": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          }
+        },
+        "activeProfileID": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activeProfileLayerCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "activeProfileMatched": {
+          "const": true
+        },
+        "byteCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 524288
+        },
+        "profileCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "unexpectedResponseCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "notificationCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "mutatingOperationsPerformed": {
+      "const": false
+    }
+  }
+}

@@ -25,6 +25,8 @@ test("shared contract catalogs and fixtures pass", () => {
     configurationSchemaCount: 2,
     cliCapabilityEvidenceSchemaCount: 1,
     cliCompatibilityReportCount: 1,
+    hardwareCapabilityEvidenceSchemaCount: 1,
+    hardwareCompatibilityReportCount: 1,
     ipcFixtureCount: 18,
   });
 });
@@ -117,4 +119,24 @@ test("CLI evidence schema rejects missing, extra, and oversized fields", () => {
     () => validateJsonSchema(cliCapabilityEvidenceSchema, oversized),
     /longer than maxLength/u,
   );
+});
+
+test("committed hardware evidence is read-only and schema-valid", () => {
+  const { hardwareCapabilityEvidenceSchema } = loadContractCatalogs(root);
+  const report = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        root,
+        "Compatibility",
+        "creator-micro-2-0x8298-firmware-0.6.2-usb.json",
+      ),
+      "utf8",
+    ),
+  );
+  assert.equal(validateJsonSchema(hardwareCapabilityEvidenceSchema, report), true);
+  assert.equal(report.outcome, "read-only-qualified");
+  assert.equal(report.mutatingOperationsPerformed, false);
+  assert.deepEqual(report.keymap.activeLayerKeyRowLengths, [2, 4, 4, 3]);
+  assert.equal(report.status.activeLayerIndex, 2);
+  assert.equal(Object.hasOwn(report, "serialNumber"), false);
 });

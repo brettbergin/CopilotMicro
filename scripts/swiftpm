@@ -6,8 +6,8 @@ git_config="$root/scripts/git-swiftpm.config"
 developer_dir="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
 tooling="$root/build/tooling/swiftpm"
 
-if [[ $# -eq 0 || ! "$1" =~ ^(build|test)$ ]]; then
-    printf '%s\n' "usage: scripts/swiftpm build|test [swift options]" >&2
+if [[ $# -eq 0 || ! "$1" =~ ^(build|run|test)$ ]]; then
+    printf '%s\n' "usage: scripts/swiftpm build|run|test [swift options]" >&2
     exit 2
 fi
 

@@ -4,8 +4,10 @@ Scope: F-16 through F-20, F-22, F-23.
 
 Implementation status: the version-1 local and portable configuration schemas,
 atomic user-only settings store, bounded recovery history, strict import
-preview/confirmation flow and GUI wiring are implemented. Hardware discovery,
-device backups, managed keymap writes and restore remain unimplemented.
+preview/confirmation flow and GUI wiring are implemented. Native IOKit
+discovery, bounded HID framing/reassembly and an explicit read-only hardware
+probe are implemented. Device backups, managed keymap writes, physical input,
+lighting and restore remain unimplemented.
 
 ## Supported hardware boundary
 
@@ -32,6 +34,30 @@ small configuration size or silently discard parse failures.
 Request IDs, outstanding requests, timeout cleanup and reconnect handling
 must prevent collisions and stale-response association. Qualification must
 establish actual firmware limits and pacing.
+
+### Initial live read-only evidence
+
+USB qualification on 2026-09-12 discovered one candidate reported by macOS as
+`Creator Micro 2`, Work Louder VID `0x303A`, PID `0x8298`, with primary
+keyboard usage plus vendor usage pair `0xFF00`/`1`. Input/output report maxima
+were both 64 bytes and the serial property was present but not recorded.
+
+The non-exclusive transport successfully called only `sys.version`,
+`device.status` and `fs.read` for `keymap.json`. Sanitized results recorded:
+
+- Firmware `0.6.2`.
+- USB transport, battery `99`, charging true.
+- Active profile ID `0`, matched by identity rather than array position.
+- Active layer index `2`, proving the active layer is not necessarily first.
+- One profile, three layers and active key rows `[2,4,4,3]`.
+- No unexpected response IDs or notifications during the bounded probe.
+- No configuration, lighting or other mutating RPC.
+
+The evidence is
+[`Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json`](../Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json).
+The OS product string does not include `Pro`; exact Pro feature qualification
+therefore still depends on reversible mapping, input and lighting behavior.
+Bluetooth remains untested.
 
 ## Managed bindings
 
