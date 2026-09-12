@@ -77,6 +77,9 @@ private struct SmokeReport: Encodable {
     let statusItemMenuInstalled: Bool
     let menuActionsValidated: Bool
     let keepsRunningAfterManagerClose: Bool
+    let managerAreasValidated: Bool
+    let emulatorJourneyValidated: Bool
+    let liveServicesDisabled: Bool
     let fittingWidth: Double
     let fittingHeight: Double
 }
@@ -265,6 +268,9 @@ struct CopilotMicroApp {
         let mainMenuInstalled = application.mainMenu === controller.mainMenu
         let statusItemInstalled = controller.statusItem != nil
         let statusItemMenuInstalled = controller.statusItem?.menu === controller.menu
+        let managerAreasValidated = ManagerArea.allCases.count == 7
+        let emulatorJourneyValidated = EmulatorStore.validateDemoJourney(configuration: configuration)
+        let liveServicesDisabled = manager.store.liveServicesDisabled
         let invariants: [(String, Bool)] = [
             ("main_thread", Thread.isMainThread),
             (
@@ -283,6 +289,9 @@ struct CopilotMicroApp {
             ("status_menu_actions", menuValid),
             ("main_menu_actions", mainMenuValid),
             ("manager_close_lifecycle", staysRunning),
+            ("manager_areas", managerAreasValidated),
+            ("emulator_journey", emulatorJourneyValidated),
+            ("live_services_disabled", liveServicesDisabled),
             ("finite_layout", size.width.isFinite && size.height.isFinite),
             ("minimum_layout", size.width >= 600 && size.height >= 380),
         ]
@@ -312,6 +321,9 @@ struct CopilotMicroApp {
             statusItemMenuInstalled: statusItemMenuInstalled,
             menuActionsValidated: menuValid,
             keepsRunningAfterManagerClose: staysRunning,
+            managerAreasValidated: managerAreasValidated,
+            emulatorJourneyValidated: emulatorJourneyValidated,
+            liveServicesDisabled: liveServicesDisabled,
             fittingWidth: size.width,
             fittingHeight: size.height
         )

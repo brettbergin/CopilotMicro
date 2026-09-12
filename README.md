@@ -8,10 +8,10 @@ session management, model/effort, voice, input, cancellation and permission
 controls. A graphical manager provides onboarding, remapping, diagnostics and
 local configuration.
 
-**Status:** early native foundation. The menu bar, Open Manager/Quit actions,
-emulator-only manager window, app packaging, versioned contracts and
-deterministic controls/session/lighting reducers exist. The complete GUI
-simulator and live hardware/CLI integrations are not implemented yet.
+**Status:** interactive GUI emulator. The menu panel, seven-area manager,
+original pad editor, session/control simulator, lighting preview, app packaging,
+versioned contracts and deterministic reducers exist. Local persistence and
+all live hardware/CLI integrations remain unavailable and clearly disabled.
 
 ## Developer setup
 
@@ -61,7 +61,11 @@ Swift Testing dependency; first resolution downloads public packages.
 
 `make package` prints the signed app's absolute `appPath` as JSON. Each call
 uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
-bar item and choose Open Manager. To choose an output location explicitly:
+bar item and choose Open Manager. In the manager, choose demo scenarios,
+edit local key assignments, use the separate input simulator and inspect the
+all-key lighting projection. These interactions never open HID, attach to a
+CLI, install an extension or request macOS permissions. To choose an output
+location explicitly:
 
 ```sh
 make package PACKAGE_OUTPUT=build/my-preview

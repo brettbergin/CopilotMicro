@@ -3,6 +3,11 @@
 Status: implementation plan and acceptance contract. No feature is implemented
 or qualified merely because it appears in this document.
 
+Current evidence: stage 0 and the isolated stage-1 GUI/emulator milestone are
+implemented. This does not qualify any live CLI, terminal, HID or updater
+feature, and it does not convert simulated acceptance journeys into hardware
+or integration evidence.
+
 ## Delivery strategy
 
 The implementation interview selected GUI/emulator-first: begin by verifying

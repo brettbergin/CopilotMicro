@@ -3,6 +3,12 @@
 Scope: F-01, F-04 through F-21, F-24 through F-26.
 Detailed action semantics live in [phase 004](phase-004-session-lifecycle.md).
 
+Implementation status: the compact menu and seven-area manager now provide an
+interactive, explicitly labeled emulator with editable pad assignments,
+separate physical-input controls, scenario-driven lighting and bounded demo
+diagnostics. Live terminal, CLI, HID, storage, update and permission features
+remain visible but unavailable.
+
 ## Interaction principles
 
 The CLI remains the working surface. Copilot Micro explains and configures

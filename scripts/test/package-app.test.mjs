@@ -33,7 +33,11 @@ const report = (app, smokeMode = "hidden") => ({
   statusItemInstalled: smokeMode === "accessory",
   statusItemMenuInstalled: smokeMode === "accessory",
   menuActionsValidated: true,
-  keepsRunningAfterManagerClose: true, fittingWidth: 600, fittingHeight: 380,
+  keepsRunningAfterManagerClose: true,
+  managerAreasValidated: true,
+  emulatorJourneyValidated: true,
+  liveServicesDisabled: true,
+  fittingWidth: 600, fittingHeight: 380,
 });
 
 function fixture(t) {
@@ -357,6 +361,8 @@ test("smoke invariants require hidden UI and production accessory lifecycle wiri
       { statusItemMenuInstalled: !accessory },
       { windowCreated: false }, { hostingViewCreated: false }, { menuActionsValidated: false },
       { keepsRunningAfterManagerClose: false }, { mainThread: false },
+      { managerAreasValidated: false }, { emulatorJourneyValidated: false },
+      { liveServicesDisabled: false },
       { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
       { configuration: { ...configuration, liveIntegrationsEnabled: true } },
     ]) {
