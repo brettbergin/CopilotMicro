@@ -68,6 +68,7 @@ public struct ActionPayload: Codable, Equatable, Sendable {
 public struct ActionRequest: Codable, Equatable, Sendable {
     public static let protocolVersion = 1
     public static let maximumEncodedBytes = 65_536
+    public static let maximumContextRevision: UInt64 = 9_007_199_254_740_991
 
     public enum MessageType: String, Codable, Sendable {
         case action
@@ -163,6 +164,12 @@ public enum ActionRequestDecoder {
             throw ActionRequestDecodeError.invalidMessageType
         }
         guard
+            let contextRevision = envelope["contextRevision"] as? UInt64,
+            contextRevision <= ActionRequest.maximumContextRevision
+        else {
+            throw ActionRequestDecodeError.malformed
+        }
+        guard
             let actionName = action["type"] as? String,
             let actionID = ActionID(rawValue: actionName)
         else {
@@ -171,6 +178,14 @@ public enum ActionRequestDecoder {
         let hasPermissionRequest = action["permissionRequestId"] != nil
         guard hasPermissionRequest == actionID.requiresPermissionRequest else {
             throw ActionRequestDecodeError.invalidArguments
+        }
+        if hasPermissionRequest {
+            guard
+                let value = action["permissionRequestId"] as? String,
+                (try? RequestID(rawValue: value)) != nil
+            else {
+                throw ActionRequestDecodeError.invalidArguments
+            }
         }
         do {
             return try JSONDecoder().decode(ActionRequest.self, from: data)
@@ -183,6 +198,7 @@ public enum ActionRequestDecoder {
 public struct ActionContext: Sendable {
     public let binding: LiveBinding?
     public let connection: ConnectionState
+    public let isPaused: Bool
     public let contextRevision: UInt64
     public let capabilities: [ActionID: Capability]
     public let pendingRequestIDs: Set<RequestID>
@@ -191,6 +207,7 @@ public struct ActionContext: Sendable {
     public init(
         binding: LiveBinding?,
         connection: ConnectionState,
+        isPaused: Bool,
         contextRevision: UInt64,
         capabilities: [ActionID: Capability],
         pendingRequestIDs: Set<RequestID> = [],
@@ -198,6 +215,7 @@ public struct ActionContext: Sendable {
     ) {
         self.binding = binding
         self.connection = connection
+        self.isPaused = isPaused
         self.contextRevision = contextRevision
         self.capabilities = capabilities
         self.pendingRequestIDs = pendingRequestIDs
@@ -206,6 +224,7 @@ public struct ActionContext: Sendable {
 }
 
 public enum ActionRejectionCode: String, Codable, Error, Equatable, Sendable {
+    case paused
     case disconnected
     case unsynchronized
     case staleInstance
@@ -218,10 +237,15 @@ public enum ActionRejectionCode: String, Codable, Error, Equatable, Sendable {
     case missingPermissionRequest
     case permissionRequestNotPending
     case permissionRequestNotVisible
+    case duplicateRequest
+    case replayLedgerFull
 }
 
 public enum ActionGuard {
     public static func validate(_ request: ActionRequest, against context: ActionContext) -> ActionRejectionCode? {
+        guard !context.isPaused else {
+            return .paused
+        }
         guard context.connection != .disconnected else {
             return .disconnected
         }
@@ -266,6 +290,61 @@ public enum ActionGuard {
     }
 }
 
+public enum ActionReservation: Equatable, Sendable {
+    case reserved
+    case rejected(ActionRejectionCode)
+}
+
+public struct ActionReplayLedger: Sendable {
+    public static let maximumTrackedRequests = 4_096
+
+    private var generation: ConnectionGeneration?
+    private var inFlight: Set<RequestID> = []
+    private var completed: Set<RequestID> = []
+
+    public init() {}
+
+    public mutating func reserve(_ request: ActionRequest, against context: ActionContext) -> ActionReservation {
+        if let rejection = ActionGuard.validate(request, against: context) {
+            return .rejected(rejection)
+        }
+        if let generation, generation != request.generation {
+            return .rejected(.staleGeneration)
+        }
+        if generation == nil {
+            generation = request.generation
+        }
+        guard !inFlight.contains(request.requestID), !completed.contains(request.requestID) else {
+            return .rejected(.duplicateRequest)
+        }
+        guard inFlight.count + completed.count < Self.maximumTrackedRequests else {
+            return .rejected(.replayLedgerFull)
+        }
+        inFlight.insert(request.requestID)
+        return .reserved
+    }
+
+    @discardableResult
+    public mutating func complete(_ requestID: RequestID) -> Bool {
+        guard inFlight.remove(requestID) != nil else {
+            return false
+        }
+        completed.insert(requestID)
+        return true
+    }
+
+    @discardableResult
+    public mutating func invalidate(for newGeneration: ConnectionGeneration?) -> Bool {
+        guard newGeneration != generation else {
+            return false
+        }
+        generation = newGeneration
+        inFlight.removeAll()
+        completed.removeAll()
+        return true
+    }
+}
+
 public enum ActionOutcome: String, Codable, CaseIterable, Sendable {
     case accepted
     case completed
@@ -275,6 +354,7 @@ public enum ActionOutcome: String, Codable, CaseIterable, Sendable {
 
 public enum ActionResultCode: String, Codable, CaseIterable, Sendable {
     case focusConsumed
+    case paused
     case disconnected
     case unsynchronized
     case staleInstance
@@ -291,6 +371,8 @@ public enum ActionResultCode: String, Codable, CaseIterable, Sendable {
     case hostRejected
     case transportFailure
     case alreadyResolved
+    case duplicateRequest
+    case replayLedgerFull
 }
 
 public struct ActionResult: Codable, Equatable, Sendable {
@@ -306,7 +388,8 @@ public struct ActionResult: Codable, Equatable, Sendable {
     }
 
     public static let protocolVersion = 1
-    public static let maximumMessageBytes = 512
+    public static let maximumEncodedBytes = 65_536
+    public static let maximumMessageCharacters = 512
     public let protocolVersion: Int
     public let messageType: MessageType
     public let requestID: RequestID
@@ -323,9 +406,10 @@ public struct ActionResult: Codable, Equatable, Sendable {
         guard !message.isEmpty else {
             throw ValidationError.emptyMessage
         }
-        guard message.utf8.count <= Self.maximumMessageBytes else {
+        guard message.unicodeScalars.count <= Self.maximumMessageCharacters else {
             throw ValidationError.messageTooLong
         }
+
         protocolVersion = Self.protocolVersion
         messageType = .actionResult
         self.requestID = requestID
@@ -357,5 +441,45 @@ public struct ActionResult: Codable, Equatable, Sendable {
             code: container.decodeIfPresent(ActionResultCode.self, forKey: .code),
             message: container.decode(String.self, forKey: .message)
         )
+    }
+}
+
+public enum ActionResultDecoder {
+    private static let requiredKeys: Set<String> = [
+        "protocolVersion",
+        "messageType",
+        "requestId",
+        "outcome",
+        "message",
+    ]
+    private static let allowedKeys = requiredKeys.union(["code"])
+
+    public static func decode(_ data: Data) throws -> ActionResult {
+        guard data.count <= ActionResult.maximumEncodedBytes else {
+            throw ActionRequestDecodeError.messageTooLarge
+        }
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let envelope = object as? [String: Any]
+        else {
+            throw ActionRequestDecodeError.malformed
+        }
+        let keys = Set(envelope.keys)
+        guard requiredKeys.isSubset(of: keys) else {
+            throw ActionRequestDecodeError.malformed
+        }
+        guard keys.isSubset(of: allowedKeys) else {
+            throw ActionRequestDecodeError.unexpectedField
+        }
+        if keys.contains("code"), envelope["code"] is NSNull {
+            throw ActionRequestDecodeError.malformed
+        }
+        do {
+            return try JSONDecoder().decode(ActionResult.self, from: data)
+        } catch let error as ActionResult.ValidationError {
+            throw error
+        } catch {
+            throw ActionRequestDecodeError.malformed
+        }
     }
 }

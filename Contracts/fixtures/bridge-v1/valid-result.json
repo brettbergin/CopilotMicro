@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "messageType": "actionResult",
+  "requestId": "action-cancel-1",
+  "outcome": "completed",
+  "message": "Foreground cancellation settled."
+}

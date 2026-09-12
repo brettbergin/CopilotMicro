@@ -32,6 +32,5 @@ public enum ConnectionState: String, Codable, CaseIterable, Sendable {
     case synchronizing
     case ready
     case reconnecting
-    case paused
     case shuttingDown
 }

@@ -16,22 +16,66 @@ struct InputNormalizationTests {
 
     @Test("The two wide-key contacts produce one press and one release")
     func wideKeyIsCoalesced() throws {
-        var normalizer = KeyInputNormalizer()
+        var normalizer = makeKeyNormalizer()
 
-        #expect(normalizer.process(contact: try contact(10), isPressed: true) == .pressed(.submit))
-        #expect(normalizer.process(contact: try contact(11), isPressed: true) == nil)
-        #expect(normalizer.process(contact: try contact(10), isPressed: false) == nil)
-        #expect(normalizer.process(contact: try contact(11), isPressed: false) == .released(.submit))
+        #expect(
+            normalizer.process(contact: try contact(10), isPressed: true, atMilliseconds: 0) == .pressed(.submit)
+        )
+        #expect(normalizer.process(contact: try contact(11), isPressed: true, atMilliseconds: 1) == nil)
+        #expect(normalizer.process(contact: try contact(10), isPressed: false, atMilliseconds: 2) == nil)
+        #expect(
+            normalizer.process(contact: try contact(11), isPressed: false, atMilliseconds: 3) == .released(.submit)
+        )
     }
 
     @Test("Duplicate edges do not repeat one-shot controls")
     func duplicateEdgesAreIgnored() throws {
-        var normalizer = KeyInputNormalizer()
+        var normalizer = makeKeyNormalizer()
 
-        #expect(normalizer.process(contact: try contact(9), isPressed: true) == .pressed(.cancel))
-        #expect(normalizer.process(contact: try contact(9), isPressed: true) == nil)
-        #expect(normalizer.process(contact: try contact(9), isPressed: false) == .released(.cancel))
-        #expect(normalizer.process(contact: try contact(9), isPressed: false) == nil)
+        #expect(
+            normalizer.process(contact: try contact(9), isPressed: true, atMilliseconds: 0) == .pressed(.cancel)
+        )
+        #expect(normalizer.process(contact: try contact(9), isPressed: true, atMilliseconds: 1) == nil)
+        #expect(
+            normalizer.process(contact: try contact(9), isPressed: false, atMilliseconds: 2) == .released(.cancel)
+        )
+        #expect(normalizer.process(contact: try contact(9), isPressed: false, atMilliseconds: 3) == nil)
+    }
+
+    @Test("Reset suppresses a held one-shot key until release")
+    func resetDoesNotReplayHeldInput() throws {
+        var normalizer = makeKeyNormalizer()
+        let cancel = try contact(9)
+
+        #expect(normalizer.process(contact: cancel, isPressed: true, atMilliseconds: 0) == .pressed(.cancel))
+        normalizer.reset()
+        #expect(normalizer.process(contact: cancel, isPressed: true, atMilliseconds: 1) == nil)
+        #expect(normalizer.process(contact: cancel, isPressed: false, atMilliseconds: 2) == nil)
+        #expect(normalizer.process(contact: cancel, isPressed: true, atMilliseconds: 3) == .pressed(.cancel))
+    }
+
+    @Test("Staggered wide-key contacts within the debounce window cannot submit twice")
+    func staggeredWideContactsAreCoalesced() throws {
+        var normalizer = makeKeyNormalizer()
+        let left = try contact(10)
+        let right = try contact(11)
+
+        #expect(normalizer.process(contact: left, isPressed: true, atMilliseconds: 0) == .pressed(.submit))
+        #expect(normalizer.process(contact: left, isPressed: false, atMilliseconds: 10) == .released(.submit))
+        #expect(normalizer.process(contact: right, isPressed: true, atMilliseconds: 20) == nil)
+        #expect(normalizer.process(contact: right, isPressed: false, atMilliseconds: 30) == nil)
+        #expect(normalizer.process(contact: right, isPressed: true, atMilliseconds: 60) == .pressed(.submit))
+    }
+
+    @Test("A reconnect snapshot can suppress contacts already held by the device")
+    func synchronizationSuppressesReportedHeldContacts() throws {
+        var normalizer = makeKeyNormalizer()
+        let submit = try contact(10)
+        normalizer.reset(suppressing: [submit])
+
+        #expect(normalizer.process(contact: submit, isPressed: true, atMilliseconds: 0) == nil)
+        #expect(normalizer.process(contact: submit, isPressed: false, atMilliseconds: 1) == nil)
+        #expect(normalizer.process(contact: submit, isPressed: true, atMilliseconds: 100) == .pressed(.submit))
     }
 
     @Test("Joystick confirmation requires a neutral transition")
@@ -58,5 +102,9 @@ struct InputNormalizationTests {
 
     private func contact(_ value: Int) throws -> MatrixContactID {
         try MatrixContactID(rawValue: value)
+    }
+
+    private func makeKeyNormalizer() -> KeyInputNormalizer {
+        KeyInputNormalizer(wideKeyCoalescingMilliseconds: 50)
     }
 }

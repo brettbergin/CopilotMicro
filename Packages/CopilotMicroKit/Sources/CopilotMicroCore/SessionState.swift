@@ -129,10 +129,14 @@ public struct SessionEventContext: Equatable, Sendable {
 }
 
 public struct SessionSnapshot: Equatable, Sendable {
+    public static let maximumPendingAttention = 128
+
     public enum ValidationError: Error, Equatable, Sendable {
         case terminalStateWithoutKnownWork
         case completionDuringActiveWork
         case conflictingTerminalState
+        case tooManyPendingRequests
+        case duplicatePendingRequest
     }
 
     public let mode: SessionModeState
@@ -156,6 +160,12 @@ public struct SessionSnapshot: Equatable, Sendable {
     }
 
     public func validate() throws {
+        guard pendingAttention.count <= Self.maximumPendingAttention else {
+            throw ValidationError.tooManyPendingRequests
+        }
+        guard Set(pendingAttention.map(\.requestID)).count == pendingAttention.count else {
+            throw ValidationError.duplicatePendingRequest
+        }
         if !work.isKnown, failure != nil || unacknowledgedCompletionID != nil {
             throw ValidationError.terminalStateWithoutKnownWork
         }
@@ -171,6 +181,7 @@ public struct SessionSnapshot: Equatable, Sendable {
 public struct SessionRuntimeState: Equatable, Sendable {
     public var binding: LiveBinding?
     public var connection: ConnectionState
+    public var isPaused: Bool
     public var contextRevision: UInt64
     public var mode: SessionModeState
     public var work: WorkState
@@ -181,6 +192,7 @@ public struct SessionRuntimeState: Equatable, Sendable {
     public init(
         binding: LiveBinding? = nil,
         connection: ConnectionState = .disconnected,
+        isPaused: Bool = false,
         contextRevision: UInt64 = 0,
         mode: SessionModeState = .unknown,
         work: WorkState = .unknown,
@@ -190,6 +202,7 @@ public struct SessionRuntimeState: Equatable, Sendable {
     ) {
         self.binding = binding
         self.connection = connection
+        self.isPaused = isPaused
         self.contextRevision = contextRevision
         self.mode = mode
         self.work = work
@@ -221,10 +234,13 @@ public enum SessionEventRejection: String, Equatable, Sendable {
     case staleSession
     case staleGeneration
     case outOfOrder
+    case revisionGap
     case invalidSnapshot
     case invalidWorkState
     case staleCompletion
     case staleError
+    case duplicatePendingRequest
+    case tooManyPendingRequests
 }
 
 public enum SessionReduction: Equatable, Sendable {
@@ -237,15 +253,17 @@ public enum SessionReducer {
     public static func reduce(_ state: inout SessionRuntimeState, _ event: SessionEvent) -> SessionReduction {
         switch event {
         case .connected(let binding):
+            let isPaused = state.isPaused
             state = SessionRuntimeState(
                 binding: binding,
                 connection: .synchronizing,
+                isPaused: isPaused,
                 mode: .unknown,
                 work: .unknown
             )
             return .applied
         case .snapshot(let context, let snapshot):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateSnapshot(context, against: state) else {
                 guard (try? snapshot.validate()) != nil else {
                     return .rejected(.invalidSnapshot)
                 }
@@ -262,7 +280,7 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .workStarted(let context, let work):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 guard work.isKnown, work.hasActiveWork else {
                     return .rejected(.invalidWorkState)
                 }
@@ -274,7 +292,7 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .workCompleted(let context, let completionID):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 let completedRealWork = state.work.hasActiveWork
                 state.contextRevision = context.revision
                 state.work = .idle
@@ -286,7 +304,7 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .workAborted(let context):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 state.contextRevision = context.revision
                 state.work = .idle
                 state.unacknowledgedCompletion = nil
@@ -294,7 +312,7 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .workFailed(let context, let failure):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 state.contextRevision = context.revision
                 state.work = .idle
                 state.failure = failure
@@ -303,14 +321,20 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .attentionAdded(let context, let attention):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
+                guard !state.pendingAttention.contains(where: { $0.requestID == attention.requestID }) else {
+                    return .rejected(.duplicatePendingRequest)
+                }
+                guard state.pendingAttention.count < SessionSnapshot.maximumPendingAttention else {
+                    return .rejected(.tooManyPendingRequests)
+                }
                 state.contextRevision = context.revision
                 state.pendingAttention.insert(attention)
                 return .applied
             }
             return .rejected(rejection)
         case .attentionResolved(let context, let requestID):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 state.contextRevision = context.revision
                 state.pendingAttention = Set(
                     state.pendingAttention.filter { $0.requestID != requestID }
@@ -319,7 +343,7 @@ public enum SessionReducer {
             }
             return .rejected(rejection)
         case .errorRecovered(let context, let errorID):
-            guard let rejection = validate(context, against: state) else {
+            guard let rejection = validateIncrement(context, against: &state) else {
                 guard state.failure?.id == errorID else {
                     return .rejected(.staleError)
                 }
@@ -338,26 +362,53 @@ public enum SessionReducer {
             state.unacknowledgedCompletion = nil
             return .applied
         case .paused:
-            state.connection = .paused
+            state.isPaused = true
             return .applied
         case .resume:
-            guard state.binding != nil else {
-                return .rejected(.noBinding)
+            state.isPaused = false
+            if state.binding != nil {
+                invalidateDerivedState(&state)
             }
-            state.connection = .synchronizing
-            state.mode = .unknown
-            state.work = .unknown
-            state.pendingAttention.removeAll()
-            state.failure = nil
-            state.unacknowledgedCompletion = nil
             return .applied
         case .disconnected:
-            state = SessionRuntimeState()
+            let isPaused = state.isPaused
+            state = SessionRuntimeState(isPaused: isPaused)
             return .applied
         }
     }
 
-    private static func validate(
+    private static func validateSnapshot(
+        _ context: SessionEventContext,
+        against state: SessionRuntimeState
+    ) -> SessionEventRejection? {
+        if let identityRejection = validateIdentity(context, against: state) {
+            return identityRejection
+        }
+        guard context.revision > state.contextRevision else {
+            return .outOfOrder
+        }
+        return nil
+    }
+
+    private static func validateIncrement(
+        _ context: SessionEventContext,
+        against state: inout SessionRuntimeState
+    ) -> SessionEventRejection? {
+        if let identityRejection = validateIdentity(context, against: state) {
+            return identityRejection
+        }
+        let (nextRevision, overflow) = state.contextRevision.addingReportingOverflow(1)
+        guard !overflow, context.revision == nextRevision else {
+            if context.revision > state.contextRevision {
+                invalidateDerivedState(&state)
+                return .revisionGap
+            }
+            return .outOfOrder
+        }
+        return nil
+    }
+
+    private static func validateIdentity(
         _ context: SessionEventContext,
         against state: SessionRuntimeState
     ) -> SessionEventRejection? {
@@ -373,9 +424,15 @@ public enum SessionReducer {
         guard context.binding.generation == binding.generation else {
             return .staleGeneration
         }
-        guard context.revision > state.contextRevision else {
-            return .outOfOrder
-        }
         return nil
+    }
+
+    private static func invalidateDerivedState(_ state: inout SessionRuntimeState) {
+        state.connection = .synchronizing
+        state.mode = .unknown
+        state.work = .unknown
+        state.pendingAttention.removeAll()
+        state.failure = nil
+        state.unacknowledgedCompletion = nil
     }
 }

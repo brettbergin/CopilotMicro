@@ -19,7 +19,8 @@ test("shared contract catalogs and fixtures pass", () => {
   assert.deepEqual(runContractChecks(root), {
     actionCount: 16,
     controlCount: 12,
-    fixtureCount: 10,
+    fixtureCount: 13,
+    resultFixtureCount: 5,
   });
 });
 
@@ -46,6 +47,7 @@ test("connection and capability failures remain distinct", () => {
     pendingRequestIds: new Set(),
     visiblePermissionRequestId: null,
   };
+  assert.equal(validateActionGuard(request, { ...base, paused: true }), "paused");
   assert.equal(validateActionGuard(request, { ...base, connection: "disconnected" }), "disconnected");
   assert.equal(validateActionGuard(request, { ...base, connection: "synchronizing" }), "unsynchronized");
   assert.equal(

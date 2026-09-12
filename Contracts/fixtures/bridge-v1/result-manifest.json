@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "name": "valid-completed-result",
+      "file": "valid-result.json",
+      "decode": "valid"
+    },
+    {
+      "name": "unexpected-result-field",
+      "file": "invalid-result-extra-field.json",
+      "decode": "unexpectedField"
+    },
+    {
+      "name": "null-result-code",
+      "file": "invalid-result-null-code.json",
+      "decode": "malformed"
+    },
+    {
+      "name": "unicode-message-at-limit",
+      "generator": "unicode512",
+      "decode": "valid"
+    },
+    {
+      "name": "unicode-message-over-limit",
+      "generator": "unicode513",
+      "decode": "messageTooLong"
+    }
+  ]
+}

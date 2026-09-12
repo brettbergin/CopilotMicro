@@ -75,7 +75,8 @@
         },
         "contextRevision": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "action": {
           "type": "object",
@@ -151,6 +152,7 @@
         "code": {
           "enum": [
             "focusConsumed",
+            "paused",
             "disconnected",
             "unsynchronized",
             "staleInstance",
@@ -166,7 +168,9 @@
             "timedOut",
             "hostRejected",
             "transportFailure",
-            "alreadyResolved"
+            "alreadyResolved",
+            "duplicateRequest",
+            "replayLedgerFull"
           ]
         },
         "message": {
@@ -237,6 +241,7 @@
         "generation",
         "contextRevision",
         "connection",
+        "paused",
         "mode",
         "work",
         "pendingAttention",
@@ -260,7 +265,8 @@
         },
         "contextRevision": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "connection": {
           "enum": [
@@ -268,9 +274,11 @@
             "synchronizing",
             "ready",
             "reconnecting",
-            "paused",
             "shuttingDown"
           ]
+        },
+        "paused": {
+          "type": "boolean"
         },
         "mode": {
           "oneOf": [

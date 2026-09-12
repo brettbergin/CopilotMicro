@@ -21,6 +21,7 @@ struct ContractFixtureTests {
         let context = ActionContext(
             binding: binding,
             connection: .ready,
+            isPaused: false,
             contextRevision: 42,
             capabilities: capabilities,
             pendingRequestIDs: [permissionID],
@@ -40,10 +41,57 @@ struct ContractFixtureTests {
             do {
                 let request = try ActionRequestDecoder.decode(data)
                 #expect(fixture.decode == "valid", "Unexpectedly decoded \(fixture.name)")
-                let result = ActionGuard.validate(request, against: context)?.rawValue ?? "allowed"
+                let result: String
+                if fixture.replay == "duplicate" {
+                    var ledger = ActionReplayLedger()
+                    #expect(ledger.reserve(request, against: context) == .reserved)
+                    switch ledger.reserve(request, against: context) {
+                    case .reserved:
+                        result = "allowed"
+                    case .rejected(let rejection):
+                        result = rejection.rawValue
+                    }
+                } else {
+                    result = ActionGuard.validate(request, against: context)?.rawValue ?? "allowed"
+                }
                 #expect(result == fixture.guardResult, "Unexpected guard result for \(fixture.name)")
             } catch let error as ActionRequestDecodeError {
                 #expect(error.rawValue == fixture.decode, "Unexpected decode result for \(fixture.name)")
+            }
+        }
+    }
+
+    @Test("Swift accepts and rejects the shared action-result fixtures")
+    func sharedActionResultFixtures() throws {
+        let directory = contractDirectory.appendingPathComponent("fixtures/bridge-v1", isDirectory: true)
+        let manifest = try JSONDecoder().decode(
+            FixtureManifest.self,
+            from: Data(contentsOf: directory.appendingPathComponent("result-manifest.json"))
+        )
+        #expect(manifest.schemaVersion == 1)
+
+        for fixture in manifest.cases {
+            let data: Data
+            if let generator = fixture.generator, generator.hasPrefix("unicode") {
+                let count = try #require(Int(generator.dropFirst("unicode".count)))
+                data = try JSONSerialization.data(withJSONObject: [
+                    "protocolVersion": 1,
+                    "messageType": "actionResult",
+                    "requestId": "action-result-unicode",
+                    "outcome": "completed",
+                    "message": String(repeating: "\u{00E9}", count: count),
+                ])
+            } else {
+                data = try Data(contentsOf: directory.appendingPathComponent(try #require(fixture.file)))
+            }
+
+            do {
+                _ = try ActionResultDecoder.decode(data)
+                #expect(fixture.decode == "valid", "Unexpectedly decoded \(fixture.name)")
+            } catch let error as ActionRequestDecodeError {
+                #expect(error.rawValue == fixture.decode, "Unexpected decode result for \(fixture.name)")
+            } catch let error as ActionResult.ValidationError {
+                #expect(String(describing: error) == fixture.decode, "Unexpected decode result for \(fixture.name)")
             }
         }
     }
@@ -77,6 +125,13 @@ struct ContractFixtureTests {
         let code = try #require(properties["code"] as? [String: Any])
         let resultCodes = try #require(code["enum"] as? [String])
         #expect(Set(resultCodes) == Set(ActionResultCode.allCases.map(\.rawValue)))
+        let message = try #require(properties["message"] as? [String: Any])
+        #expect(message["maxLength"] as? Int == ActionResult.maximumMessageCharacters)
+
+        let actionRequest = try #require(definitions["actionRequest"] as? [String: Any])
+        let requestProperties = try #require(actionRequest["properties"] as? [String: Any])
+        let revision = try #require(requestProperties["contextRevision"] as? [String: Any])
+        #expect(revision["maximum"] as? UInt64 == ActionRequest.maximumContextRevision)
     }
 
     @Test("Swift physical layout exactly matches the shared default controls")
@@ -147,7 +202,7 @@ struct ContractFixtureTests {
             try ActionResult(
                 requestID: requestID,
                 outcome: .failed,
-                message: String(repeating: "x", count: ActionResult.maximumMessageBytes + 1)
+                message: String(repeating: "x", count: ActionResult.maximumMessageCharacters + 1)
             )
         }
     }
@@ -195,6 +250,7 @@ private struct FixtureCase: Decodable {
     let generator: String?
     let decode: String
     let guardResult: String?
+    let replay: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -202,6 +258,7 @@ private struct FixtureCase: Decodable {
         case generator
         case decode
         case guardResult = "guard"
+        case replay
     }
 }
 

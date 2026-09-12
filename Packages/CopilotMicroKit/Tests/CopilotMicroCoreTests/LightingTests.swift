@@ -30,7 +30,7 @@ struct LightingTests {
         #expect(LightingProjector.project(unknown).semanticState == .unknown)
         #expect(LightingProjector.project(unknown).color == .off)
 
-        unknown.connection = .paused
+        unknown.isPaused = true
         #expect(LightingProjector.project(unknown).semanticState == .paused)
         #expect(LightingProjector.project(unknown).color == .off)
     }

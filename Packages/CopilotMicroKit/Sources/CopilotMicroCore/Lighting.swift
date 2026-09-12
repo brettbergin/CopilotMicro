@@ -88,7 +88,7 @@ public enum LightingProjector {
         _ state: SessionRuntimeState,
         preferences: LightingPreferences = LightingPreferences()
     ) -> LightingProjection {
-        if state.connection == .paused {
+        if state.isPaused {
             return projection(.paused, .off, .off, "Paused", preferences)
         }
         guard state.binding != nil, state.connection != .disconnected else {

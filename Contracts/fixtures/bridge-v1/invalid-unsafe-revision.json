@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "messageType": "action",
+  "requestId": "action-revision-1",
+  "instanceId": "cli-instance-1",
+  "sessionId": "session-1",
+  "generation": "generation-1",
+  "contextRevision": 9007199254740992,
+  "action": {
+    "type": "session.cancelForeground"
+  }
+}

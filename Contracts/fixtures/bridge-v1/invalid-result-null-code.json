@@ -1,0 +1,8 @@
+{
+  "protocolVersion": 1,
+  "messageType": "actionResult",
+  "requestId": "action-cancel-1",
+  "outcome": "rejected",
+  "code": null,
+  "message": "Rejected."
+}

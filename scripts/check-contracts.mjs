@@ -4,6 +4,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const MAXIMUM_ACTION_BYTES = 65_536;
+export const MAXIMUM_CONTEXT_REVISION = 9_007_199_254_740_991;
+export const MAXIMUM_RESULT_MESSAGE_CHARACTERS = 512;
 const ENVELOPE_KEYS = new Set([
   "protocolVersion",
   "messageType",
@@ -15,6 +17,8 @@ const ENVELOPE_KEYS = new Set([
   "action",
 ]);
 const ACTION_KEYS = new Set(["type", "permissionRequestId"]);
+const RESULT_REQUIRED_KEYS = new Set(["protocolVersion", "messageType", "requestId", "outcome", "message"]);
+const RESULT_ALLOWED_KEYS = new Set([...RESULT_REQUIRED_KEYS, "code"]);
 const IDENTIFIER = /^[!-~]{1,128}$/u;
 
 function isPlainObject(value) {
@@ -53,6 +57,7 @@ export function validateActionRequest(data, actionCatalog) {
     || !validIdentifier(value.generation)
     || !Number.isSafeInteger(value.contextRevision)
     || value.contextRevision < 0
+    || value.contextRevision > MAXIMUM_CONTEXT_REVISION
   ) {
     return { error: "malformed" };
   }
@@ -68,7 +73,32 @@ export function validateActionRequest(data, actionCatalog) {
   return { value };
 }
 
+export function validateActionResult(data, resultCodes) {
+  if (Buffer.byteLength(data) > MAXIMUM_ACTION_BYTES) return { error: "messageTooLarge" };
+  let value;
+  try {
+    value = JSON.parse(data);
+  } catch {
+    return { error: "malformed" };
+  }
+  if (!isPlainObject(value)) return { error: "malformed" };
+  const keys = Object.keys(value);
+  if (keys.some((key) => !RESULT_ALLOWED_KEYS.has(key))) return { error: "unexpectedField" };
+  if ([...RESULT_REQUIRED_KEYS].some((key) => !Object.hasOwn(value, key))) {
+    return { error: "malformed" };
+  }
+  if (value.protocolVersion !== 1) return { error: "unsupportedProtocol" };
+  if (value.messageType !== "actionResult") return { error: "invalidMessageType" };
+  if (!validIdentifier(value.requestId)) return { error: "malformed" };
+  if (!["accepted", "completed", "rejected", "failed"].includes(value.outcome)) return { error: "malformed" };
+  if (typeof value.message !== "string" || value.message.length === 0) return { error: "emptyMessage" };
+  if ([...value.message].length > MAXIMUM_RESULT_MESSAGE_CHARACTERS) return { error: "messageTooLong" };
+  if (value.code !== undefined && !resultCodes.has(value.code)) return { error: "malformed" };
+  return { value };
+}
+
 export function validateActionGuard(request, context) {
+  if (context.paused) return "paused";
   if (context.connection === "disconnected") return "disconnected";
   if (context.connection !== "ready" || !context.binding) return "unsynchronized";
   if (request.instanceId !== context.binding.instanceId) return "staleInstance";
@@ -88,6 +118,31 @@ export function validateActionGuard(request, context) {
     }
   }
   return "allowed";
+}
+
+export class ActionReplayLedger {
+  static maximumTrackedRequests = 4_096;
+
+  #generation = null;
+  #requestIds = new Set();
+
+  reserve(request, context) {
+    const rejection = validateActionGuard(request, context);
+    if (rejection !== "allowed") return rejection;
+    if (this.#generation !== null && this.#generation !== request.generation) return "staleGeneration";
+    this.#generation ??= request.generation;
+    if (this.#requestIds.has(request.requestId)) return "duplicateRequest";
+    if (this.#requestIds.size >= ActionReplayLedger.maximumTrackedRequests) return "replayLedgerFull";
+    this.#requestIds.add(request.requestId);
+    return "reserved";
+  }
+
+  invalidate(newGeneration) {
+    if (newGeneration === this.#generation) return false;
+    this.#generation = newGeneration;
+    this.#requestIds.clear();
+    return true;
+  }
 }
 
 function readJSON(file) {
@@ -111,6 +166,9 @@ export function loadContractCatalogs(root) {
     actionCatalog.set(action.id, action);
   }
   assert.deepEqual(schema.$defs.actionType.enum, actions.actions.map((action) => action.id));
+  assert.equal(schema.$defs.actionRequest.properties.contextRevision.maximum, MAXIMUM_CONTEXT_REVISION);
+  assert.equal(schema.$defs.actionResult.properties.message.maxLength, MAXIMUM_RESULT_MESSAGE_CHARACTERS);
+  const resultCodes = new Set(schema.$defs.actionResult.properties.code.enum);
 
   const contacts = [];
   const controlIDs = new Set();
@@ -132,11 +190,11 @@ export function loadContractCatalogs(root) {
   );
   assert.equal(controls.controls.find((control) => control.id === "key.sessions")?.matrixContacts[0], 1);
   assert.equal(controls.controls.find((control) => control.id === "key.new")?.matrixContacts[0], 0);
-  return { actionCatalog, actions, controls, schema };
+  return { actionCatalog, actions, controls, resultCodes, schema };
 }
 
 export function runContractChecks(root) {
-  const { actionCatalog } = loadContractCatalogs(root);
+  const { actionCatalog, resultCodes } = loadContractCatalogs(root);
   const fixtureDirectory = path.join(root, "Contracts", "fixtures", "bridge-v1");
   const manifest = readJSON(path.join(fixtureDirectory, "manifest.json"));
   assert.equal(manifest.schemaVersion, 1);
@@ -152,6 +210,7 @@ export function runContractChecks(root) {
     capabilities,
     pendingRequestIds: new Set(["permission-1"]),
     visiblePermissionRequestId: "permission-1",
+    paused: false,
   };
 
   for (const fixture of manifest.cases) {
@@ -161,10 +220,37 @@ export function runContractChecks(root) {
     const decoded = validateActionRequest(data, actionCatalog);
     assert.equal(decoded.error ?? "valid", fixture.decode, fixture.name);
     if (fixture.decode === "valid") {
-      assert.equal(validateActionGuard(decoded.value, context), fixture.guard, fixture.name);
+      if (fixture.replay === "duplicate") {
+        const ledger = new ActionReplayLedger();
+        assert.equal(ledger.reserve(decoded.value, context), "reserved", fixture.name);
+        assert.equal(ledger.reserve(decoded.value, context), fixture.guard, fixture.name);
+      } else {
+        assert.equal(validateActionGuard(decoded.value, context), fixture.guard, fixture.name);
+      }
     }
   }
-  return { actionCount: actionCatalog.size, controlCount: 12, fixtureCount: manifest.cases.length };
+
+  const resultManifest = readJSON(path.join(fixtureDirectory, "result-manifest.json"));
+  assert.equal(resultManifest.schemaVersion, 1);
+  for (const fixture of resultManifest.cases) {
+    const data = fixture.generator?.startsWith("unicode")
+      ? JSON.stringify({
+          protocolVersion: 1,
+          messageType: "actionResult",
+          requestId: "action-result-unicode",
+          outcome: "completed",
+          message: "é".repeat(Number.parseInt(fixture.generator.slice("unicode".length), 10)),
+        })
+      : fs.readFileSync(path.join(fixtureDirectory, fixture.file), "utf8");
+    const decoded = validateActionResult(data, resultCodes);
+    assert.equal(decoded.error ?? "valid", fixture.decode, fixture.name);
+  }
+  return {
+    actionCount: actionCatalog.size,
+    controlCount: 12,
+    fixtureCount: manifest.cases.length,
+    resultFixtureCount: resultManifest.cases.length,
+  };
 }
 
 function isMainModule() {

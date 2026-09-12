@@ -34,6 +34,11 @@
       "decode": "invalidArguments"
     },
     {
+      "name": "null-permission-request",
+      "file": "invalid-permission-null-request.json",
+      "decode": "invalidArguments"
+    },
+    {
       "name": "stale-generation",
       "file": "valid-stale-generation.json",
       "decode": "valid",
@@ -50,6 +55,18 @@
       "file": "valid-stale-permission.json",
       "decode": "valid",
       "guard": "permissionRequestNotPending"
+    },
+    {
+      "name": "duplicate-request",
+      "file": "valid-duplicate-request.json",
+      "decode": "valid",
+      "guard": "duplicateRequest",
+      "replay": "duplicate"
+    },
+    {
+      "name": "unsafe-javascript-revision",
+      "file": "invalid-unsafe-revision.json",
+      "decode": "malformed"
     },
     {
       "name": "oversized-message",

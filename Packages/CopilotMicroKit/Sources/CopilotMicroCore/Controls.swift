@@ -107,18 +107,36 @@ public enum ControlTransition: Equatable, Sendable {
 }
 
 public struct KeyInputNormalizer: Sendable {
+    private let wideKeyCoalescingMilliseconds: UInt64
     private var pressedContacts: Set<MatrixContactID> = []
     private var pressedControls: Set<PhysicalControlID> = []
+    private var suppressedControls: Set<PhysicalControlID> = []
+    private var wideKeyCooldownUntil: UInt64?
 
-    public init() {}
+    public init(wideKeyCoalescingMilliseconds: UInt64) {
+        self.wideKeyCoalescingMilliseconds = wideKeyCoalescingMilliseconds
+    }
 
-    public mutating func process(contact: MatrixContactID, isPressed: Bool) -> ControlTransition? {
+    public mutating func process(
+        contact: MatrixContactID,
+        isPressed: Bool,
+        atMilliseconds milliseconds: UInt64
+    ) -> ControlTransition? {
         guard let control = PhysicalLayout.contactToControl[contact] else {
             return nil
         }
 
         if isPressed {
             guard pressedContacts.insert(contact).inserted else {
+                return nil
+            }
+            if control == .submit,
+                let cooldown = wideKeyCooldownUntil,
+                milliseconds < cooldown
+            {
+                suppressedControls.insert(control)
+            }
+            guard !suppressedControls.contains(control) else {
                 return nil
             }
             guard pressedControls.insert(control).inserted else {
@@ -135,15 +153,30 @@ public struct KeyInputNormalizer: Sendable {
             .first(where: { $0.id == control })?
             .contacts
             .contains(where: pressedContacts.contains) ?? false
-        guard !stillPressed, pressedControls.remove(control) != nil else {
+        guard !stillPressed else {
             return nil
+        }
+        if suppressedControls.remove(control) != nil {
+            return nil
+        }
+        guard pressedControls.remove(control) != nil else {
+            return nil
+        }
+        if control == .submit {
+            let (cooldown, overflow) = milliseconds.addingReportingOverflow(
+                wideKeyCoalescingMilliseconds
+            )
+            wideKeyCooldownUntil = overflow ? UInt64.max : cooldown
         }
         return .released(control)
     }
 
-    public mutating func reset() {
-        pressedContacts.removeAll()
+    public mutating func reset(suppressing currentlyPressedContacts: Set<MatrixContactID> = []) {
+        let contactsToSuppress = pressedContacts.union(currentlyPressedContacts)
+        suppressedControls = Set(contactsToSuppress.compactMap { PhysicalLayout.contactToControl[$0] })
+        pressedContacts = currentlyPressedContacts
         pressedControls.removeAll()
+        wideKeyCooldownUntil = nil
     }
 }
 
