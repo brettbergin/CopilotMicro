@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+
+void import("./doctor.mjs").then(({ main }) => {
+  process.exitCode = main();
+});
