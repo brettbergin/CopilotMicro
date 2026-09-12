@@ -218,7 +218,9 @@ operation, private device association, source and target configurations,
 verified backup, active profile/layer and normalized change set. A mutating
 command opens the HID interface exclusively, rechecks the source, saves a
 pre-change snapshot, writes the full keymap once and verifies a complete
-read-back. These commands are intentionally not part of `make check`.
+read-back. Exclusive configuration access may require granting Input Monitoring
+to the terminal running the command. These commands are intentionally not part
+of `make check`.
 
 No device mapping has been applied yet. Physical input and lighting remain
 unqualified until the reviewed mapping is explicitly approved and exercised.

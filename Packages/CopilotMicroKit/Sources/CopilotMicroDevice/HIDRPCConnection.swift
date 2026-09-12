@@ -129,6 +129,9 @@ public final class HIDRPCConnection {
         let result = IOHIDDeviceOpen(record.device, accessMode.options)
         guard result == kIOReturnSuccess else {
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+            if result == kIOReturnNotPrivileged {
+                throw HIDConnectionError.openFailed(UInt32(bitPattern: result))
+            }
             if accessMode == .exclusiveConfiguration {
                 throw HIDConnectionError.exclusiveAccessFailed(UInt32(bitPattern: result))
             }

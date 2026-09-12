@@ -134,7 +134,9 @@ do not overwrite them silently with a stale cached copy.
 Mutating transactions must seize exclusive access to the vendor HID interface.
 If another configurator prevents exclusive ownership, stop before the backup
 snapshot or write and ask the user to close it. Non-exclusive read access is
-used only for discovery and preview.
+used only for discovery and preview. macOS may require Input Monitoring for
+exclusive access; denial blocks the write rather than falling back to an
+unprotected non-exclusive transaction.
 
 Ordinary light changes and local action reassignment must not rewrite the
 device keymap when its event bindings are already correct.
