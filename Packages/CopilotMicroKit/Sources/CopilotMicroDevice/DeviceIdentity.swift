@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public enum DeviceTransport: String, Codable, Sendable {
@@ -44,6 +45,7 @@ public struct HIDDeviceDescriptor: Codable, Equatable, Sendable {
     public let maximumInputReportBytes: Int
     public let maximumOutputReportBytes: Int
     public let serialPresent: Bool
+    public let associationID: String?
     public let qualification: DeviceQualification
     public let qualificationReason: String
 
@@ -58,7 +60,8 @@ public struct HIDDeviceDescriptor: Codable, Equatable, Sendable {
         usagePairs: [HIDUsagePair],
         maximumInputReportBytes: Int,
         maximumOutputReportBytes: Int,
-        serialPresent: Bool
+        serialPresent: Bool,
+        associationID: String? = nil
     ) {
         self.registryID = registryID
         self.vendorID = vendorID
@@ -71,6 +74,7 @@ public struct HIDDeviceDescriptor: Codable, Equatable, Sendable {
         self.maximumInputReportBytes = maximumInputReportBytes
         self.maximumOutputReportBytes = maximumOutputReportBytes
         self.serialPresent = serialPresent
+        self.associationID = associationID
         let result = CreatorMicro2Hardware.qualify(
             vendorID: vendorID,
             productID: productID,
@@ -84,6 +88,25 @@ public struct HIDDeviceDescriptor: Codable, Equatable, Sendable {
         )
         self.qualification = result.qualification
         self.qualificationReason = result.reason
+    }
+}
+
+public enum DeviceAssociationIdentifier {
+    public static func make(vendorID: Int, productID: Int, serialNumber: String?) -> String? {
+        guard
+            let serialNumber,
+            !serialNumber.isEmpty,
+            serialNumber.utf8.count <= 256,
+            serialNumber.unicodeScalars.allSatisfy({
+                $0.value >= 0x20 && $0.value != 0x7F
+            })
+        else {
+            return nil
+        }
+        let material = "copilot-micro-device-v1:\(vendorID):\(productID):\(serialNumber)"
+        return SHA256.hash(data: Data(material.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }
 

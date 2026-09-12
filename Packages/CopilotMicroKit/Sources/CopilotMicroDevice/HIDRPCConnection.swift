@@ -29,6 +29,7 @@ public enum HIDReadMethod: Sendable {
 public enum HIDConnectionError: Error, LocalizedError {
     case candidateNotFound
     case candidateUnsupported(String)
+    case configuration(DeviceConfigurationWriteError)
     case deviceRemoved
     case malformedResponse
     case openFailed(UInt32)
@@ -42,6 +43,8 @@ public enum HIDConnectionError: Error, LocalizedError {
             return "The selected Creator Micro 2 candidate is no longer present."
         case .candidateUnsupported(let reason):
             return reason
+        case .configuration(let error):
+            return error.localizedDescription
         case .deviceRemoved:
             return "The device disconnected while a read-only request was active."
         case .malformedResponse:
@@ -175,17 +178,80 @@ public final class HIDRPCConnection {
     }
 
     public func read(_ method: HIDReadMethod, timeoutSeconds: Double = 8) throws -> Any? {
+        try request(method: method.method, params: method.params, timeoutSeconds: timeoutSeconds)
+    }
+
+    public func apply(
+        _ plan: DeviceConfigurationWritePlan,
+        authorization: DeviceWriteAuthorization,
+        timeoutSeconds: Double = 8
+    ) throws -> DeviceWriteReceipt {
+        guard
+            descriptor.associationID == authorization.associationID,
+            plan.operation == authorization.operation,
+            plan.sourceSHA256 == authorization.sourceSHA256,
+            plan.resultSHA256 == authorization.resultSHA256
+        else {
+            throw HIDConnectionError.configuration(.authorizationMismatch)
+        }
+        let current = try DeviceKeymapDocument(
+            rpcResult: read(.keymap, timeoutSeconds: timeoutSeconds),
+            activeLayerIndex: plan.activeLayerIndex
+        )
+        guard current.sha256 == plan.sourceSHA256 else {
+            throw HIDConnectionError.configuration(.stalePlan)
+        }
+        guard let encoded = String(data: plan.resultData, encoding: .utf8) else {
+            throw HIDConnectionError.configuration(.writeRejected)
+        }
+        let response = try request(
+            method: "fs.write",
+            params: [
+                "file": "keymap.json",
+                "data": encoded,
+            ],
+            timeoutSeconds: timeoutSeconds
+        )
+        guard
+            let object = response as? [String: Any],
+            HIDJSONNumber.integer(object["ok"]) == 1
+        else {
+            throw HIDConnectionError.configuration(.writeRejected)
+        }
+        let readBack = try DeviceKeymapDocument(
+            rpcResult: read(.keymap, timeoutSeconds: timeoutSeconds),
+            activeLayerIndex: plan.activeLayerIndex
+        )
+        guard
+            readBack.sha256 == plan.resultSHA256
+                || readBack.isSemanticallyEqual(to: plan.resultData)
+        else {
+            throw HIDConnectionError.configuration(.readBackMismatch)
+        }
+        return DeviceWriteReceipt(
+            operation: plan.operation,
+            sourceSHA256: plan.sourceSHA256,
+            resultSHA256: readBack.sha256,
+            readBackVerified: true
+        )
+    }
+
+    private func request(
+        method: String,
+        params: Any,
+        timeoutSeconds: Double
+    ) throws -> Any? {
         guard !closed, !removed else { throw HIDConnectionError.deviceRemoved }
         let requestID = try allocator.reserve()
-        responses[requestID] = PendingRequest(method: method.method, response: .waiting)
+        responses[requestID] = PendingRequest(method: method, response: .waiting)
         defer {
             responses.removeValue(forKey: requestID)
             allocator.release(requestID)
         }
         let object: [String: Any] = [
             "id": requestID,
-            "method": method.method,
-            "params": method.params,
+            "method": method,
+            "params": params,
         ]
         let message = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         for report in try HIDReportFraming.encodeRPCMessage(message) {
@@ -218,7 +284,7 @@ public final class HIDRPCConnection {
             }
         }
         close()
-        throw HIDConnectionError.timeout(method.method)
+        throw HIDConnectionError.timeout(method)
     }
 
     private func receive(reportID: UInt32, bytes: [UInt8]) {

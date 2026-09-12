@@ -18,6 +18,44 @@ struct DeviceIdentityTests {
         #expect(makeDescriptor(inputBytes: 4097).qualification == .unsupported)
     }
 
+    @Test("Association identifiers are stable hashes and never expose the serial")
+    func associationIdentifiersArePrivate() throws {
+        let serial = "device-serial-value"
+        let first = try #require(
+            DeviceAssociationIdentifier.make(
+                vendorID: 0x303A,
+                productID: 0x8298,
+                serialNumber: serial
+            )
+        )
+        let second = try #require(
+            DeviceAssociationIdentifier.make(
+                vendorID: 0x303A,
+                productID: 0x8298,
+                serialNumber: serial
+            )
+        )
+        #expect(first == second)
+        #expect(first.count == 64)
+        #expect(first.allSatisfy { $0.isHexDigit })
+        #expect(!first.contains(serial))
+        #expect(
+            first
+                != DeviceAssociationIdentifier.make(
+                    vendorID: 0x303A,
+                    productID: 0x8297,
+                    serialNumber: serial
+                )
+        )
+        #expect(
+            DeviceAssociationIdentifier.make(
+                vendorID: 0x303A,
+                productID: 0x8298,
+                serialNumber: nil
+            ) == nil
+        )
+    }
+
     private func makeDescriptor(
         vendorID: Int = 0x303A,
         productID: Int = 0x8298,

@@ -64,10 +64,13 @@ enum HIDNativeDiscovery {
         }
         return devices.compactMap { device in
             guard let registryID = registryID(device) else { return nil }
+            let vendorID = integer(device, kIOHIDVendorIDKey) ?? 0
+            let productID = integer(device, kIOHIDProductIDKey) ?? 0
+            let serialNumber = string(device, kIOHIDSerialNumberKey)
             let descriptor = HIDDeviceDescriptor(
                 registryID: registryID,
-                vendorID: integer(device, kIOHIDVendorIDKey) ?? 0,
-                productID: integer(device, kIOHIDProductIDKey) ?? 0,
+                vendorID: vendorID,
+                productID: productID,
                 product: string(device, kIOHIDProductKey) ?? "Unknown HID device",
                 transport: DeviceTransport(
                     rawValueFromHID: string(device, kIOHIDTransportKey)
@@ -77,7 +80,12 @@ enum HIDNativeDiscovery {
                 usagePairs: usagePairs(device),
                 maximumInputReportBytes: integer(device, kIOHIDMaxInputReportSizeKey) ?? 0,
                 maximumOutputReportBytes: integer(device, kIOHIDMaxOutputReportSizeKey) ?? 0,
-                serialPresent: !(string(device, kIOHIDSerialNumberKey) ?? "").isEmpty
+                serialPresent: !(serialNumber ?? "").isEmpty,
+                associationID: DeviceAssociationIdentifier.make(
+                    vendorID: vendorID,
+                    productID: productID,
+                    serialNumber: serialNumber
+                )
             )
             return HIDNativeRecord(descriptor: descriptor, device: device)
         }

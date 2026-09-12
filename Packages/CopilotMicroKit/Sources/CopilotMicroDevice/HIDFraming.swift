@@ -72,7 +72,7 @@ public enum HIDReportFraming {
     public static let reportID: UInt8 = 0x06
     public static let reportBytes = 64
     public static let maximumChunkBytes = 61
-    public static let maximumMessageBytes = 131_072
+    public static let maximumMessageBytes = 1_048_576
 
     public static func encodeRPCMessage(_ message: Data) throws -> [[UInt8]] {
         guard !message.isEmpty else { throw HIDWireError.emptyMessage }

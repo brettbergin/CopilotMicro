@@ -94,52 +94,16 @@ public enum DeviceSnapshotParser {
         from result: Any?,
         activeLayerIndex: Int
     ) throws -> DeviceKeymapSummary {
-        guard
-            let wrapper = result as? [String: Any],
-            let encoded = wrapper["data"] as? String,
-            let data = encoded.data(using: .utf8)
-        else {
-            throw DeviceSnapshotError.malformedKeymap
-        }
-        guard data.count <= maximumKeymapBytes else {
+        do {
+            return try DeviceKeymapDocument(
+                rpcResult: result,
+                activeLayerIndex: activeLayerIndex
+            ).summary
+        } catch DeviceKeymapDocumentError.tooLarge {
             throw DeviceSnapshotError.keymapTooLarge
-        }
-        guard
-            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let version = integer(root["version"]),
-            version >= 1,
-            let activeProfileID = integer(root["activeProfileId"]),
-            activeProfileID >= 0,
-            let profiles = root["profiles"] as? [[String: Any]],
-            (1...64).contains(profiles.count)
-        else {
+        } catch {
             throw DeviceSnapshotError.malformedKeymap
         }
-        guard
-            let activeProfile = profiles.first(where: {
-                integer($0["id"]) == activeProfileID
-            }),
-            let layers = activeProfile["layers"] as? [[String: Any]],
-            (1...64).contains(layers.count),
-            layers.indices.contains(activeLayerIndex),
-            let layout = layers[activeLayerIndex]["layout"] as? [String: Any],
-            let keymap = layout["keymap"] as? [[Any]],
-            !keymap.isEmpty,
-            keymap.count <= 16,
-            keymap.allSatisfy({ (1...64).contains($0.count) })
-        else {
-            throw DeviceSnapshotError.malformedKeymap
-        }
-        return DeviceKeymapSummary(
-            byteCount: data.count,
-            schemaVersion: version,
-            activeProfileID: activeProfileID,
-            activeProfileMatched: true,
-            profileCount: profiles.count,
-            activeProfileLayerCount: layers.count,
-            activeLayerAvailable: true,
-            activeLayerKeyRowLengths: keymap.map(\.count)
-        )
     }
 
     private static func integer(_ value: Any?) -> Int? {
