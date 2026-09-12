@@ -16,9 +16,11 @@ No component described here has been implemented in this repository.
 | Configuration store | Versioned settings, backups, migrations and import/export | Tokens or copied conversation history |
 | Update service | Qualified internal release discovery, verification, staging and approved replacement | CLI updates, session restart or silent permission changes |
 
-Use an ordinary native menu bar app, not a kernel/system extension. A full
-Xcode app target can own bundle resources and packaging, with independently
-testable Swift modules for state, configuration and protocols. The small
+Use an ordinary native menu bar app, not a kernel/system extension. Swift
+Package Manager builds the local native executable and independently testable
+Swift modules for state, configuration and protocols. A deterministic packager
+owns `.app` metadata, resources and ad-hoc signing. Full Xcode is optional for
+separately qualified Xcode-specific UI automation, not a local build gate. The small
 JavaScript extension uses the SDK provided by its CLI host. A separate
 always-running privileged daemon or cloud backend is not required.
 

@@ -13,27 +13,34 @@ application and hardware/CLI integrations are not implemented or qualified yet.
 
 ## Developer setup
 
-Install full [Xcode](https://apps.apple.com/app/xcode/id497799835) from Apple
-and open it once to finish its license/component setup. Command Line Tools
-alone are insufficient for the native app/UI workflow.
+Local native builds use Swift 6, Swift Package Manager and Apple's macOS SDK
+from the installed Command Line Tools. **Full Xcode and an Apple account are
+not required for this build path.** A native SwiftUI/AppKit app, ad-hoc signing,
+relocated bundle resources and headless window/view creation were verified
+with Command Line Tools Swift 6.3.3 and macOS SDK 26.5 on macOS 26.6.2.
 
-With Node installed, check the Xcode prerequisite without changing the global
+With Node installed, check local prerequisites without changing the global
 developer-tool selection:
 
 ```sh
-make doctor-xcode
+make doctor
 ```
 
-For a nonstandard installation, select it for just the command:
+Select an installed toolchain for just one command when needed:
 
 ```sh
-DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" make doctor-xcode
+DEVELOPER_DIR="/Library/Developer/CommandLineTools" make doctor
 ```
 
-The developer tools are declared in `Brewfile`. Once full Xcode setup is
-complete, review that file and install missing tools with
+The developer tools are declared in `Brewfile`. Review that file and install
+missing tools with
 `brew bundle install --file=Brewfile --no-upgrade`, then run `make doctor`.
 The checker is read-only; it does not install tools or log into Copilot.
+
+Full Xcode is a separate prerequisite for Xcode-specific UI automation, not
+for the local native app. `make doctor-xcode` checks that optional environment
+strictly. Such checks can later use an authorized macOS CI runner with Xcode
+preinstalled; no CI run or UI automation is claimed here.
 
 Run `make check` for the setup checker's syntax/tests. This does not build or
 qualify a native application. Missing prerequisites are reported explicitly.

@@ -5,15 +5,17 @@ or qualified merely because it appears in this document.
 
 ## Delivery strategy
 
-The implementation interview selected GUI/emulator-first: begin with guided
-full Xcode setup, then the native shell and deterministic simulated behavior.
+The implementation interview selected GUI/emulator-first: begin by verifying
+the local Swift/macOS toolchain, then the native shell and deterministic
+simulated behavior. A stock Command Line Tools/SwiftPM build path is verified;
+full Xcode is not a universal prerequisite for the native app.
 Introduce live integrations only after their contracts and safety gates are
 qualified. Preserve the complete agreed scope and report unsupported
 integrations explicitly; do not replace them with dangerous shortcuts.
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
-| 0. Developer foundation | Guided full Xcode setup and reproducible native build/test tooling | Real Xcode/SDK prerequisites and scaffold checks succeed |
+| 0. Developer foundation | Verified Swift/macOS SDK and reproducible SwiftPM native build/package tooling | Local prerequisites, packaged resources and headless scaffold checks succeed; Xcode-only checks remain distinct |
 | 1. Native GUI/emulator | Menu panel, manager, editor, deterministic state/input model and isolated simulator | Core journeys are accessible and clearly simulated; no HID/CLI side effects |
 | 2. Contract probes | Exact CLI/terminal/firmware qualification and unsupported-feature ledger | Session identity, native actions, state/visibility evidence and versions recorded without touching production work |
 | 3. Session bridge | Trusted CLI-hosted extension plus private local IPC and mock receiver | Two disposable sessions demonstrate isolation, state correlation, replacement and reconnect |

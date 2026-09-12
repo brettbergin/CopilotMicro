@@ -9,15 +9,18 @@ Developer setup tooling exists. The native app, GUI/emulator and live
 CLI/device integrations are not implemented yet. Build the GUI/emulator
 before connecting live integrations.
 
-Use Swift 6 with SwiftUI/AppKit, an XcodeGen-managed project and a local Swift
-package for native code. Use a small `.mjs` bridge with the CLI-provided SDK.
+Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
+package for native code. The local build uses Apple's installed Command Line
+Tools and explicit `.app` packaging; full Xcode is not a universal prerequisite.
+Keep Xcode-only UI automation separately gated. Use a small `.mjs` bridge with
+the CLI-provided SDK.
 Do not place unfinished bridge code in `.github/extensions/`, where opening
 the repository could load it into a real session.
 
 ## Canonical commands
 
-- `make doctor-xcode`: read-only full Xcode/SDK prerequisite check.
-- `make doctor`: read-only developer prerequisite report.
+- `make doctor-xcode`: optional, strict full Xcode/SDK prerequisite check.
+- `make doctor`: read-only local native developer prerequisite report.
 - `make test-doctor`: isolated Node tests for the prerequisite checker.
 - `make check`: current setup-tooling syntax and tests only.
 

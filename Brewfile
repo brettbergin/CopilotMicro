@@ -1,3 +1,2 @@
-# Development tools only; full Xcode is installed separately from Apple.
+# Native builds use Apple's installed Command Line Tools and SwiftPM.
 brew "node"
-brew "xcodegen"

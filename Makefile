@@ -4,8 +4,8 @@
 
 help:
 	@printf '%s\n' \
-		'doctor-xcode  Check full Xcode and its macOS SDK without changing settings' \
-		'doctor        Report required and optional developer prerequisites' \
+		'doctor-xcode  Check the optional full-Xcode environment without changing settings' \
+		'doctor        Check local Swift/macOS SDK prerequisites with CLT or Xcode' \
 		'test-doctor   Run isolated prerequisite-checker tests' \
 		'check         Check setup tooling only; no native app exists yet'
 

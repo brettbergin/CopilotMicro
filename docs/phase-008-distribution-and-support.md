@@ -60,16 +60,42 @@ Launch at login is opt-in using the native macOS service-management mechanism.
 Respect its real registered/approved status. Starting the menu bar app does
 not automatically start Copilot; offer explicit Open Copilot when disconnected.
 
-For development, full Xcode and an appropriate macOS SDK are required for the
-native app/XCTest workflow. The research machine's command-line-tools-only
-installation could compile the reference release but could not compile
-XCTest. Installing/updating developer tools is not part of end-user setup.
+The local native build uses Swift Package Manager and Apple's installed
+Command Line Tools, which contain the macOS SDK. A SwiftUI/AppKit build,
+ad-hoc-signed `.app` and relocated-resource/headless runtime smoke were
+verified with Swift 6.3.3 and SDK 26.5 on macOS 26.6.2. This does not require
+an Apple account or downloading full Xcode.
 
-The repository's read-only `make doctor-xcode` checks full Xcode and its macOS
-SDK; `make doctor` checks the broader developer prerequisites. Use
-`DEVELOPER_DIR` for a command-scoped selection rather than changing global
-`xcode-select`. Neither command installs tools, logs into Copilot or qualifies
-live integrations. See the [README setup guide](../README.md#developer-setup).
+Xcode-specific UI automation is a separate capability. A prior XCTest failure
+must not be generalized into inability to build a native app. Record the
+actual unit-test runner and UI verification evidence separately. An authorized
+macOS CI runner with Xcode preinstalled is a possible later path, not evidence
+that those checks have already run.
+
+Local SwiftPM unit tests were verified with the official Swift Testing 6.2.4
+dependency and SwiftSyntax 602.0.0, including a deliberately failing test
+returning nonzero. Bundled Testing/XCTest are absent in this CLT installation;
+Testing 6.3.2 links against unavailable `_TestingInterop`. Keep the verified
+test-only dependency pinned until a replacement is qualified.
+
+This combination can emit a compile-time `DecodingError` about a corrupted
+JSON/EOF macro-plugin shutdown message, matching
+[Swift issue 90663](https://github.com/swiftlang/swift/issues/90663).
+It appeared before build completion; actual test counts and failure exits
+were verified independently. Do not hide the diagnostic, accept nonzero
+build/test exits, or skip rebuilding changed tests to suppress it.
+
+The read-only `make doctor` checks local native prerequisites; optional
+`make doctor-xcode` strictly checks full Xcode/SDK. Use command-scoped
+`DEVELOPER_DIR` rather than changing global `xcode-select`. Neither command
+installs tools, logs into Copilot or qualifies live integrations. Developer
+tool installation is not part of end-user setup. See the
+[README setup guide](../README.md#developer-setup) and Apple's
+[Command Line Tools overview](https://developer.apple.com/library/archive/technotes/tn2339/_index.html).
+
+Ad-hoc signing does not provide Developer ID identity or notarization.
+Those later distribution capabilities require separately provisioned Apple
+signing resources; lack of them is not a reason to block local GUI work.
 
 ## Managed bridge lifecycle
 
