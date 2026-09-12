@@ -4,13 +4,15 @@ Status: implementation plan, current qualification ledger and acceptance
 contract. A feature is implemented or qualified only where evidence is stated.
 
 Current evidence: stage 0, the isolated stage-1 GUI/emulator milestone and the
-local configuration/diagnostic foundation are implemented. The transport-only
-part of stage 3 also has native/Node mock evidence for private authenticated
-IPC, bounded frames, roles, generations, sequences and rejection cases. The app
-does not start it. A separate source-only probe joined owned disposable Copilot
-CLI `1.0.84-5` sessions and produced a conservative compatibility report.
-This does not qualify the production bridge, terminal, HID or updater, and it
-does not convert simulated acceptance journeys into hardware evidence.
+local configuration/diagnostic foundation are implemented. I-07 adds
+native/Node mock evidence for an uninstalled read-only stage-3 observer:
+private authenticated IPC, host/session/generation separation, unknown-first
+snapshots, event reconciliation, capability changes, liveness/replacement and
+explicit rejection of all stateful actions. The app does not start it. A
+separate source-only probe joined owned disposable Copilot CLI `1.0.84-5`
+sessions and produced the compatibility ceiling used by I-07. This does not
+qualify a live production bridge, terminal, HID or updater, and it does not
+convert simulated acceptance journeys into hardware evidence.
 
 ## Delivery strategy
 
@@ -143,13 +145,16 @@ Cases must include:
 ## Evidence and test layers
 
 Use unit tests for deterministic state/actions/configuration and byte framing.
-The current native/Node IPC tests cover only temporary local sockets and shared
-negative fixtures; they provide partial A-29 transport evidence, not production
-session isolation. The disposable probe provides bounded evidence for U-01
-through U-08 only; it does not use the production bridge. Use further
-contract/integration tests with owned disposable CLI sessions for bridge and
-terminal behavior. Use real-device qualification for physical geometry,
-lighting, transport and restore.
+The current native/Node IPC tests cover temporary local sockets, shared negative
+fixtures and deterministic I-07 observer/reconciler behavior. They provide
+partial A-02/A-29 evidence for identity separation, replacement, stale
+generation rejection, ordered reconciliation and liveness, not live production
+session isolation. Every action rejection is tested, but no action execution is
+qualified. The disposable probe provides bounded evidence for U-01 through
+U-08 only; it does not use the production bridge. Use further
+contract/integration tests with owned disposable CLI sessions for installed
+bridge and terminal behavior. Use real-device qualification for physical
+geometry, lighting, transport and restore.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
@@ -171,6 +176,10 @@ interactive live target and is not part of `make check`. It stages the passive
 extension in a private owned disposable repository, strips GitHub/Copilot token
 environment variables and cleans only marker-verified paths. The default probe
 registers no tools, hooks or permission handler.
+
+No I-07 command installs or loads `Bridge/src/extension.mjs`, and `make check`
+does not launch Copilot CLI. The shipped app resource remains emulator-only and
+starts no production listener or session service.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence
@@ -201,7 +210,9 @@ support claims and unsafe substitutes are not.
 ## Current completion boundary
 
 The phase-00 documentation, native foundation, GUI/emulator, local storage,
-diagnostics, authenticated IPC contract and disposable CLI qualification are
-implemented. Production CLI control, terminal targeting, HID, updater and
-their acceptance journeys remain future work. The compatibility report is a
-work-package result, not a claim that the live controller is complete.
+diagnostics, authenticated IPC contract, disposable CLI qualification and I-07
+read-only observer/reconciler source are implemented. Production installation,
+app activation, stateful CLI control, terminal targeting, HID, updater and
+their acceptance journeys remain future work. The compatibility report and
+mock I-07 checks are work-package results, not a claim that the live controller
+is complete.

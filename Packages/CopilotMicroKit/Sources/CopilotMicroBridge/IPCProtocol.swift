@@ -338,13 +338,15 @@ public enum IPCRegistrationResultCodec {
 public enum IPCPayloadMessageType: String, CaseIterable, Sendable {
     case action
     case actionResult
+    case heartbeat
+    case sessionEvent
     case sessionSnapshot
 
     var sender: IPCPeerRole {
         switch self {
         case .action:
             .nativeApp
-        case .actionResult, .sessionSnapshot:
+        case .actionResult, .heartbeat, .sessionEvent, .sessionSnapshot:
             .cliBridge
         }
     }
@@ -616,6 +618,10 @@ private func validateBridgePayload(
             }
         case .actionResult:
             _ = try ActionResultDecoder.decode(data)
+        case .heartbeat:
+            try validateHeartbeat(object, generation: generation)
+        case .sessionEvent:
+            try validateSessionEvent(object, generation: generation)
         case .sessionSnapshot:
             try validateSessionSnapshot(object, generation: generation)
         }
@@ -640,7 +646,11 @@ private func validateSessionSnapshot(
         "mode",
         "work",
         "pendingAttention",
+        "attention",
         "capabilities",
+        "hostCapabilities",
+        "model",
+        "compatibility",
     ]
     let allowedKeys = requiredKeys.union([
         "visiblePermissionRequestId",
@@ -668,8 +678,16 @@ private func validateSessionSnapshot(
         validWork(work),
         let pendingAttention = object["pendingAttention"] as? [[String: Any]],
         validPendingAttention(pendingAttention),
+        let attention = object["attention"] as? [String: Any],
+        validAttention(attention),
         let capabilities = object["capabilities"] as? [String: Any],
         validCapabilities(capabilities),
+        let hostCapabilities = object["hostCapabilities"] as? [String: Any],
+        validHostCapabilities(hostCapabilities),
+        let model = object["model"] as? [String: Any],
+        validModel(model),
+        let compatibility = object["compatibility"] as? [String: Any],
+        validCompatibility(compatibility),
         validNullableIdentifier(object["visiblePermissionRequestId"]),
         validFailure(object["failure"]),
         validNullableIdentifier(object["completionId"])
@@ -690,10 +708,13 @@ private func validMode(_ value: Any?) -> Bool {
 
 private func validWork(_ value: [String: Any]) -> Bool {
     guard Set(value.keys) == Set(["known", "foregroundActive", "backgroundCount", "queuedCount"]),
-        value["known"] is Bool,
-        value["foregroundActive"] is Bool,
-        safeUnsignedInteger(value["backgroundCount"]) != nil,
-        safeUnsignedInteger(value["queuedCount"]) != nil
+        let known = value["known"] as? Bool,
+        let foregroundActive = value["foregroundActive"] as? Bool,
+        let backgroundCount = safeUnsignedInteger(value["backgroundCount"]),
+        backgroundCount <= 128,
+        let queuedCount = safeUnsignedInteger(value["queuedCount"]),
+        queuedCount <= 128,
+        known || (!foregroundActive && backgroundCount == 0 && queuedCount == 0)
     else {
         return false
     }
@@ -719,6 +740,20 @@ private func validPendingAttention(_ values: [[String: Any]]) -> Bool {
     return true
 }
 
+private func validAttention(_ value: [String: Any]) -> Bool {
+    guard Set(value.keys) == Set(["known", "permissionCount", "otherCount"]),
+        let known = value["known"] as? Bool,
+        let permissionCount = safeUnsignedInteger(value["permissionCount"]),
+        permissionCount <= 128,
+        let otherCount = safeUnsignedInteger(value["otherCount"]),
+        otherCount <= 128,
+        known || (permissionCount == 0 && otherCount == 0)
+    else {
+        return false
+    }
+    return true
+}
+
 private func validCapabilities(_ values: [String: Any]) -> Bool {
     guard values.count <= 64 else {
         return false
@@ -739,6 +774,133 @@ private func validCapabilities(_ values: [String: Any]) -> Bool {
         }
     }
     return true
+}
+
+private func validHostCapabilities(_ value: [String: Any]) -> Bool {
+    Set(value.keys) == Set(["elicitation", "canvases", "mcpApps"])
+        && value["elicitation"] is Bool
+        && value["canvases"] is Bool
+        && value["mcpApps"] is Bool
+}
+
+private func validModel(_ value: [String: Any]) -> Bool {
+    guard
+        Set(value.keys)
+            == Set([
+                "known",
+                "modelId",
+                "reasoningEffort",
+                "contextTier",
+                "availableModels",
+            ]),
+        let known = value["known"] as? Bool,
+        validNullableBoundedString(value["modelId"], maximumCharacters: 128),
+        validNullableBoundedString(value["reasoningEffort"], maximumCharacters: 32),
+        validNullableBoundedString(value["contextTier"], maximumCharacters: 32),
+        let availableModels = value["availableModels"] as? [[String: Any]],
+        availableModels.count <= 64,
+        known
+            || (value["modelId"] is NSNull
+                && value["reasoningEffort"] is NSNull
+                && value["contextTier"] is NSNull
+                && availableModels.isEmpty)
+    else {
+        return false
+    }
+    for model in availableModels {
+        guard
+            Set(model.keys)
+                == Set([
+                    "id",
+                    "reasoningEffort",
+                    "supportedReasoningEfforts",
+                ]),
+            validRequiredBoundedString(model["id"], maximumCharacters: 128),
+            model["reasoningEffort"] is Bool,
+            let efforts = model["supportedReasoningEfforts"] as? [String],
+            efforts.count <= 16,
+            efforts.allSatisfy({
+                !$0.isEmpty && $0.unicodeScalars.count <= 32
+            })
+        else {
+            return false
+        }
+    }
+    return true
+}
+
+private func validCompatibility(_ value: [String: Any]) -> Bool {
+    guard
+        Set(value.keys) == Set(["status", "cliVersion", "sdkVersion", "reason"]),
+        let status = value["status"] as? String,
+        SessionObservationCompatibilityStatus(rawValue: status) != nil,
+        validRequiredBoundedString(value["cliVersion"], maximumCharacters: 128),
+        validRequiredBoundedString(value["sdkVersion"], maximumCharacters: 128),
+        validRequiredBoundedString(value["reason"], maximumCharacters: 512)
+    else {
+        return false
+    }
+    return true
+}
+
+private func validateSessionEvent(
+    _ object: [String: Any],
+    generation: ConnectionGeneration
+) throws {
+    let keys: Set<String> = [
+        "protocolVersion",
+        "messageType",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+        "reason",
+    ]
+    guard Set(object.keys) == keys,
+        object["protocolVersion"] as? Int == IPCFrame.protocolVersion,
+        object["messageType"] as? String == IPCPayloadMessageType.sessionEvent.rawValue,
+        let instanceID = object["instanceId"] as? String,
+        (try? CLIInstanceID(rawValue: instanceID)) != nil,
+        let sessionID = object["sessionId"] as? String,
+        (try? SessionID(rawValue: sessionID)) != nil,
+        let rawGeneration = object["generation"] as? String,
+        let eventGeneration = try? ConnectionGeneration(rawValue: rawGeneration),
+        eventGeneration == generation,
+        let revision = safeUnsignedInteger(object["contextRevision"]),
+        revision > 0,
+        let reason = object["reason"] as? String,
+        SessionObservationEventReason(rawValue: reason) != nil
+    else {
+        throw IPCWireDecodeError.invalidPayload
+    }
+}
+
+private func validateHeartbeat(
+    _ object: [String: Any],
+    generation: ConnectionGeneration
+) throws {
+    let keys: Set<String> = [
+        "protocolVersion",
+        "messageType",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+    ]
+    guard Set(object.keys) == keys,
+        object["protocolVersion"] as? Int == IPCFrame.protocolVersion,
+        object["messageType"] as? String == IPCPayloadMessageType.heartbeat.rawValue,
+        let instanceID = object["instanceId"] as? String,
+        (try? CLIInstanceID(rawValue: instanceID)) != nil,
+        let sessionID = object["sessionId"] as? String,
+        (try? SessionID(rawValue: sessionID)) != nil,
+        let rawGeneration = object["generation"] as? String,
+        let heartbeatGeneration = try? ConnectionGeneration(rawValue: rawGeneration),
+        heartbeatGeneration == generation,
+        safeUnsignedInteger(object["contextRevision"]) != nil
+    else {
+        throw IPCWireDecodeError.invalidPayload
+    }
 }
 
 private func validFailure(_ value: Any?) -> Bool {
@@ -778,6 +940,26 @@ private func validOptionalBoundedString(
         return false
     }
     return string.unicodeScalars.count <= maximumCharacters
+}
+
+private func validRequiredBoundedString(
+    _ value: Any?,
+    maximumCharacters: Int
+) -> Bool {
+    guard let string = value as? String else {
+        return false
+    }
+    return !string.isEmpty && string.unicodeScalars.count <= maximumCharacters
+}
+
+private func validNullableBoundedString(
+    _ value: Any?,
+    maximumCharacters: Int
+) -> Bool {
+    if value is NSNull {
+        return true
+    }
+    return validRequiredBoundedString(value, maximumCharacters: maximumCharacters)
 }
 
 private func safeUnsignedInteger(_ value: Any?) -> UInt64? {

@@ -81,7 +81,20 @@ const REGISTRATION_RESULT_KEYS = new Set([
 const PAYLOAD_SENDERS = new Map([
   ["action", "nativeApp"],
   ["actionResult", "cliBridge"],
+  ["heartbeat", "cliBridge"],
+  ["sessionEvent", "cliBridge"],
   ["sessionSnapshot", "cliBridge"],
+]);
+const SESSION_EVENT_REASONS = new Set([
+  "activity",
+  "attention",
+  "backgroundTasks",
+  "capabilities",
+  "hostError",
+  "lifecycle",
+  "mode",
+  "model",
+  "queue",
 ]);
 
 function isPlainObject(value) {
@@ -166,7 +179,11 @@ function validateSnapshotPayload(value, generation) {
     "mode",
     "work",
     "pendingAttention",
+    "attention",
     "capabilities",
+    "hostCapabilities",
+    "model",
+    "compatibility",
   ]);
   const allowed = new Set([
     ...required,
@@ -193,8 +210,12 @@ function validateSnapshotPayload(value, generation) {
     || !isPlainObject(value.work)
     || !Array.isArray(value.pendingAttention)
     || value.pendingAttention.length > 128
+    || !isPlainObject(value.attention)
     || !isPlainObject(value.capabilities)
     || Object.keys(value.capabilities).length > 64
+    || !isPlainObject(value.hostCapabilities)
+    || !isPlainObject(value.model)
+    || !isPlainObject(value.compatibility)
   ) {
     return false;
   }
@@ -207,6 +228,27 @@ function validateSnapshotPayload(value, generation) {
     || value.work.backgroundCount < 0
     || !Number.isSafeInteger(value.work.queuedCount)
     || value.work.queuedCount < 0
+    || value.work.backgroundCount > 128
+    || value.work.queuedCount > 128
+    || (!value.work.known
+      && (value.work.foregroundActive
+        || value.work.backgroundCount !== 0
+        || value.work.queuedCount !== 0))
+  ) {
+    return false;
+  }
+
+  if (
+    !exactKeys(value.attention, new Set(["known", "permissionCount", "otherCount"]))
+    || typeof value.attention.known !== "boolean"
+    || !Number.isSafeInteger(value.attention.permissionCount)
+    || value.attention.permissionCount < 0
+    || value.attention.permissionCount > 128
+    || !Number.isSafeInteger(value.attention.otherCount)
+    || value.attention.otherCount < 0
+    || value.attention.otherCount > 128
+    || (!value.attention.known
+      && (value.attention.permissionCount !== 0 || value.attention.otherCount !== 0))
   ) {
     return false;
   }
@@ -243,6 +285,72 @@ function validateSnapshotPayload(value, generation) {
   }
 
   if (
+    !exactKeys(value.hostCapabilities, new Set(["elicitation", "canvases", "mcpApps"]))
+    || typeof value.hostCapabilities.elicitation !== "boolean"
+    || typeof value.hostCapabilities.canvases !== "boolean"
+    || typeof value.hostCapabilities.mcpApps !== "boolean"
+  ) {
+    return false;
+  }
+
+  if (
+    !exactKeys(
+      value.model,
+      new Set([
+        "known",
+        "modelId",
+        "reasoningEffort",
+        "contextTier",
+        "availableModels",
+      ]),
+    )
+    || typeof value.model.known !== "boolean"
+    || !validNullableString(value.model.modelId, 128)
+    || !validNullableString(value.model.reasoningEffort, 32)
+    || !validNullableString(value.model.contextTier, 32)
+    || !Array.isArray(value.model.availableModels)
+    || value.model.availableModels.length > 64
+    || (!value.model.known
+      && (value.model.modelId !== null
+        || value.model.reasoningEffort !== null
+        || value.model.contextTier !== null
+        || value.model.availableModels.length !== 0))
+  ) {
+    return false;
+  }
+  for (const model of value.model.availableModels) {
+    if (
+      !isPlainObject(model)
+      || !exactKeys(
+        model,
+        new Set(["id", "reasoningEffort", "supportedReasoningEfforts"]),
+      )
+      || !validRequiredString(model.id, 128)
+      || typeof model.reasoningEffort !== "boolean"
+      || !Array.isArray(model.supportedReasoningEfforts)
+      || model.supportedReasoningEfforts.length > 16
+      || model.supportedReasoningEfforts.some(
+        (effort) => !validRequiredString(effort, 32),
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (
+    !exactKeys(
+      value.compatibility,
+      new Set(["status", "cliVersion", "sdkVersion", "reason"]),
+    )
+    || !["qualifiedReadOnly", "unqualified"].includes(value.compatibility.status)
+    || !validIdentifier(value.compatibility.cliVersion)
+    || !validIdentifier(value.compatibility.sdkVersion)
+    || !validRequiredString(value.compatibility.reason, 512)
+  ) {
+    return false;
+  }
+
+  if (
     !(value.visiblePermissionRequestId === undefined
       || value.visiblePermissionRequestId === null
       || validIdentifier(value.visiblePermissionRequestId))
@@ -267,14 +375,80 @@ function validateSnapshotPayload(value, generation) {
   return true;
 }
 
+function validateSessionEventPayload(value, generation) {
+  if (
+    !exactKeys(
+      value,
+      new Set([
+        "protocolVersion",
+        "messageType",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+        "reason",
+      ]),
+    )
+    || !validIdentifier(value.instanceId)
+    || !validIdentifier(value.sessionId)
+    || value.generation !== generation
+    || !Number.isSafeInteger(value.contextRevision)
+    || value.contextRevision < 1
+    || value.contextRevision > MAXIMUM_SAFE_SEQUENCE
+    || !SESSION_EVENT_REASONS.has(value.reason)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function validateHeartbeatPayload(value, generation) {
+  if (
+    !exactKeys(
+      value,
+      new Set([
+        "protocolVersion",
+        "messageType",
+        "instanceId",
+        "sessionId",
+        "generation",
+        "contextRevision",
+      ]),
+    )
+    || !validIdentifier(value.instanceId)
+    || !validIdentifier(value.sessionId)
+    || value.generation !== generation
+    || !Number.isSafeInteger(value.contextRevision)
+    || value.contextRevision < 0
+    || value.contextRevision > MAXIMUM_SAFE_SEQUENCE
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function validateBridgePayload(value, generation) {
   if (value.protocolVersion !== IPC_PROTOCOL_VERSION) return false;
   if (value.messageType === "action") return validateActionPayload(value, generation);
   if (value.messageType === "actionResult") return validateResultPayload(value);
+  if (value.messageType === "heartbeat") return validateHeartbeatPayload(value, generation);
+  if (value.messageType === "sessionEvent") {
+    return validateSessionEventPayload(value, generation);
+  }
   if (value.messageType === "sessionSnapshot") {
     return validateSnapshotPayload(value, generation);
   }
   return false;
+}
+
+function validRequiredString(value, maximumCharacters) {
+  return typeof value === "string"
+    && value.length > 0
+    && [...value].length <= maximumCharacters;
+}
+
+function validNullableString(value, maximumCharacters) {
+  return value === null || validRequiredString(value, maximumCharacters);
 }
 
 function parseBoundedJSON(data) {

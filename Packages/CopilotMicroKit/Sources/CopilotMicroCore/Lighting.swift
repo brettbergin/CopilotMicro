@@ -94,15 +94,18 @@ public enum LightingProjector {
         guard state.binding != nil, state.connection != .disconnected else {
             return projection(.disconnected, .off, .off, "Disconnected", preferences)
         }
-        guard state.connection == .ready, case .known(let mode) = state.mode, state.work.isKnown else {
+        guard state.connection == .ready, case .known(let mode) = state.mode, state.work.isKnown,
+            state.attention.isKnown
+        else {
             return projection(.unknown, .off, .off, "State unknown", preferences)
         }
         if state.failure != nil {
             return projection(.error, .red, .steady, "Error", preferences)
         }
-        if !state.pendingAttention.isEmpty {
+        if !state.pendingAttention.isEmpty || state.attention.requiresAttention {
             let text =
                 state.pendingAttention.contains(where: { $0.kind == .permission })
+                    || state.attention.permissionCount > 0
                 ? "Needs permission" : "Needs input"
             return projection(
                 .attention,

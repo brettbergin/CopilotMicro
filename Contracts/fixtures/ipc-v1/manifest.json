@@ -186,6 +186,53 @@
       "sequence": "accepted"
     },
     {
+      "name": "valid-session-event-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "sessionEvent",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 43,
+          "reason": "mode"
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "accepted"
+    },
+    {
+      "name": "valid-heartbeat-frame",
+      "kind": "frame",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "frame",
+        "role": "cliBridge",
+        "generation": "generation-1",
+        "sequence": 1,
+        "payload": {
+          "protocolVersion": 1,
+          "messageType": "heartbeat",
+          "instanceId": "cli-instance-1",
+          "sessionId": "session-1",
+          "generation": "generation-1",
+          "contextRevision": 42
+        }
+      },
+      "decode": "valid",
+      "receiverRole": "nativeApp",
+      "direction": "allowed",
+      "sequence": "accepted"
+    },
+    {
       "name": "wrong-role-result-frame",
       "kind": "frame",
       "message": {
@@ -337,10 +384,43 @@
             "queuedCount": 0
           },
           "pendingAttention": [],
+          "attention": {
+            "known": true,
+            "permissionCount": 0,
+            "otherCount": 0
+          },
           "capabilities": {
             "composer.focus": {
               "status": "supported"
             }
+          },
+          "hostCapabilities": {
+            "elicitation": true,
+            "canvases": false,
+            "mcpApps": false
+          },
+          "model": {
+            "known": true,
+            "modelId": "gpt-qualified",
+            "reasoningEffort": "medium",
+            "contextTier": "default",
+            "availableModels": [
+              {
+                "id": "gpt-qualified",
+                "reasoningEffort": true,
+                "supportedReasoningEfforts": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            ]
+          },
+          "compatibility": {
+            "status": "qualifiedReadOnly",
+            "cliVersion": "1.0.84-5",
+            "sdkVersion": "host-provided",
+            "reason": "Read-only behavior is qualified for this host tuple."
           },
           "visiblePermissionRequestId": null,
           "failure": null,
@@ -378,10 +458,33 @@
             "queuedCount": 0
           },
           "pendingAttention": [],
+          "attention": {
+            "known": true,
+            "permissionCount": 0,
+            "otherCount": 0
+          },
           "capabilities": {
             "shell.execute": {
               "status": "supported"
             }
+          },
+          "hostCapabilities": {
+            "elicitation": false,
+            "canvases": false,
+            "mcpApps": false
+          },
+          "model": {
+            "known": false,
+            "modelId": null,
+            "reasoningEffort": null,
+            "contextTier": null,
+            "availableModels": []
+          },
+          "compatibility": {
+            "status": "unqualified",
+            "cliVersion": "unknown",
+            "sdkVersion": "host-provided",
+            "reason": "This host tuple is not qualified."
           }
         }
       },

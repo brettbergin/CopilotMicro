@@ -10,10 +10,13 @@ deterministic controls/session/lighting contract layer exist. Versioned local
 settings, portable import/export and bounded redacted diagnostics are
 implemented. The authenticated local IPC package and isolated Node client now
 exist, but the app does not start a socket and no production CLI extension is
-installed. A passive source-only probe has qualified bounded surfaces in owned
-disposable Copilot CLI `1.0.84-5` sessions. Its evidence does not enable live
-app control. All production CLI/device integrations remain unimplemented.
-Preserve the emulator/live boundary while promoting only qualified behavior.
+installed. A passive source-only probe qualified bounded surfaces in owned disposable
+Copilot CLI `1.0.84-5` sessions. The production source tree now contains an
+uninstalled read-only extension entry point and native session reconciler for
+that qualified observation subset. The app still starts no listener or live
+service, and every production stateful action remains explicitly rejected
+until I-15. Preserve the emulator/live boundary and do not widen this passive
+authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -32,7 +35,8 @@ the repository could load it into a real session.
 - `make test-contracts`: shared schema, action, control and negative-fixture
   checks used by both the native model and JavaScript bridge.
 - `make test-bridge`: isolated Node framing, authentication, role and client
-  tests. It does not load an extension into Copilot CLI.
+  tests, including the uninstalled production observer/rejection runtime. It
+  does not load an extension into Copilot CLI.
 - `make test-cli-probe`: isolated disposable workspace, privacy, evidence and
   capability-classification tests. It does not launch Copilot CLI.
 - `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.

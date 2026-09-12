@@ -35,6 +35,26 @@ of every live/saved session by parsing private session databases.
 | Paused | Native recovery/configuration; no hardware-triggered CLI actions |
 | Shutting down | Clear owned runtime lighting when possible; release device/IPC; preserve keymap and CLI process |
 
+### I-07 read-only production boundary
+
+The production bridge source now implements only the qualified observation
+subset for Copilot CLI `1.0.84-5`. A CLI-hosted lifetime joins its current
+foreground session, authenticates to the private local bridge, starts unknown,
+and reconciles bounded mode, model, task, queue and pending-permission-count
+snapshots after qualified host events. Pending counts do not expose request
+identity or visible-prompt authority.
+
+`instanceId` identifies the CLI host lifetime, `sessionId` identifies the joined
+foreground session and `generation` identifies one extension/IPC lifetime.
+Replacement or reconnection creates a new generation, invalidates old state and
+returns to unknown until a newer authoritative snapshot arrives. Heartbeat
+expiry has the same invalidating effect.
+
+Every production stateful action remains rejected until I-15. Qualified
+read-only mode/model surfaces are not permission to call their mutating RPCs,
+and unavailable session, composer, voice and permission operations have no
+fallback command or keystroke implementation.
+
 Opening Copilot is an explicit action using the validated preferred terminal
 and chosen local directory. Preserve ordinary CLI login/trust prompts. Do not
 add allow-all flags, change global CLI settings, install a new CLI build

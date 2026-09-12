@@ -310,6 +310,7 @@ public final class AuthenticatedIPCConnection: @unchecked Sendable {
     public let connectionID: IPCConnectionID
     public let generation: ConnectionGeneration
     public let localRole: IPCPeerRole
+    public let registration: IPCRegistration
 
     private let socket: UnixSocketConnection
     private let lock = NSLock()
@@ -321,14 +322,15 @@ public final class AuthenticatedIPCConnection: @unchecked Sendable {
     init(
         socket: UnixSocketConnection,
         connectionID: IPCConnectionID,
-        generation: ConnectionGeneration,
+        registration: IPCRegistration,
         localRole: IPCPeerRole
     ) {
         self.socket = socket
         self.connectionID = connectionID
-        self.generation = generation
+        self.generation = registration.generation
+        self.registration = registration
         self.localRole = localRole
-        incomingSequence = IPCSequenceTracker(generation: generation)
+        incomingSequence = IPCSequenceTracker(generation: registration.generation)
     }
 
     public func send(
@@ -509,7 +511,7 @@ public final class AuthenticatedIPCServer: @unchecked Sendable {
             return AuthenticatedIPCConnection(
                 socket: socket,
                 connectionID: connectionID,
-                generation: registration.generation,
+                registration: registration,
                 localRole: .nativeApp
             )
         } catch {
@@ -555,7 +557,7 @@ public enum AuthenticatedIPCClient {
             return AuthenticatedIPCConnection(
                 socket: socket,
                 connectionID: connectionID,
-                generation: registration.generation,
+                registration: registration,
                 localRole: .cliBridge
             )
         } catch {

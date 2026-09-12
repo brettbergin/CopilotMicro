@@ -32,13 +32,15 @@ class PersistentFrameReader {
     if (this.#failure) return Promise.reject(this.#failure);
     return new Promise((resolve, reject) => {
       const waiter = { resolve, reject, timer: null };
-      waiter.timer = setTimeout(() => {
-        const index = this.#waiters.indexOf(waiter);
-        if (index >= 0) this.#waiters.splice(index, 1);
-        const error = new Error("timedOut");
-        this.destroy(error);
-        reject(error);
-      }, timeoutMilliseconds);
+      if (timeoutMilliseconds !== null) {
+        waiter.timer = setTimeout(() => {
+          const index = this.#waiters.indexOf(waiter);
+          if (index >= 0) this.#waiters.splice(index, 1);
+          const error = new Error("timedOut");
+          this.destroy(error);
+          reject(error);
+        }, timeoutMilliseconds);
+      }
       this.#waiters.push(waiter);
     });
   }
@@ -64,7 +66,7 @@ class PersistentFrameReader {
     for (const frame of frames) {
       if (this.#waiters.length > 0) {
         const waiter = this.#waiters.shift();
-        clearTimeout(waiter.timer);
+        if (waiter.timer) clearTimeout(waiter.timer);
         waiter.resolve(frame);
       } else {
         this.#frames.push(frame);
@@ -89,7 +91,7 @@ class PersistentFrameReader {
     this.#failure = error;
     this.#frames = [];
     for (const waiter of this.#waiters.splice(0)) {
-      clearTimeout(waiter.timer);
+      if (waiter.timer) clearTimeout(waiter.timer);
       waiter.reject(error);
     }
     this.#socket.off("data", this.#onData);
@@ -173,8 +175,15 @@ export async function connectAuthenticated({
         socket.write(encodeLengthPrefixedFrame(Buffer.from(JSON.stringify(frame))));
         nextOutgoingSequence += 1;
       },
-      async receive() {
-        const data = await reader.read(timeoutMilliseconds);
+      async receive(receiveTimeoutMilliseconds = null) {
+        if (
+          receiveTimeoutMilliseconds !== null
+          && (!Number.isSafeInteger(receiveTimeoutMilliseconds)
+            || receiveTimeoutMilliseconds <= 0)
+        ) {
+          throw new Error("timedOut");
+        }
+        const data = await reader.read(receiveTimeoutMilliseconds);
         const validatedFrame = validateFrame(data);
         if (validatedFrame.error) {
           reader.destroy(new Error(validatedFrame.error));

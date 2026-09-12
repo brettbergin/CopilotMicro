@@ -35,6 +35,8 @@ struct UnixSocketTransportTests {
 
             #expect(try permissions(at: directory) == 0o700)
             #expect(try permissions(at: socketURL) == 0o600)
+            #expect(serverConnection.registration == registration)
+            #expect(clientConnection.registration == registration)
 
             let result = try ActionResult(
                 requestID: RequestID(rawValue: "request-1"),

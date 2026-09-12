@@ -25,7 +25,7 @@ test("shared contract catalogs and fixtures pass", () => {
     configurationSchemaCount: 2,
     cliCapabilityEvidenceSchemaCount: 1,
     cliCompatibilityReportCount: 1,
-    ipcFixtureCount: 18,
+    ipcFixtureCount: 20,
   });
 });
 
@@ -116,5 +116,34 @@ test("CLI evidence schema rejects missing, extra, and oversized fields", () => {
   assert.throws(
     () => validateJsonSchema(cliCapabilityEvidenceSchema, oversized),
     /longer than maxLength/u,
+  );
+});
+
+test("production extension source remains passive and uninstalled", () => {
+  const sourceFiles = [
+    "Bridge/src/extension.mjs",
+    "Bridge/src/extension-runtime.mjs",
+    "Bridge/src/session-observer.mjs",
+  ];
+  const source = sourceFiles
+    .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+    .join("\n");
+  for (const forbidden of [
+    /child_process/u,
+    /permissionHandler/u,
+    /permissions\.setRequired/u,
+    /session\.abort/u,
+    /session\.send/u,
+    /\.mode\.set/u,
+    /\.model\.set/u,
+    /GITHUB_TOKEN/u,
+    /COPILOT_SDK_TOKEN/u,
+  ]) {
+    assert.doesNotMatch(source, forbidden);
+  }
+  assert.match(source, /joinSession\(\{ tools: \[\] \}\)/u);
+  assert.equal(
+    fs.existsSync(path.join(root, ".github", "extensions", "copilot-micro")),
+    false,
   );
 });

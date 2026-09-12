@@ -73,6 +73,48 @@ public struct PendingAttention: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+public struct AttentionState: Equatable, Sendable {
+    public enum ValidationError: Error, Equatable, Sendable {
+        case negativeCount
+    }
+
+    public let isKnown: Bool
+    public let permissionCount: Int
+    public let otherCount: Int
+
+    public static let unknown = AttentionState(
+        isKnown: false,
+        permissionCount: 0,
+        otherCount: 0
+    )
+    public static let none = AttentionState(
+        isKnown: true,
+        permissionCount: 0,
+        otherCount: 0
+    )
+
+    public init(permissionCount: Int, otherCount: Int) throws {
+        guard permissionCount >= 0, otherCount >= 0 else {
+            throw ValidationError.negativeCount
+        }
+        self.init(
+            isKnown: true,
+            permissionCount: permissionCount,
+            otherCount: otherCount
+        )
+    }
+
+    public var requiresAttention: Bool {
+        isKnown && (permissionCount > 0 || otherCount > 0)
+    }
+
+    private init(isKnown: Bool, permissionCount: Int, otherCount: Int) {
+        self.isKnown = isKnown
+        self.permissionCount = permissionCount
+        self.otherCount = otherCount
+    }
+}
+
 public enum SessionErrorCategory: String, Codable, CaseIterable, Sendable {
     case host
     case integration
@@ -142,6 +184,7 @@ public struct SessionSnapshot: Equatable, Sendable {
     public let mode: SessionModeState
     public let work: WorkState
     public let pendingAttention: Set<PendingAttention>
+    public let attention: AttentionState
     public let failure: SessionFailure?
     public let unacknowledgedCompletionID: CompletionID?
 
@@ -149,12 +192,14 @@ public struct SessionSnapshot: Equatable, Sendable {
         mode: SessionModeState,
         work: WorkState,
         pendingAttention: Set<PendingAttention> = [],
+        attention: AttentionState = .none,
         failure: SessionFailure? = nil,
         unacknowledgedCompletionID: CompletionID? = nil
     ) {
         self.mode = mode
         self.work = work
         self.pendingAttention = pendingAttention
+        self.attention = attention
         self.failure = failure
         self.unacknowledgedCompletionID = unacknowledgedCompletionID
     }
@@ -186,6 +231,7 @@ public struct SessionRuntimeState: Equatable, Sendable {
     public var mode: SessionModeState
     public var work: WorkState
     public var pendingAttention: Set<PendingAttention>
+    public var attention: AttentionState
     public var failure: SessionFailure?
     public var unacknowledgedCompletion: CompletionMarker?
 
@@ -197,6 +243,7 @@ public struct SessionRuntimeState: Equatable, Sendable {
         mode: SessionModeState = .unknown,
         work: WorkState = .unknown,
         pendingAttention: Set<PendingAttention> = [],
+        attention: AttentionState = .none,
         failure: SessionFailure? = nil,
         unacknowledgedCompletion: CompletionMarker? = nil
     ) {
@@ -207,6 +254,7 @@ public struct SessionRuntimeState: Equatable, Sendable {
         self.mode = mode
         self.work = work
         self.pendingAttention = pendingAttention
+        self.attention = attention
         self.failure = failure
         self.unacknowledgedCompletion = unacknowledgedCompletion
     }
@@ -223,6 +271,7 @@ public enum SessionEvent: Equatable, Sendable {
     case attentionResolved(SessionEventContext, RequestID)
     case errorRecovered(SessionEventContext, ErrorID)
     case acknowledge(CompletionAcknowledgement)
+    case reconciliationRequired(LiveBinding)
     case paused
     case resume
     case disconnected
@@ -272,6 +321,7 @@ public enum SessionReducer {
                 state.mode = snapshot.mode
                 state.work = snapshot.work
                 state.pendingAttention = snapshot.pendingAttention
+                state.attention = snapshot.attention
                 state.failure = snapshot.failure
                 state.unacknowledgedCompletion = snapshot.unacknowledgedCompletionID.map {
                     CompletionMarker(id: $0, binding: context.binding)
@@ -361,6 +411,21 @@ public enum SessionReducer {
             }
             state.unacknowledgedCompletion = nil
             return .applied
+        case .reconciliationRequired(let binding):
+            guard let currentBinding = state.binding else {
+                return .rejected(.noBinding)
+            }
+            guard binding.instanceID == currentBinding.instanceID else {
+                return .rejected(.staleInstance)
+            }
+            guard binding.sessionID == currentBinding.sessionID else {
+                return .rejected(.staleSession)
+            }
+            guard binding.generation == currentBinding.generation else {
+                return .rejected(.staleGeneration)
+            }
+            invalidateDerivedState(&state)
+            return .applied
         case .paused:
             state.isPaused = true
             return .applied
@@ -432,6 +497,7 @@ public enum SessionReducer {
         state.mode = .unknown
         state.work = .unknown
         state.pendingAttention.removeAll()
+        state.attention = .unknown
         state.failure = nil
         state.unacknowledgedCompletion = nil
     }
