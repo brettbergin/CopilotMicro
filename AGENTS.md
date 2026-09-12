@@ -9,9 +9,11 @@ Developer setup tooling, a complete interactive GUI emulator and the
 deterministic controls/session/lighting contract layer exist. Versioned local
 settings, portable import/export and bounded redacted diagnostics are
 implemented. The authenticated local IPC package and isolated Node client now
-exist, but the app does not start a socket and no CLI extension is installed or
-loaded. All live CLI/device integrations remain unimplemented. Preserve the
-emulator/live boundary while adding disposable CLI probes next.
+exist, but the app does not start a socket and no production CLI extension is
+installed. A passive source-only probe has qualified bounded surfaces in owned
+disposable Copilot CLI `1.0.84-5` sessions. Its evidence does not enable live
+app control. All production CLI/device integrations remain unimplemented.
+Preserve the emulator/live boundary while promoting only qualified behavior.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -31,6 +33,8 @@ the repository could load it into a real session.
   checks used by both the native model and JavaScript bridge.
 - `make test-bridge`: isolated Node framing, authentication, role and client
   tests. It does not load an extension into Copilot CLI.
+- `make test-cli-probe`: isolated disposable workspace, privacy, evidence and
+  capability-classification tests. It does not launch Copilot CLI.
 - `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.
 - `make build`: compile the native arm64 executable.
 - `make package`: build/sign an app in a fresh generated output directory.
@@ -38,6 +42,9 @@ the repository could load it into a real session.
   lifecycle smoke, then safely remove its generated package directory.
 - `make lint` / `make format`: source checks / Swift formatting.
 - `make check`: lint, Node/Core tests and packaged headless smoke.
+- `make qualify-cli CONSENT=I-own-this-disposable-session`: explicitly launch
+  the passive probe in an owned disposable project. Add `ACTIVE=1` only for
+  the fixed reversible mode/effort probes.
 
 Use `PACKAGE_OUTPUT=build/<new-name>` for a chosen packaging destination.
 Existing apps are never overwritten or deleted. Do not describe headless

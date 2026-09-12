@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-12T20:53:34.753Z",
+  "environment": {
+    "cliVersion": "1.0.84-5",
+    "cliBuildCommit": "0de509ce",
+    "sdkSource": "host-provided",
+    "sdkVersion": "1.0.13-preview.4",
+    "sdkProtocolVersion": null,
+    "childNodeVersions": [
+      "v24.20.0"
+    ],
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "lifecycle": {
+    "extensionLifetimes": 2,
+    "joinedSessions": 2,
+    "sameHostAcrossReplacement": true,
+    "terminationObserved": true
+  },
+  "capabilities": {
+    "U-01": {
+      "status": "partial",
+      "evidence": [
+        "joinSession succeeded in 2 extension lifetime(s).",
+        "Manual operator observation: /clear produced a new session and extension lifetime under the same host."
+      ],
+      "limitations": [
+        "Selecting an arbitrary existing foreground session was not demonstrated."
+      ]
+    },
+    "U-02": {
+      "status": "partial",
+      "evidence": [
+        "The live queue snapshot RPC returned bounded counts.",
+        "The live background-task snapshot RPC returned bounded counts.",
+        "The pending-permission snapshot RPC returned a bounded count."
+      ],
+      "limitations": [
+        "No API exposed a verified user acknowledgement/read state.",
+        "Whole-session idle is event-driven and requires production reconciliation."
+      ]
+    },
+    "U-03": {
+      "status": "unavailable",
+      "evidence": [
+        "Relevant host commands observed: autopilot, model, plan, rename."
+      ],
+      "limitations": [
+        "No demonstrated extension API switched, created, or archived a foreground TUI session.",
+        "Command presence alone is not proof that a companion can drive the host UI."
+      ]
+    },
+    "U-04": {
+      "status": "not-in-scope",
+      "evidence": [],
+      "limitations": [
+        "Exact terminal window, tab, and pane targeting belongs to terminal adapter qualification."
+      ]
+    },
+    "U-05": {
+      "status": "unavailable",
+      "evidence": [
+        "Host-driven composer completion triggers were readable."
+      ],
+      "limitations": [
+        "No demonstrated API focused or submitted the existing TUI composer draft.",
+        "session.send() is intentionally not accepted as a composer substitute."
+      ]
+    },
+    "U-06": {
+      "status": "unavailable",
+      "evidence": [],
+      "limitations": [
+        "No extension RPC demonstrated native voice start, stop, state, or dependency handling."
+      ]
+    },
+    "U-07": {
+      "status": "unavailable",
+      "evidence": [
+        "Pending permission requests were readable without installing a handler.",
+        "A supplemental disposable run enabled per-client permission event bridging without installing a decision handler."
+      ],
+      "limitations": [
+        "A visible disposable TUI permission prompt did not emit permission.requested to the extension after event bridging reported success.",
+        "The SDK request ID does not prove that the exact prompt is visible in the selected terminal.",
+        "Approve/reject remains disabled until visible-request binding and concurrent response races are qualified."
+      ]
+    },
+    "U-08": {
+      "status": "partial",
+      "evidence": [
+        "Current model and bounded available-model metadata were read from the live session.",
+        "Interactive and plan mode were round-tripped and restored.",
+        "The current reasoning effort was written back and read without changing its value."
+      ],
+      "limitations": [
+        "A different model was not selected, and next-turn inference semantics were not exercised.",
+        "Autopilot was not enabled by the probe."
+      ]
+    }
+  }
+}

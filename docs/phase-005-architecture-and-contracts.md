@@ -4,9 +4,10 @@ Status: target architecture supporting the agreed product. The native
 menu bar/manager scaffold, packaging, version-1 schema, action/control
 catalogs, shared fixtures, deterministic Core state model and isolated
 configuration/diagnostics module exist. The authenticated local socket,
-source-only Node client and shared negative IPC fixtures now exist. They are
-not started by the app and are not installed or loaded as a CLI extension.
-The CLI-hosted session bridge, device and live-session components remain
+source-only Node client, shared negative IPC fixtures and disposable CLI
+capability probe now exist. The app does not start the socket and no production
+extension is installed. The probe has joined owned CLI sessions, but the
+production CLI-hosted session bridge, device and live-session components remain
 unimplemented.
 
 ## Component boundaries
@@ -46,12 +47,52 @@ installation does not mean one extension instance lives forever. The native
 app can receive multiple instance registrations but activates only the
 explicitly controlled one.
 
+### Qualified CLI behavior
+
+Disposable interactive qualification on 2026-09-12 used Copilot CLI
+`1.0.84-5`, build `0de509ce`, host-provided SDK `1.0.13-preview.4` and child
+Node `v24.20.0` on Darwin ARM64. The sanitized machine-readable result is
+[`Compatibility/copilot-cli-1.0.84-5.json`](../Compatibility/copilot-cli-1.0.84-5.json).
+
+`joinSession()` succeeded. Replacing the foreground session with `/clear`
+started a second extension lifetime, joined a second session alias under the
+same host alias and terminated both lifetimes cleanly. Arbitrary selection
+among existing sessions was not exercised, so foreground binding remains
+partial rather than fully qualified.
+
+The tested extension could read bounded mode, model, task, queue, pending
+permission, command and extension snapshots. It observed turn/idle,
+mode-change, background-task and tool-execution boundaries. Interactive and
+plan mode round-tripped and was restored. The current reasoning effort could
+be written back unchanged. No different model was selected and next-turn
+model/effort semantics were not exercised.
+
+No tested extension RPC provided native session list/switch/new/archive,
+actual TUI composer focus/submit or native voice lifecycle. These operations
+remain unavailable; `session.send()` is not an acceptable composer substitute.
+
+The source-only probe registers no tools, hooks or permission decision handler.
+Hook registration was tested separately and triggered an elevated-permission
+prompt, so passive production observation must not depend on hooks. Calling
+`permissions.setRequired({required: true})` returned success in a supplemental
+disposable run, but a visible TUI permission prompt still did not emit
+`permission.requested` to the extension. Pending counts therefore do not
+establish exact visible-request authority and F-15 remains disabled.
+
+Interactive qualification is preferred. Prompt mode excludes project
+extensions unless `GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS=true` and requires
+`--allow-all-tools`; those conditions are not the production architecture.
+The interactive qualifier lets the CLI create its own local session because
+passing a fresh `--session-id` triggered a slow remote lookup and 404 fallback.
+
 ## Evidence ledger
 
-Research was performed on 2026-09-11. The local CLI was `1.0.84-4`; public
-SDK `v1.0.13` independently corroborated the extension contract. These are
-research versions, not a release support matrix. Additional SDK source was
-inspected at `0cb0050ef4a6206808c7229ee11715f01bc256b0`, pinned where cited below.
+Initial research was performed on 2026-09-11 against CLI `1.0.84-4`. Public
+SDK `v1.0.13` independently corroborated the extension contract. Live
+qualification then used the exact `1.0.84-5` tuple above. This is capability
+evidence for one build, not an arbitrary-version support promise. Additional
+SDK source was inspected at `0cb0050ef4a6206808c7229ee11715f01bc256b0`,
+pinned where cited below.
 
 | Surface | Evidence | Required qualification |
 |---|---|---|
@@ -96,9 +137,10 @@ mode `0700` runtime directories, mode `0600` socket/bootstrap files, macOS peer
 UID checks, a private 256-bit bootstrap token, strict peer roles, connection
 generations, monotonic sequences and a 64-request in-flight bound. Swift and
 Node consume the same `Contracts/fixtures/ipc-v1/manifest.json` negative cases.
-This is mock transport evidence only: the native app does not start the server,
-the source is not installed under `.github/extensions/`, and no real CLI
-session has been joined.
+This remains mock transport evidence only: the native app does not start the
+server and production source is not installed under `.github/extensions/`.
+The separate disposable probe has joined real owned sessions, but it does not
+use or qualify the production IPC bridge.
 
 ### Registration
 

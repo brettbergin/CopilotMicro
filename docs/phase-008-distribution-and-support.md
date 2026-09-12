@@ -37,8 +37,11 @@ Maintain a machine-readable support manifest and human-readable release
 matrix once implementation begins. Include per-feature support/gaps, not
 only an app-wide compatible boolean.
 
-The local research CLI was `1.0.84-4`; it is not automatically the shipping
-pin. Select the initial CLI/SDK/firmware tuple through the spikes in
+The initial research CLI was `1.0.84-4`. Disposable live qualification now
+records partial support for CLI `1.0.84-5`, build `0de509ce`, with bundled SDK
+`1.0.13-preview.4` and child Node `v24.20.0`. This is not automatically the
+shipping pin and several required control surfaces remain unavailable. Select
+the release CLI/SDK/firmware tuple through the remaining qualification in
 [phase 009](phase-009-delivery-and-acceptance.md).
 
 An unknown CLI/OS/terminal build gets a compatibility explanation, not a blind

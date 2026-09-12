@@ -9,6 +9,7 @@ import {
   MAXIMUM_ACTION_BYTES,
   loadContractCatalogs,
   runContractChecks,
+  validateJsonSchema,
   validateActionGuard,
   validateActionRequest,
 } from "../check-contracts.mjs";
@@ -22,6 +23,8 @@ test("shared contract catalogs and fixtures pass", () => {
     fixtureCount: 13,
     resultFixtureCount: 5,
     configurationSchemaCount: 2,
+    cliCapabilityEvidenceSchemaCount: 1,
+    cliCompatibilityReportCount: 1,
     ipcFixtureCount: 18,
   });
 });
@@ -71,4 +74,47 @@ test("catalog validation rejects duplicate actions without changing repository f
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("committed CLI evidence keeps unsafe capabilities disabled", () => {
+  const reportPath = path.join(root, "Compatibility", "copilot-cli-1.0.84-5.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.environment.cliVersion, "1.0.84-5");
+  assert.equal(report.environment.cliBuildCommit, "0de509ce");
+  assert.equal(report.environment.sdkVersion, "1.0.13-preview.4");
+  assert.equal(report.environment.sdkProtocolVersion, null);
+  assert.equal(report.lifecycle.sameHostAcrossReplacement, true);
+  assert.equal(report.capabilities["U-01"].status, "partial");
+  assert.equal(report.capabilities["U-07"].status, "unavailable");
+  assert.equal(report.capabilities["U-08"].status, "partial");
+  assert.ok(fs.statSync(reportPath).size < 131_072);
+});
+
+test("CLI evidence schema rejects missing, extra, and oversized fields", () => {
+  const { cliCapabilityEvidenceSchema } = loadContractCatalogs(root);
+  const report = JSON.parse(
+    fs.readFileSync(
+      path.join(root, "Compatibility", "copilot-cli-1.0.84-5.json"),
+      "utf8",
+    ),
+  );
+  const missing = structuredClone(report);
+  delete missing.capabilities["U-02"];
+  assert.throws(
+    () => validateJsonSchema(cliCapabilityEvidenceSchema, missing),
+    /U-02 is required/u,
+  );
+  const extra = structuredClone(report);
+  extra.environment.token = "secret";
+  assert.throws(
+    () => validateJsonSchema(cliCapabilityEvidenceSchema, extra),
+    /token is not allowed/u,
+  );
+  const oversized = structuredClone(report);
+  oversized.capabilities["U-01"].evidence[0] = "x".repeat(241);
+  assert.throws(
+    () => validateJsonSchema(cliCapabilityEvidenceSchema, oversized),
+    /longer than maxLength/u,
+  );
 });

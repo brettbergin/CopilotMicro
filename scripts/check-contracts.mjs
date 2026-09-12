@@ -154,6 +154,106 @@ function readJSON(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function resolveLocalReference(rootSchema, reference) {
+  assert.match(reference, /^#\//u, `unsupported schema reference ${reference}`);
+  return reference.slice(2).split("/").reduce(
+    (value, part) => value[part.replaceAll("~1", "/").replaceAll("~0", "~")],
+    rootSchema,
+  );
+}
+
+function matchesSchemaType(value, type) {
+  if (type === "null") return value === null;
+  if (type === "array") return Array.isArray(value);
+  if (type === "object") return isPlainObject(value);
+  if (type === "integer") return Number.isInteger(value);
+  return typeof value === type;
+}
+
+export function validateJsonSchema(schema, value, rootSchema = schema, location = "$") {
+  if (schema.$ref) {
+    return validateJsonSchema(
+      resolveLocalReference(rootSchema, schema.$ref),
+      value,
+      rootSchema,
+      location,
+    );
+  }
+  if (Object.hasOwn(schema, "const")) {
+    assert.deepEqual(value, schema.const, `${location} does not match const`);
+  }
+  if (schema.enum) {
+    assert.ok(
+      schema.enum.some((candidate) => JSON.stringify(candidate) === JSON.stringify(value)),
+      `${location} is not in enum`,
+    );
+  }
+  if (schema.type) {
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    assert.ok(
+      types.some((type) => matchesSchemaType(value, type)),
+      `${location} has invalid type`,
+    );
+  }
+  if (typeof value === "string") {
+    const length = [...value].length;
+    if (schema.minLength !== undefined) {
+      assert.ok(length >= schema.minLength, `${location} is shorter than minLength`);
+    }
+    if (schema.maxLength !== undefined) {
+      assert.ok(length <= schema.maxLength, `${location} is longer than maxLength`);
+    }
+    if (schema.format === "date-time") {
+      assert.ok(
+        value.includes("T") && !Number.isNaN(Date.parse(value)),
+        `${location} is not a date-time`,
+      );
+    }
+  }
+  if (typeof value === "number") {
+    if (schema.minimum !== undefined) {
+      assert.ok(value >= schema.minimum, `${location} is below minimum`);
+    }
+    if (schema.maximum !== undefined) {
+      assert.ok(value <= schema.maximum, `${location} is above maximum`);
+    }
+  }
+  if (Array.isArray(value)) {
+    if (schema.maxItems !== undefined) {
+      assert.ok(value.length <= schema.maxItems, `${location} exceeds maxItems`);
+    }
+    if (schema.uniqueItems) {
+      assert.equal(
+        new Set(value.map((item) => JSON.stringify(item))).size,
+        value.length,
+        `${location} contains duplicate items`,
+      );
+    }
+    if (schema.items) {
+      value.forEach((item, index) => {
+        validateJsonSchema(schema.items, item, rootSchema, `${location}[${index}]`);
+      });
+    }
+  }
+  if (isPlainObject(value)) {
+    for (const required of schema.required ?? []) {
+      assert.ok(Object.hasOwn(value, required), `${location}.${required} is required`);
+    }
+    const properties = schema.properties ?? {};
+    if (schema.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        assert.ok(Object.hasOwn(properties, key), `${location}.${key} is not allowed`);
+      }
+    }
+    for (const [key, childSchema] of Object.entries(properties)) {
+      if (Object.hasOwn(value, key)) {
+        validateJsonSchema(childSchema, value[key], rootSchema, `${location}.${key}`);
+      }
+    }
+  }
+  return true;
+}
+
 export function loadContractCatalogs(root) {
   const contracts = path.join(root, "Contracts");
   const actions = readJSON(path.join(contracts, "actions.json"));
@@ -162,12 +262,16 @@ export function loadContractCatalogs(root) {
   const ipcSchema = readJSON(path.join(contracts, "ipc-v1.schema.json"));
   const configurationSchema = readJSON(path.join(contracts, "configuration-v1.schema.json"));
   const portableConfigurationSchema = readJSON(path.join(contracts, "portable-configuration-v1.schema.json"));
+  const cliCapabilityEvidenceSchema = readJSON(
+    path.join(contracts, "cli-capability-evidence-v1.schema.json"),
+  );
   assert.equal(actions.schemaVersion, 1);
   assert.equal(controls.schemaVersion, 1);
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(ipcSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(configurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(portableConfigurationSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(cliCapabilityEvidenceSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
 
   const actionCatalog = new Map();
   for (const action of actions.actions) {
@@ -228,6 +332,15 @@ export function loadContractCatalogs(root) {
       `portable configuration exposes ${forbidden}`,
     );
   }
+  assert.deepEqual(
+    cliCapabilityEvidenceSchema.properties.capabilities.required,
+    ["U-01", "U-02", "U-03", "U-04", "U-05", "U-06", "U-07", "U-08"],
+  );
+  assert.equal(
+    cliCapabilityEvidenceSchema.$defs.environment.properties.sdkSource.const,
+    "host-provided",
+  );
+  assert.equal(cliCapabilityEvidenceSchema.$defs.lifecycle.additionalProperties, false);
   return {
     actionCatalog,
     actions,
@@ -237,11 +350,16 @@ export function loadContractCatalogs(root) {
     ipcSchema,
     configurationSchema,
     portableConfigurationSchema,
+    cliCapabilityEvidenceSchema,
   };
 }
 
 export function runContractChecks(root) {
-  const { actionCatalog, resultCodes } = loadContractCatalogs(root);
+  const {
+    actionCatalog,
+    cliCapabilityEvidenceSchema,
+    resultCodes,
+  } = loadContractCatalogs(root);
   const fixtureDirectory = path.join(root, "Contracts", "fixtures", "bridge-v1");
   const manifest = readJSON(path.join(fixtureDirectory, "manifest.json"));
   assert.equal(manifest.schemaVersion, 1);
@@ -297,12 +415,24 @@ export function runContractChecks(root) {
   );
   assert.equal(ipcManifest.schemaVersion, 1);
   assert.match(ipcManifest.bootstrapToken, /^[a-f0-9]{64}$/u);
+  const compatibilityReports = fs.readdirSync(path.join(root, "Compatibility"))
+    .filter((file) => /^copilot-cli-.+\.json$/u.test(file))
+    .sort();
+  assert.ok(compatibilityReports.length > 0, "missing CLI compatibility report");
+  for (const report of compatibilityReports) {
+    validateJsonSchema(
+      cliCapabilityEvidenceSchema,
+      readJSON(path.join(root, "Compatibility", report)),
+    );
+  }
   return {
     actionCount: actionCatalog.size,
     controlCount: 12,
     fixtureCount: manifest.cases.length,
     resultFixtureCount: resultManifest.cases.length,
     configurationSchemaCount: 2,
+    cliCapabilityEvidenceSchemaCount: 1,
+    cliCompatibilityReportCount: compatibilityReports.length,
     ipcFixtureCount: ipcManifest.cases.length,
   };
 }

@@ -9,8 +9,9 @@ diagnostic rotation and explicit redacted export. The isolated local IPC layer
 now enforces private filesystem modes, same-user peer checks, bootstrap
 authentication, strict roles, bounded frames, generations and ordered
 sequences. It is not started by the app and has not joined a CLI session.
-Live extension authority, device writes and updater boundaries remain design
-requirements.
+A separate passive probe has joined owned disposable CLI sessions without
+using the production IPC path. Live production extension authority, device
+writes and updater boundaries remain design requirements.
 
 ## Trust boundaries
 
@@ -54,6 +55,20 @@ A skipped feature may not violate these invariants as a convenience fallback.
 
 Start with a passive extension observer. The default bridge must not install
 an approve-all handler or answer requests merely because it received an event.
+
+On Copilot CLI `1.0.84-5`, registering hooks triggered an explicit elevated
+permission prompt, so the passive probe registers no hooks. Ordinary event
+subscriptions and bounded read-only RPC snapshots loaded without that
+elevation. Hook permission is not a prerequisite the product may request just
+to monitor state.
+
+The tested permission event bridge is not sufficient for F-15.
+`permissions.setRequired({required: true})` returned success, but the extension
+still did not receive `permission.requested` while the selected TUI visibly
+displayed a disposable shell permission prompt. Pending-request counts are
+readable but do not prove which request is visible. Treat this capability as
+unavailable, not partially safe, until exact visibility and decision authority
+are independently demonstrated.
 
 Enabling hardware approval requires verifying both the extension's authority
 and an exact visible-request binding. Required host consent must be explicit
@@ -122,6 +137,12 @@ Do not collect/store by default:
 - Tool arguments/results, permission command text or source-code contents.
 - Tokens, auth headers, environment dumps or voice recordings.
 - Clipboard contents or system-wide keystrokes.
+
+Disposable probe evidence follows the same boundary. It is limited to 256
+JSONL records, 128 KiB total and 8 KiB per record, uses user-only mode `0600`,
+aliases host/session/request identifiers and records only allowlisted event
+categories and bounded RPC summaries. PTY transcripts used during manual
+qualification are temporary test evidence and must never be committed.
 
 The manager may show necessary live identity/context without persisting it.
 Use scoped host interaction evidence for completion acknowledgement; do not

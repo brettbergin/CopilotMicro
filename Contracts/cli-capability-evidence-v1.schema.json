@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://copilot-micro.local/contracts/cli-capability-evidence-v1.schema.json",
+  "title": "Copilot Micro CLI capability evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "environment",
+    "lifecycle",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "lifecycle": {
+      "$ref": "#/$defs/lifecycle"
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "U-01",
+        "U-02",
+        "U-03",
+        "U-04",
+        "U-05",
+        "U-06",
+        "U-07",
+        "U-08"
+      ],
+      "properties": {
+        "U-01": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-02": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-03": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-04": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-05": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-06": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-07": {
+          "$ref": "#/$defs/capability"
+        },
+        "U-08": {
+          "$ref": "#/$defs/capability"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cliVersion",
+        "cliBuildCommit",
+        "sdkSource",
+        "sdkVersion",
+        "sdkProtocolVersion",
+        "childNodeVersions",
+        "platform",
+        "architecture"
+      ],
+      "properties": {
+        "cliVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cliBuildCommit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "sdkSource": {
+          "const": "host-provided"
+        },
+        "sdkVersion": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "sdkProtocolVersion": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "childNodeVersions": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          }
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extensionLifetimes",
+        "joinedSessions",
+        "sameHostAcrossReplacement",
+        "terminationObserved"
+      ],
+      "properties": {
+        "extensionLifetimes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "joinedSessions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "sameHostAcrossReplacement": {
+          "type": "boolean"
+        },
+        "terminationObserved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence",
+        "limitations"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "demonstrated",
+            "partial",
+            "unavailable",
+            "unresolved",
+            "not-in-scope"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        }
+      }
+    }
+  }
+}

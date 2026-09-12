@@ -1,15 +1,16 @@
 # Phase 009: delivery and acceptance
 
-Status: implementation plan and acceptance contract. No feature is implemented
-or qualified merely because it appears in this document.
+Status: implementation plan, current qualification ledger and acceptance
+contract. A feature is implemented or qualified only where evidence is stated.
 
 Current evidence: stage 0, the isolated stage-1 GUI/emulator milestone and the
 local configuration/diagnostic foundation are implemented. The transport-only
 part of stage 3 also has native/Node mock evidence for private authenticated
 IPC, bounded frames, roles, generations, sequences and rejection cases. The app
-does not start it and no extension has joined Copilot CLI. This does not qualify
-any live CLI, terminal, HID or updater feature, and it does not convert
-simulated acceptance journeys into hardware or integration evidence.
+does not start it. A separate source-only probe joined owned disposable Copilot
+CLI `1.0.84-5` sessions and produced a conservative compatibility report.
+This does not qualify the production bridge, terminal, HID or updater, and it
+does not convert simulated acceptance journeys into hardware evidence.
 
 ## Delivery strategy
 
@@ -37,25 +38,28 @@ Signing/notarization is a later milestone. It must not be accidentally made
 a prerequisite for the stakeholder's initial ad-hoc internal distribution,
 but update integrity remains required.
 
-## Initial integration uncertainty ledger
+## Integration uncertainty ledger
 
-All features begin unimplemented. This ledger highlights additional research
-uncertainties; it is not a list of confirmed product defects.
+The CLI results below come from owned disposable sessions on 2026-09-12. The
+machine-readable evidence is
+[`Compatibility/copilot-cli-1.0.84-5.json`](../Compatibility/copilot-cli-1.0.84-5.json).
+Partial means useful behavior was demonstrated but the full required product
+contract was not.
 
-| ID | Unproven area | Affected features | Required result or gap |
-|---|---|---|---|
-| U-01 | Foreground-session extension lifecycle | F-01 | Join/replacement/selection synchronization demonstrated |
-| U-02 | Authoritative initial state and acknowledgement | F-02, F-03 | Mode, activity, pending requests and user acknowledgement qualified; unsupported signals disclosed |
-| U-03 | Native list/switch/new/archive operations | F-04, F-05, F-06, F-07 | Real host behavior, not fabricated commands or private-file edits |
-| U-04 | Exact terminal window/tab/pane targeting | F-01, F-13, F-14, F-15 | Separate evidence for each terminal |
-| U-05 | Existing composer focus/submit | F-13, F-14 | Preserve and submit the actual draft once; no `session.send()` substitute |
-| U-06 | CLI voice lifecycle/dependencies | F-11 | Native voice start/stop/state and required grants verified |
-| U-07 | Visible request and permission authority | F-15 | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
-| U-08 | Model and effort capabilities | F-09, F-10 | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | F-02, F-03, F-16, F-22, F-23 | Visible LED/input behavior and reversible map on exact hardware |
-| U-10 | Safe internal built-in updater | F-24 | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
+| ID | Area | Status | Current result | Required result or gap |
+|---|---|---|---|---|
+| U-01 | Foreground-session extension lifecycle | Partial | `joinSession()` and `/clear` replacement/reload worked under one host; arbitrary existing-session selection was not tested | Join/replacement/selection synchronization demonstrated |
+| U-02 | Authoritative initial state and acknowledgement | Partial | Mode/task/queue/pending snapshots and activity boundaries were observable; verified user acknowledgement was not | Mode, activity, pending requests and user acknowledgement qualified; unsupported signals disclosed |
+| U-03 | Native list/switch/new/archive operations | Unavailable | No callable extension surface demonstrated these host UI operations | Real host behavior, not fabricated commands or private-file edits |
+| U-04 | Exact terminal window/tab/pane targeting | Not in scope | Deferred to terminal adapters | Separate evidence for each terminal |
+| U-05 | Existing composer focus/submit | Unavailable | Completion trigger metadata was readable; no actual draft focus/submit API was demonstrated | Preserve and submit the actual draft once; no `session.send()` substitute |
+| U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
+| U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
+| U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
+| U-09 | Current Pro firmware and both transports | Unproven | No hardware probe in this work package | Visible LED/input behavior and reversible map on exact hardware |
+| U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
-The first probes must not authorize production tools, alter real work, flash
+Qualification probes must not authorize production tools, alter real work, flash
 firmware, change global CLI permissions or attach to sessions without explicit
 test ownership.
 
@@ -140,10 +144,12 @@ Cases must include:
 
 Use unit tests for deterministic state/actions/configuration and byte framing.
 The current native/Node IPC tests cover only temporary local sockets and shared
-negative fixtures; they provide partial A-29 transport evidence, not live
-session isolation. Use contract/integration tests with owned disposable CLI
-sessions for bridge and terminal behavior. Use real-device qualification for
-physical geometry, lighting, transport and restore.
+negative fixtures; they provide partial A-29 transport evidence, not production
+session isolation. The disposable probe provides bounded evidence for U-01
+through U-08 only; it does not use the production bridge. Use further
+contract/integration tests with owned disposable CLI sessions for bridge and
+terminal behavior. Use real-device qualification for physical geometry,
+lighting, transport and restore.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
@@ -151,13 +157,20 @@ compile does not qualify app onboarding or permissions.
 
 Use the canonical commands as source scaffolding lands. Currently `make check`
 covers source checks, shared native/Node IPC fixtures, isolated Node client
-tests, Swift package tests, packaged hidden native smoke and a bounded accessory
+tests, isolated probe privacy/classification tests, Swift package tests,
+packaged hidden native smoke and a bounded accessory
 startup smoke through the production delegate, main-menu and status-item
 lifecycle wiring. The smoke opens no manager window or production listener,
 exits immediately and removes only its exact generated package directory.
 `make package` produces the retained ad-hoc-signed app. These do not establish
 complete GUI interaction, XCUITest, terminal or hardware qualification; do not
 describe unimplemented or unexercised acceptance cases as passing.
+
+`make qualify-cli CONSENT=I-own-this-disposable-session` is an explicit
+interactive live target and is not part of `make check`. It stages the passive
+extension in a private owned disposable repository, strips GitHub/Copilot token
+environment variables and cleans only marker-verified paths. The default probe
+registers no tools, hooks or permission handler.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence
@@ -185,9 +198,10 @@ Do not say "complete" while omitting a requested feature. A useful, polished
 subset is acceptable under the stakeholder's explicit gap policy; misleading
 support claims and unsafe substitutes are not.
 
-## Foundation completion
+## Current completion boundary
 
-The phase-00 documentation set is complete when the interview choices are
-represented consistently, every intended feature has acceptance coverage,
-technical uncertainties are explicit, and documents are committed to the
-requested local branch. Application qualification remains future work.
+The phase-00 documentation, native foundation, GUI/emulator, local storage,
+diagnostics, authenticated IPC contract and disposable CLI qualification are
+implemented. Production CLI control, terminal targeting, HID, updater and
+their acceptance journeys remain future work. The compatibility report is a
+work-package result, not a claim that the live controller is complete.

@@ -15,8 +15,10 @@ portable import/export and bounded redacted diagnostics exist. All live
 hardware/CLI integrations remain unavailable and clearly disabled. An
 owner-restricted Unix-domain IPC package and isolated Node client now share
 bounded authentication, framing, role, generation and sequence contracts, but
-the app does not start that listener and no CLI extension is installed or
-loaded.
+the app does not start that listener and no production CLI extension is
+installed. A source-only disposable probe has joined owned Copilot CLI
+`1.0.84-5` sessions and recorded a conservative compatibility report; it is
+not production session control.
 
 ## Developer setup
 
@@ -115,6 +117,51 @@ under `Bridge/` is placed in `.github/extensions/` or loaded into a real
 Copilot CLI session. Production listener startup, bridge installation and
 session behavior remain intentionally blocked until disposable capability
 probes qualify the actual installed CLI.
+
+## Disposable CLI qualification
+
+`Bridge/probe/` contains a passive, source-only extension that is copied into
+an owned private disposable Git repository only after exact consent. It is
+never installed from this checkout and registers no tools, hooks or permission
+decision handler. Structured evidence is capped at 256 records, 128 KiB total
+and 8 KiB per record, uses mode `0600`, aliases live identifiers and excludes
+prompts, responses, commands, tool arguments/results, paths and tokens.
+
+The initial live report is
+[`Compatibility/copilot-cli-1.0.84-5.json`](Compatibility/copilot-cli-1.0.84-5.json).
+On Copilot CLI `1.0.84-5` (build `0de509ce`, bundled SDK
+`1.0.13-preview.4`, child Node `v24.20.0`):
+
+- `joinSession()` succeeded and `/clear` produced a replacement extension and
+  session lifetime under the same host; arbitrary existing-session selection
+  was not demonstrated.
+- Mode, model, effort, task, queue and limited event surfaces were readable.
+  Interactive/plan mode round-tripped and was restored, but model/effort
+  next-turn semantics remain partial.
+- Native session list/switch/new/archive, actual composer focus/submit and
+  voice lifecycle were unavailable from the tested extension surface.
+- Pending permission counts were readable, but a visible TUI permission prompt
+  did not emit `permission.requested` to the extension even after the
+  per-client event bridge reported success. Hardware approve/reject remains
+  unavailable.
+
+Run only the isolated tests during normal development:
+
+```sh
+make test-cli-probe
+```
+
+Launching a new live probe requires an interactive terminal and exact consent:
+
+```sh
+make qualify-cli CONSENT=I-own-this-disposable-session
+```
+
+Add `ACTIVE=1` only to exercise the fixed reversible mode/effort probes in the
+owned session. The qualifier does not pass a synthetic session ID, strips
+GitHub/Copilot token environment variables and removes only its marker-verified
+workspace unless explicitly kept. Normal `make check` stages/tests the probe
+but never launches Copilot CLI.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;
