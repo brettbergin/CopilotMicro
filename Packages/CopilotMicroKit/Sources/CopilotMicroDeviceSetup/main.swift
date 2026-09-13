@@ -119,6 +119,7 @@ private struct DeviceContext {
 }
 
 @main
+@MainActor
 private struct CopilotMicroDeviceSetup {
     static func main() async {
         var mutatingOperationsMayHaveOccurred = false

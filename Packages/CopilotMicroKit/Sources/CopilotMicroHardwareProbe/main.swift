@@ -10,6 +10,7 @@ private struct ProbeFailure: Encodable {
 }
 
 @main
+@MainActor
 private struct CopilotMicroHardwareProbe {
     static func main() {
         do {

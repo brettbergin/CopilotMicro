@@ -34,6 +34,8 @@ payload per fragment. Implement byte-oriented reassembly, including UTF-8
 boundaries, before JSON decoding. Bound memory/time and reject malformed data
 with an explicit diagnostic. Do not copy the reference's assumptions about
 small configuration size or silently discard parse failures.
+Keep the connection and its mutable response state on the main actor because
+IOKit delivers its registered callbacks through the main run loop.
 
 Request IDs, outstanding requests, timeout cleanup and reconnect handling
 must prevent collisions and stale-response association. Qualification must

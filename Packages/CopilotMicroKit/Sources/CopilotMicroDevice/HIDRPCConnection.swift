@@ -91,6 +91,7 @@ public enum HIDConnectionError: Error, LocalizedError {
     }
 }
 
+@MainActor
 public final class HIDRPCConnection {
     public let descriptor: HIDDeviceDescriptor
     public private(set) var unexpectedResponseCount = 0
@@ -168,13 +169,15 @@ public final class HIDRPCConnection {
             CreatorMicro2Hardware.reportBytes,
             { context, _, _, _, reportID, report, length in
                 guard let context, length > 0 else { return }
-                let connection = Unmanaged<HIDRPCConnection>
-                    .fromOpaque(context)
-                    .takeUnretainedValue()
-                connection.receive(
-                    reportID: reportID,
-                    bytes: Array(UnsafeBufferPointer(start: report, count: length))
-                )
+                MainActor.assumeIsolated {
+                    let connection = Unmanaged<HIDRPCConnection>
+                        .fromOpaque(context)
+                        .takeUnretainedValue()
+                    connection.receive(
+                        reportID: reportID,
+                        bytes: Array(UnsafeBufferPointer(start: report, count: length))
+                    )
+                }
             },
             context
         )
@@ -182,10 +185,12 @@ public final class HIDRPCConnection {
             device,
             { context, _, _ in
                 guard let context else { return }
-                let connection = Unmanaged<HIDRPCConnection>
-                    .fromOpaque(context)
-                    .takeUnretainedValue()
-                connection.deviceWasRemoved()
+                MainActor.assumeIsolated {
+                    let connection = Unmanaged<HIDRPCConnection>
+                        .fromOpaque(context)
+                        .takeUnretainedValue()
+                    connection.deviceWasRemoved()
+                }
             },
             context
         )
@@ -197,8 +202,10 @@ public final class HIDRPCConnection {
     }
 
     deinit {
-        close()
-        inputBuffer.deallocate()
+        MainActor.assumeIsolated {
+            close()
+            inputBuffer.deallocate()
+        }
     }
 
     public func close() {
