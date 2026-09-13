@@ -37,6 +37,7 @@ const report = (app, smokeMode = "hidden") => ({
   managerAreasValidated: true,
   directDeviceUIValidated: true,
   deviceServiceSuppressedForSmoke: true,
+  bridgeServiceSuppressedForSmoke: true,
   fittingWidth: 600, fittingHeight: 380,
 });
 
@@ -363,6 +364,7 @@ test("smoke invariants require hidden UI and production accessory lifecycle wiri
       { keepsRunningAfterManagerClose: false }, { mainThread: false },
       { managerAreasValidated: false }, { directDeviceUIValidated: false },
       { deviceServiceSuppressedForSmoke: false },
+      { bridgeServiceSuppressedForSmoke: false },
       { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
       { configuration: { ...configuration, deviceIntegrationEnabled: false } },
     ]) {

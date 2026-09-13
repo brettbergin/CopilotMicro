@@ -8,14 +8,19 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private(set) var statusItem: NSStatusItem?
     private(set) var didFinishLaunching = false
     private let deviceItem = NSMenuItem()
+    private let bridgeItem = NSMenuItem()
     private let inputItem = NSMenuItem()
     private let lightingItem = NSMenuItem()
     private let issueItem = NSMenuItem()
     private let pauseItem = NSMenuItem()
     private let reconnectItem = NSMenuItem()
+    private let restartBridgeItem = NSMenuItem()
 
-    init(hardwareEnabled: Bool) {
-        manager = ManagerWindow(hardwareEnabled: hardwareEnabled)
+    init(hardwareEnabled: Bool, bridgeEnabled: Bool) {
+        manager = ManagerWindow(
+            hardwareEnabled: hardwareEnabled,
+            bridgeEnabled: bridgeEnabled
+        )
         super.init()
         configureMainMenu()
         menu.autoenablesItems = false
@@ -25,7 +30,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
-        for item in [deviceItem, inputItem, lightingItem, issueItem] {
+        for item in [deviceItem, bridgeItem, inputItem, lightingItem, issueItem] {
             item.isEnabled = false
             menu.addItem(item)
         }
@@ -34,6 +39,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         reconnectItem.target = self
         reconnectItem.action = #selector(reconnect)
         menu.addItem(reconnectItem)
+        restartBridgeItem.title = "Restart CLI Bridge"
+        restartBridgeItem.target = self
+        restartBridgeItem.action = #selector(restartBridge)
+        menu.addItem(restartBridgeItem)
         pauseItem.target = self
         pauseItem.action = #selector(togglePause)
         menu.addItem(pauseItem)
@@ -44,6 +53,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item(title: "Quit Copilot Micro", action: #selector(quit), key: "q"))
 
         manager.store.onPresentationChange = { [weak self] in
+            self?.refreshMenu()
+        }
+        manager.bridgeStore.onPresentationChange = { [weak self] in
             self?.refreshMenu()
         }
         refreshMenu()
@@ -58,11 +70,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.menu = menu
         statusItem = item
         manager.store.start()
+        manager.bridgeStore.start()
         refreshMenu()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         manager.store.stop()
+        manager.bridgeStore.stop()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -92,10 +106,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             && reconnectItem.action == #selector(reconnect)
             && reconnectItem.target === self
             && reconnectItem.isEnabled == manager.store.hardwareEnabled
+            && restartBridgeItem.action == #selector(restartBridge)
+            && restartBridgeItem.target === self
+            && restartBridgeItem.isEnabled == manager.bridgeStore.bridgeEnabled
             && pauseItem.action == #selector(togglePause)
             && pauseItem.target === self
             && pauseItem.isEnabled == manager.store.hardwareEnabled
-            && !deviceItem.isEnabled && !inputItem.isEnabled
+            && !deviceItem.isEnabled && !bridgeItem.isEnabled && !inputItem.isEnabled
             && !lightingItem.isEnabled && !issueItem.isEnabled
             && quit.action == #selector(self.quit)
             && quit.target === self && quit.isEnabled
@@ -188,6 +205,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         manager.store.togglePause()
     }
 
+    @objc private func restartBridge() {
+        manager.bridgeStore.restart()
+    }
+
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
     }
@@ -195,6 +216,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func refreshMenu() {
         let store = manager.store
         deviceItem.title = "Device: \(store.connectionState.label)"
+        bridgeItem.title = "CLI bridge: \(manager.bridgeStore.connectionState.label)"
         inputItem.title = "Last input: \(store.lastInput)"
         lightingItem.title =
             "Key lighting: \(store.lightingApplied ? store.lightingColor.displayName : "Off")"
@@ -205,8 +227,9 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pauseItem.title = store.isPaused ? "Resume Device" : "Pause Device"
         pauseItem.keyEquivalent = "p"
         reconnectItem.isEnabled = store.hardwareEnabled
+        restartBridgeItem.isEnabled = manager.bridgeStore.bridgeEnabled
         pauseItem.isEnabled = store.hardwareEnabled
         statusItem?.button?.toolTip =
-            "Copilot Micro: \(store.connectionState.label). \(store.lastInput)"
+            "Copilot Micro: device \(store.connectionState.label.lowercased()), bridge \(manager.bridgeStore.connectionState.label.lowercased()). \(store.lastInput)"
     }
 }

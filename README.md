@@ -14,8 +14,10 @@ validates the managed keymap, shows real key, dial and radial joystick events,
 and applies matching runtime color/brightness to the 13 key LEDs and ambient
 underglow. It does not write device flash. The owner-restricted IPC package,
 uninstalled read-only extension entry point and native session reconciler
-implement the qualified Copilot CLI `1.0.84-5` observation subset, but the app
-does not start that bridge and all stateful CLI actions remain disabled.
+implement the qualified Copilot CLI `1.0.84-5` observation subset. Normal app
+launches now start the private authenticated listener and display its state,
+but the app does not install the extension or launch Copilot yet. All stateful
+CLI actions remain disabled.
 Validated terminal and CLI discovery plus the shared exact-target contract are
 implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
 are qualified through its documented AppleScript API, including focus from
@@ -124,10 +126,17 @@ reasons. Pending permission counts never become request authority.
 The source-only Node client and native reconciler use the same registration and
 frame contract. Replacement keeps host, session and generation identities
 separate; stale generations, out-of-order state and liveness expiry invalidate
-the binding. `make test-bridge` and `make test-core` exercise these paths using
-isolated mocks. Nothing under `Bridge/` is placed in `.github/extensions/` or
-loaded into a real Copilot CLI session. The direct-device app still starts no
-production CLI listener or session service.
+the binding. Normal packaged-app launches create or load the owner-only
+bootstrap material, start the Unix socket listener, reconcile authenticated
+registrations and connect surface tokens to the shared Ghostty association
+registry. The menu and Diagnostics view report listener/connection state.
+Smoke mode suppresses all bridge filesystem and socket access.
+
+`make test-bridge` and `make test-core` exercise these paths using isolated
+mocks and temporary real sockets. Nothing under `Bridge/` is placed in
+`.github/extensions/` or loaded into a real Copilot CLI session. Extension
+installation, explicit Open Copilot and a real app-to-CLI registration remain
+pending.
 
 ## Disposable CLI qualification
 

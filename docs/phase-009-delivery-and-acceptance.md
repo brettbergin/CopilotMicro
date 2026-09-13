@@ -8,7 +8,8 @@ configuration/diagnostic foundation are implemented. I-07 adds
 native/Node mock evidence for an uninstalled read-only stage-3 observer:
 private authenticated IPC, host/session/generation separation, unknown-first
 snapshots, event reconciliation, capability changes, liveness/replacement and
-explicit rejection of all stateful actions. The app does not start it. A
+explicit rejection of all stateful actions. Normal app launches now start the
+private listener and display bounded bridge state, while smoke suppresses it. A
 separate source-only probe joined owned disposable Copilot CLI `1.0.84-5`
 sessions and produced the compatibility ceiling used by I-07.
 USB HID discovery/read, durable original backup, guarded restore, reduced
@@ -194,8 +195,9 @@ registers no tools, hooks or permission handler.
 
 No I-07 command installs or loads `Bridge/src/extension.mjs`, and `make check`
 does not launch Copilot CLI or open HID. The shipped app resource enables the
-direct device service during normal launches but starts no production CLI
-listener or session service.
+direct device service and authenticated CLI listener during normal launches.
+It still does not install the extension, launch Copilot or enable stateful CLI
+actions.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence

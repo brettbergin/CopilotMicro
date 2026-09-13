@@ -6,8 +6,9 @@ catalogs, shared fixtures, deterministic Core state model and isolated
 configuration/diagnostics module exist. The authenticated local socket,
 source-only Node client, shared negative IPC fixtures, disposable CLI
 capability probe, uninstalled production observer source and native session
-reconciler now exist. The app does not start the socket and no production
-extension is installed. I-07 implements only the qualified read-only session
+reconciler now exist. The packaged app starts the private authenticated socket
+on normal launches, while smoke mode suppresses bridge filesystem/socket
+access. No production extension is installed. I-07 implements only the qualified read-only session
 subset and rejects stateful actions. The device boundary now includes bounded
 IOKit HID transport, guarded original backup/restore, a reduced 15-change
 active-layer map, normalized `v.oai.hid` keys/dial and native `kb.radial`
@@ -156,10 +157,11 @@ Pending permission snapshots carry counts only, not request IDs. Capability
 snapshots advertise no supported stateful action, and the native reconciler
 rejects any production snapshot that does.
 
-This remains isolated source/mock evidence: the native app does not start the
-server, production source is not installed under `.github/extensions/`, and no
-live CLI qualification was rerun for I-07. The disposable probe's existing
-`1.0.84-5` evidence is the compatibility ceiling.
+The native app now owns this server lifecycle and exposes bounded
+listener/connection status. Production source is not installed under
+`.github/extensions/`, no real CLI registration has connected through the app,
+and no live CLI qualification was rerun for this integration. The disposable
+probe's existing `1.0.84-5` evidence is the compatibility ceiling.
 
 ### Registration
 

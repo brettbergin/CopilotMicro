@@ -1,4 +1,5 @@
 import CopilotMicroCore
+import Dispatch
 import Foundation
 
 public enum GhosttyAssociationEnvironment {
@@ -98,6 +99,17 @@ public actor GhosttyTargetBindingStore {
             return instanceID
         }
         return nil
+    }
+
+    public func claim(
+        _ token: SurfaceAssociationToken,
+        for instanceID: CLIInstanceID
+    ) -> GhosttyAssociationClaimOutcome {
+        claim(
+            token,
+            for: instanceID,
+            nowMilliseconds: DispatchTime.now().uptimeNanoseconds / 1_000_000
+        )
     }
 
     public func claim(

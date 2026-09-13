@@ -35,6 +35,13 @@ struct UnixSocketTransportTests {
 
             #expect(try permissions(at: directory) == 0o700)
             #expect(try permissions(at: socketURL) == 0o600)
+            #expect(
+                try permissions(
+                    at: directory.appendingPathComponent(
+                        IPCBridgeRuntime.listenerLockFilename
+                    )
+                ) == 0o600
+            )
             #expect(serverConnection.registration == registration)
             #expect(clientConnection.registration == registration)
 
@@ -153,6 +160,48 @@ struct UnixSocketTransportTests {
             #expect(!FileManager.default.fileExists(atPath: socketURL.path))
         }
     }
+
+    @Test("Listener lease rejects a second owner")
+    func listenerLeaseRejectsSecondOwner() async throws {
+        try await withShortSocketDirectory { _, socketURL in
+            let first = try UnixSocketListener(socketURL: socketURL)
+            try first.start()
+            defer { first.close() }
+
+            let second = try UnixSocketListener(socketURL: socketURL)
+            #expect(throws: IPCTransportError.addressInUse) {
+                try second.start()
+            }
+        }
+    }
+
+    @Test("Listener reclaims an owner-only stale socket after the lease is free")
+    func reclaimsStaleSocket() async throws {
+        try await withShortSocketDirectory { directory, socketURL in
+            try createStaleSocket(at: socketURL)
+            #expect(FileManager.default.fileExists(atPath: socketURL.path))
+
+            let listener = try UnixSocketListener(socketURL: socketURL)
+            try listener.start()
+            defer { listener.close() }
+
+            #expect(try permissions(at: directory) == 0o700)
+            #expect(try permissions(at: socketURL) == 0o600)
+        }
+    }
+
+    @Test("Listener preserves a stale socket with unsafe permissions")
+    func preservesUnsafeStaleSocket() async throws {
+        try await withShortSocketDirectory { _, socketURL in
+            try createStaleSocket(at: socketURL, permissions: 0o666)
+            let listener = try UnixSocketListener(socketURL: socketURL)
+
+            #expect(throws: IPCTransportError.permissionDenied) {
+                try listener.start()
+            }
+            #expect(FileManager.default.fileExists(atPath: socketURL.path))
+        }
+    }
 }
 
 private func testToken() throws -> IPCBootstrapToken {
@@ -196,4 +245,41 @@ private func withShortSocketDirectory(
     }
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
     try await body(directory, directory.appendingPathComponent("bridge.sock"))
+}
+
+private func createStaleSocket(
+    at socketURL: URL,
+    permissions: mode_t = 0o600
+) throws {
+    let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+    guard descriptor >= 0 else {
+        throw IPCTransportError.ioFailure
+    }
+    defer { Darwin.close(descriptor) }
+
+    var address = sockaddr_un()
+    let bytes = Array(socketURL.path.utf8CString)
+    guard bytes.count <= MemoryLayout.size(ofValue: address.sun_path) else {
+        throw IPCTransportError.pathTooLong
+    }
+    address.sun_family = sa_family_t(AF_UNIX)
+    address.sun_len = UInt8(MemoryLayout<sa_family_t>.size + bytes.count)
+    let addressLength = socklen_t(address.sun_len)
+    withUnsafeMutableBytes(of: &address.sun_path) { destination in
+        for (index, byte) in bytes.enumerated() {
+            destination[index] = UInt8(bitPattern: byte)
+        }
+    }
+    let result = withUnsafePointer(to: &address) { pointer in
+        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            Darwin.bind(
+                descriptor,
+                $0,
+                addressLength
+            )
+        }
+    }
+    guard result == 0, chmod(socketURL.path, permissions) == 0 else {
+        throw IPCTransportError.ioFailure
+    }
 }

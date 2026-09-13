@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct ManagerView: View {
     @ObservedObject var store: LiveDeviceStore
+    @ObservedObject var bridgeStore: LiveBridgeStore
 
     var body: some View {
         NavigationSplitView {
@@ -43,13 +44,13 @@ struct ManagerView: View {
     private var detail: some View {
         switch store.selectedArea {
         case .overview:
-            OverviewView(store: store)
+            OverviewView(store: store, bridgeStore: bridgeStore)
         case .controls:
             ControlsView(store: store)
         case .lighting:
             LightingView(store: store)
         case .diagnostics:
-            DiagnosticsView(store: store)
+            DiagnosticsView(store: store, bridgeStore: bridgeStore)
         }
     }
 }
@@ -57,12 +58,16 @@ struct ManagerView: View {
 @MainActor
 final class ManagerWindow {
     let store: LiveDeviceStore
+    let bridgeStore: LiveBridgeStore
     let window: NSWindow
     let hostingView: NSHostingView<ManagerView>
 
-    init(hardwareEnabled: Bool) {
+    init(hardwareEnabled: Bool, bridgeEnabled: Bool) {
         store = LiveDeviceStore(hardwareEnabled: hardwareEnabled)
-        hostingView = NSHostingView(rootView: ManagerView(store: store))
+        bridgeStore = LiveBridgeStore(bridgeEnabled: bridgeEnabled)
+        hostingView = NSHostingView(
+            rootView: ManagerView(store: store, bridgeStore: bridgeStore)
+        )
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_020, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -135,6 +140,7 @@ private struct DeviceBanner: View {
 
 private struct OverviewView: View {
     @ObservedObject var store: LiveDeviceStore
+    @ObservedObject var bridgeStore: LiveBridgeStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -161,6 +167,12 @@ private struct OverviewView: View {
                     value: store.inputMonitoring.rawValue.capitalized,
                     detail: "Required for physical key and control events",
                     symbol: "hand.raised"
+                )
+                StatusCard(
+                    title: "CLI bridge",
+                    value: bridgeStore.connectionState.label,
+                    detail: bridgeStore.connectionState.detail,
+                    symbol: "point.3.connected.trianglepath.dotted"
                 )
             }
 
@@ -318,6 +330,7 @@ private struct LightingView: View {
 
 private struct DiagnosticsView: View {
     @ObservedObject var store: LiveDeviceStore
+    @ObservedObject var bridgeStore: LiveBridgeStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -347,6 +360,14 @@ private struct DiagnosticsView: View {
                         value: "\(store.invalidNotificationCount)"
                     )
                 }
+
+                GroupBox("Copilot CLI bridge") {
+                    VStack(spacing: 12) {
+                        LabeledContent("State", value: bridgeStore.connectionState.label)
+                        LabeledContent("Detail", value: bridgeStore.connectionState.detail)
+                    }
+                    .padding(8)
+                }
                 .padding(8)
             }
 
@@ -354,6 +375,10 @@ private struct DiagnosticsView: View {
                 Button("Reconnect device") {
                     store.reconnect()
                 }
+                Button("Restart CLI bridge") {
+                    bridgeStore.restart()
+                }
+                .disabled(!bridgeStore.bridgeEnabled)
                 Button("Clear event list") {
                     store.clearEvents()
                 }

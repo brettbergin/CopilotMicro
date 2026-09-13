@@ -10,6 +10,19 @@ public enum IPCBridgeRuntime {
     public static let directoryName = "bridge"
     public static let socketFilename = "bridge.sock"
     public static let bootstrapTokenFilename = "bootstrap-token"
+    public static let listenerLockFilename = "listener.lock"
+
+    public static func defaultRootURL(fileManager: FileManager = .default) throws -> URL {
+        guard
+            let applicationSupport = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
+            throw IPCBootstrapStoreError.fileSystem
+        }
+        return applicationSupport.appendingPathComponent("Copilot Micro", isDirectory: true)
+    }
 }
 
 public actor IPCBootstrapStore {

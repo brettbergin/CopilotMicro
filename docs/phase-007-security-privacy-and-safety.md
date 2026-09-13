@@ -9,8 +9,10 @@ diagnostic rotation and explicit redacted export. The isolated local IPC layer
 now enforces private filesystem modes, same-user peer checks, bootstrap
 authentication, strict roles, bounded frames, generations, ordered sequences
 and liveness. I-07 adds an uninstalled passive production observer and native
-reconciler, but the app does not start them. A separate passive probe has joined
-owned disposable CLI sessions without using the production IPC path. Stateful
+reconciler. Normal app launches now start the owner-restricted listener and
+smoke mode suppresses it, but the extension remains uninstalled and no real
+registration has used the production path. A separate passive probe has joined
+owned disposable CLI sessions without using that path. Stateful
 production extension authority and updater boundaries remain design
 requirements. The read-only
 hardware qualifier now opens one exact candidate non-exclusively and allowlists
@@ -140,8 +142,9 @@ bridge bootstrap material separately from portable configuration and exclude
 it from logs/exports.
 
 The uninstalled extension reads only the owner-restricted bridge directory,
-socket and bootstrap file. It does not accept a token value from environment,
-read GitHub/Copilot credentials or log paths, identifiers or raw SDK errors.
+socket and bootstrap file. It accepts only the non-secret, strict surface
+association token from its inherited environment; it does not request or read
+GitHub/Copilot credentials or log paths, identifiers or raw SDK errors.
 Host events cross IPC only as allowlisted categories followed by bounded state
 reconciliation. Pending permission counts are retained without request IDs,
 tool details or command text.

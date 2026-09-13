@@ -80,6 +80,7 @@ private struct SmokeReport: Encodable {
     let managerAreasValidated: Bool
     let directDeviceUIValidated: Bool
     let deviceServiceSuppressedForSmoke: Bool
+    let bridgeServiceSuppressedForSmoke: Bool
     let fittingWidth: Double
     let fittingHeight: Double
 }
@@ -172,7 +173,8 @@ struct CopilotMicroApp {
             on: application
         )
         let controller = MenuBarController(
-            hardwareEnabled: smokeMode == nil && configuration.deviceIntegrationEnabled
+            hardwareEnabled: smokeMode == nil && configuration.deviceIntegrationEnabled,
+            bridgeEnabled: smokeMode == nil
         )
         if smokeMode == .hidden {
             try smokeTest(
@@ -277,6 +279,9 @@ struct CopilotMicroApp {
         let deviceServiceSuppressed =
             LiveDeviceStore.validateHardwareSuppressionForSmoke()
             && manager.store.connectionState == .suppressedForSmoke
+        let bridgeServiceSuppressed =
+            manager.bridgeStore.connectionState == .suppressedForSmoke
+            && !manager.bridgeStore.runtimeStarted
         let invariants: [(String, Bool)] = [
             ("main_thread", Thread.isMainThread),
             (
@@ -298,6 +303,7 @@ struct CopilotMicroApp {
             ("manager_areas", managerAreasValidated),
             ("direct_device_ui", directDeviceUIValidated),
             ("device_service_suppressed", deviceServiceSuppressed),
+            ("bridge_service_suppressed", bridgeServiceSuppressed),
             ("finite_layout", size.width.isFinite && size.height.isFinite),
             ("minimum_layout", size.width >= 600 && size.height >= 380),
         ]
@@ -330,6 +336,7 @@ struct CopilotMicroApp {
             managerAreasValidated: managerAreasValidated,
             directDeviceUIValidated: directDeviceUIValidated,
             deviceServiceSuppressedForSmoke: deviceServiceSuppressed,
+            bridgeServiceSuppressedForSmoke: bridgeServiceSuppressed,
             fittingWidth: size.width,
             fittingHeight: size.height
         )

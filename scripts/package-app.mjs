@@ -19,7 +19,7 @@ export const LIMITS = Object.freeze({
 export const HELP = `Usage: node scripts/package-app.mjs [options]
 
 Build and ad-hoc sign the Creator Micro 2 Copilot Micro app using SwiftPM.
-No XcodeGen, asset compiler, external packages or CLI integration.
+No XcodeGen, asset compiler, external packages or CLI extension installation.
 
   --configuration debug|release  Default: release; arm64, macOS 26, Swift 6.
   --output-dir PATH              Default: build/package. Must be a strict
@@ -220,6 +220,7 @@ export function validateSmokeReport(report, app, mode = "hidden", canonicalize =
     managerAreasValidated: true,
     directDeviceUIValidated: true,
     deviceServiceSuppressedForSmoke: true,
+    bridgeServiceSuppressedForSmoke: true,
   };
   for (const [key, value] of Object.entries(expected)) {
     if (report?.[key] !== value) throw new PackagingError("smoke_failed", `Smoke invariant failed: ${key}.`);

@@ -70,12 +70,20 @@ public struct SessionBridgeReconciler: Sendable {
         let activation: SessionBridgeActivation
         if let current = self.registration {
             if current.generation == registration.generation {
-                return .duplicate
+                guard
+                    current.instanceID == registration.instanceID,
+                    current.sessionID == registration.sessionID,
+                    runtimeState.connection == .disconnected
+                else {
+                    return .duplicate
+                }
+                activation = .reconnected
+            } else {
+                activation =
+                    current.instanceID == registration.instanceID
+                        && current.sessionID == registration.sessionID
+                    ? .reconnected : .replaced
             }
-            activation =
-                current.instanceID == registration.instanceID
-                    && current.sessionID == registration.sessionID
-                ? .reconnected : .replaced
         } else {
             activation = .connected
         }
@@ -138,7 +146,7 @@ public struct SessionBridgeReconciler: Sendable {
         guard nowMilliseconds - lastSeenMilliseconds > livenessTimeoutMilliseconds else {
             return false
         }
-        disconnect()
+        suspendConnection()
         return true
     }
 
@@ -152,6 +160,20 @@ public struct SessionBridgeReconciler: Sendable {
             pendingRequestIDs: Set(runtimeState.pendingAttention.map(\.requestID)),
             visiblePermissionRequestID: nil
         )
+    }
+
+    public mutating func suspendConnection() {
+        lastSeenMilliseconds = nil
+        capabilities = Self.unknownCapabilities
+        hostCapabilities = .unavailable
+        model = .unknown
+        compatibility = SessionObservationCompatibility(
+            status: .unqualified,
+            cliVersion: registration?.cliVersion ?? "unknown",
+            sdkVersion: registration?.sdkVersion ?? "host-provided",
+            reason: "The authenticated CLI bridge transport is disconnected."
+        )
+        _ = SessionReducer.reduce(&runtimeState, .disconnected)
     }
 
     private mutating func applySnapshot(
