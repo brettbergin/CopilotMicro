@@ -13,7 +13,24 @@ public enum HIDDiscoveryError: Error, LocalizedError, Sendable {
     }
 }
 
+public enum HIDListenAccessStatus: String, Codable, Sendable {
+    case denied
+    case granted
+    case unknown
+}
+
 public enum HIDDeviceDiscovery {
+    public static var listenAccessStatus: HIDListenAccessStatus {
+        switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
+        case kIOHIDAccessTypeGranted:
+            .granted
+        case kIOHIDAccessTypeDenied:
+            .denied
+        default:
+            .unknown
+        }
+    }
+
     public static func discover() throws -> [HIDDeviceDescriptor] {
         let manager = IOHIDManagerCreate(
             kCFAllocatorDefault,

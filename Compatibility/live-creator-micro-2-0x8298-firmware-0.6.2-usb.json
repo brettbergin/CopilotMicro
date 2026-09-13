@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-13T03:50:05Z",
+  "outcome": "input-and-key-lighting-qualified",
+  "source": "operator-guided bounded developer probes",
+  "product": "Creator Micro 2",
+  "productID": "0x8298",
+  "firmwareVersion": "0.6.2",
+  "transport": "usb",
+  "activeLayerIndex": 1,
+  "originalKeymapSHA256": "fb3407ca0c14a44caf205c83b6949604c8776634a35757800bf3057ba518e77e",
+  "managedKeymap": {
+    "changeCount": 15,
+    "keymapSHA256": "960f81df54396b8000c564b8d8e2a717d010e1699151cc83170966b67d7d1285",
+    "readBackVerified": true,
+    "writeAcknowledged": false,
+    "timeoutReconciliationRequired": true,
+    "joystickBindingsPreserved": true
+  },
+  "restore": {
+    "originalRestoredBeforeReducedMapping": true,
+    "readBackVerified": true,
+    "writeAcknowledged": false,
+    "competingTrafficObserved": false
+  },
+  "input": {
+    "inputMonitoring": "granted",
+    "keyMethod": "v.oai.hid",
+    "radialMethod": "kb.radial",
+    "keyContactsObserved": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "dialDirectionsObserved": [
+      "clockwise",
+      "counterClockwise"
+    ],
+    "joystickDirectionsObserved": [
+      "north",
+      "west",
+      "south",
+      "east"
+    ],
+    "radialOrientation": {
+      "east": 0.013,
+      "south": 0.238,
+      "west": 0.487,
+      "north": 0.762
+    },
+    "radialActivationDistance": 0.5,
+    "radialReleaseDistance": 0.2,
+    "radialCardinalHalfWidth": 0.0625,
+    "wideKeyCenterPressCoalesced": true,
+    "heldKeyRepeated": false,
+    "invalidNotificationCount": 0,
+    "unexpectedResponseCount": 0
+  },
+  "lighting": {
+    "method": "v.oai.thstatus",
+    "visibleKeyLEDCount": 13,
+    "brightness": 0.35,
+    "colorsPhysicallyObserved": [
+      "white",
+      "blue",
+      "purple",
+      "amber",
+      "green",
+      "red",
+      "off"
+    ],
+    "allCommandsAcknowledged": true,
+    "ambientUnderglowModified": false,
+    "flashWritePerformed": false,
+    "hostDrivenBlinkAndPulsePhysicallyQualified": false
+  },
+  "remainingGaps": [
+    "Bluetooth",
+    "sleep and wake recovery",
+    "host-driven blink and pulse timing",
+    "production app device-service wiring",
+    "event-to-light latency"
+  ]
+}

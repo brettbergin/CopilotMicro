@@ -11,10 +11,13 @@ production CLI-hosted session bridge and live-session components remain
 unimplemented. The device boundary now has read-only IOKit discovery, bounded
 HID JSON-RPC framing and one qualified USB tuple. The guarded developer setup
 path now implements device-associated original backup, exact mapping preview,
-guarded one-write authorization and complete read-back verification. The first
-managed USB write reached the exact reviewed target despite a missing firmware
-acknowledgement, and the original-map restore is previewable. No app-owned
-device service, physical input or lighting is enabled.
+guarded one-write authorization and complete read-back verification. The
+incorrect inactive-layer target was restored to the verified original, then a
+reduced 15-change active-layer target was applied and read back. Developer
+tools now normalize `v.oai.hid` keys/dial input and native `kb.radial`
+joystick input, and physically qualified steady all-key color output through
+`v.oai.thstatus` without changing ambient underglow or flash. No app-owned
+device service or physical input routing to Copilot CLI is enabled.
 
 ## Component boundaries
 

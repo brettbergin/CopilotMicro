@@ -66,6 +66,22 @@ public struct LightingProjection: Equatable, Sendable {
     public let brightness: Brightness
     public let appliesToAllKeys: Bool
 
+    public init(
+        semanticState: LightingSemanticState,
+        color: LightingColor,
+        animation: LightingAnimation,
+        textualState: String,
+        brightness: Brightness,
+        appliesToAllKeys: Bool
+    ) {
+        self.semanticState = semanticState
+        self.color = color
+        self.animation = animation
+        self.textualState = textualState
+        self.brightness = brightness
+        self.appliesToAllKeys = appliesToAllKeys
+    }
+
     public func intensity(atMilliseconds milliseconds: UInt64) -> Double {
         let phase: Double
         switch animation {

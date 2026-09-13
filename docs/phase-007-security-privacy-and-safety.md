@@ -19,9 +19,13 @@ integrity-checked original backup and requires a closed-configurator
 declaration, known-configurator rejection, a
 device/source/target/backup/change-bound transaction digest, fresh pre-change
 snapshot, competing-response detection, exact consent and complete read-back
-before reporting a write as successful. The first managed USB write was
-independently read back at the exact reviewed target after firmware omitted
-its acknowledgement; the verified original backup remains available.
+before reporting a write as successful. The incorrect inactive-layer target
+was restored to the verified original, then the reduced 15-change active-layer
+target was applied and fully read back. Both missing acknowledgements were
+resolved through bounded reconnect-and-read reconciliation. Physical input
+observation records only bounded control identifiers and numeric radial
+samples. The lighting probe changes runtime key LEDs only, never device flash
+or ambient underglow, and clears owned key lighting on normal exit.
 
 ## Trust boundaries
 

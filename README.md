@@ -8,13 +8,15 @@ session management, model/effort, voice, input, cancellation and permission
 controls. A graphical manager provides onboarding, remapping, diagnostics and
 local configuration.
 
-**Status:** interactive GUI emulator. The menu panel, seven-area manager,
+**Status:** interactive GUI emulator plus developer-qualified USB hardware
+slice. The menu panel, seven-area manager,
 original pad editor, session/control simulator, lighting preview, app packaging,
 versioned contracts, deterministic reducers, atomic local settings, previewed
 portable import/export and bounded redacted diagnostics exist. Live product
-hardware/CLI control remains unavailable and clearly disabled. A read-only
-developer hardware probe can now discover and inspect an explicitly owned
-Creator Micro 2 without changing its configuration or lighting. An
+hardware/CLI control remains unavailable and clearly disabled. Developer tools
+can discover an explicitly owned Creator Micro 2, preserve and restore its
+original keymap, apply the reduced managed map, observe normalized physical
+input and run a bounded key-lighting sequence. An
 owner-restricted Unix-domain IPC package and isolated Node client now share
 bounded authentication, framing, role, generation and sequence contracts, but
 the app does not start that listener and no production CLI extension is
@@ -184,11 +186,12 @@ make qualify-hardware CONSENT=I-own-this-device-read
 The output omits the serial number and full keymap. It reports bounded identity,
 firmware, status and keymap-shape metadata. The initial USB qualification found
 product `Creator Micro 2`, PID `0x8298`, firmware `0.6.2`, active layer index
-`2`, three layers and key rows `[2,4,4,3]`; see
+`1` (firmware layer number `2`), three layers and key rows `[2,4,4,3]`; see
 [`Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json`](Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json).
 This proves read-only transport and explicitly disproves any assumption that
-the active layer is the first layer. It does not yet qualify Bluetooth, Pro
-marketing identity, physical input, lighting or keymap writes.
+the active layer is the first layer. Follow-on USB qualification has also
+verified reversible keymap writes, physical input and key lighting. Bluetooth
+and exact Pro marketing identity remain unqualified.
 
 If opening the vendor collection is denied, grant Input Monitoring to the
 terminal running the probe, wake the device and retry. `make check` never opens
@@ -206,11 +209,12 @@ non-mutating preview with:
 make preview-device-mapping CONSENT=I-own-this-device-read
 ```
 
-The current USB preview verified the persisted original backup and proposed 19
+The current USB preview verified the persisted original backup and proposes 15
 changes: keys `AG00` through `AG12` and dial directions `AG13`/`AG14` on active
-layer `2`, plus cardinal joystick events `AG15` through `AG18` in the unique
-layer containing the radial sectors. Encoder press, joystick diagonals,
-lighting, macros, other layers and unknown fields are preserved.
+array index `1` (firmware layer number `2`). Encoder press, all joystick
+bindings, lighting, macros, other layers and unknown fields are preserved.
+Firmware `0.6.2` emits native `kb.radial` notifications for the joystick, so
+joystick input does not require persistent keymap changes.
 
 Applying or restoring requires the exact transaction digest printed by a fresh
 preview and a declaration that other device configurators are closed. The
@@ -229,9 +233,46 @@ acknowledgement.
 The setup tool treats that timeout as ambiguous, reconnects read-only and
 reports success only if the complete keymap matches the reviewed target.
 
-The first managed USB mapping was independently read back at the exact target
-SHA-256, and a restore transaction back to the verified original backup was
-previewed. Physical input, lighting and an actual restore remain unqualified.
+The first USB write was independently read back at the exact target SHA-256
+and proved timeout reconciliation, but physical input showed that firmware
+layer number `2` selects zero-based array index `1`, not index `2`. The device
+was then restored to the verified original and the reduced 15-change target
+was applied and fully read back at
+`960f81df54396b8000c564b8d8e2a717d010e1699151cc83170966b67d7d1285`.
+
+With the managed map present, observe normalized hardware input without
+routing any actions:
+
+```sh
+make observe-device-input CONSENT=I-own-this-device-observe-input SECONDS=30
+```
+
+The bounded observer prints only sanitized key/control identifiers and
+press/release or detent transitions. It does not connect to Copilot CLI.
+
+USB firmware `0.6.2` emits keys and dial actions through `v.oai.hid` and the
+joystick through `kb.radial`. Measured cardinal angles are approximately east
+`0.013`, south `0.238`, west `0.487` and north `0.762`. Normalization activates
+at distance `0.5`, returns to neutral at `0.2`, ignores diagonal sectors and
+requires neutral before another direction. Controlled tests verified a held
+key does not repeat and that center/left/right presses of the two-contact wide
+key each produce one logical Submit press/release pair.
+
+Run the bounded physical key-lighting sequence with:
+
+```sh
+make qualify-device-lighting \
+  CONSENT=I-closed-other-device-configurators-and-authorize-key-lighting-test \
+  HOLD_SECONDS=2
+```
+
+On the qualified USB tuple, all 13 key LEDs physically displayed white, blue,
+purple, amber, green, red and off at 35% brightness. Every command returned
+`{"ok":1}`. The probe does not modify device flash or the bottom ambient
+underglow, matching the product requirement to preserve that user setting.
+Host-driven blink/pulse timing, Bluetooth, sleep/wake and app-owned live
+device-service wiring remain unqualified. Sanitized evidence is recorded in
+[`Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json`](Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json).
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;

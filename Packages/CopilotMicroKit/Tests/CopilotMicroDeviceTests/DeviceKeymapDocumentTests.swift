@@ -61,7 +61,7 @@ struct DeviceKeymapDocumentTests {
         }
     }
 
-    @Test("Production plan maps keys, dial directions, and cardinal joystick sectors")
+    @Test("Production plan maps keys and dial while preserving joystick sectors")
     func productionPlanUsesQualifiedBindings() throws {
         let document = try DeviceKeymapDocument(
             data: fixtureData(),
@@ -69,8 +69,8 @@ struct DeviceKeymapDocumentTests {
         )
         let plan = try document.planForCopilotMicro()
         #expect(plan.keyChanges.count == 13)
-        #expect(plan.peripheralChanges.count == 6)
-        #expect(plan.changeCount == 19)
+        #expect(plan.peripheralChanges.count == 2)
+        #expect(plan.changeCount == 15)
         #expect(plan.keyChanges.first?.replacementValue == "KV_OAI_AG00")
         #expect(plan.keyChanges.last?.replacementValue == "KV_OAI_AG12")
         #expect(
@@ -78,10 +78,6 @@ struct DeviceKeymapDocumentTests {
                 == [
                     "KV_OAI_AG13",
                     "KV_OAI_AG14",
-                    "KV_OAI_AG15",
-                    "KV_OAI_AG16",
-                    "KV_OAI_AG17",
-                    "KV_OAI_AG18",
                 ]
         )
 
@@ -98,11 +94,11 @@ struct DeviceKeymapDocumentTests {
         #expect(encoders[0][2] as? String == "PRESERVE_PRESS")
         let joystick = try #require(layout["joystick"] as? [String: Any])
         let sectors = try #require(joystick["sectors"] as? [[String: Any]])
-        #expect(sectors[0]["k"] as? String == "KV_OAI_AG18")
+        #expect(sectors[0]["k"] as? String == "N")
         #expect(sectors[1]["k"] as? String == "PRESERVE_DIAGONAL")
-        #expect(sectors[2]["k"] as? String == "KV_OAI_AG15")
-        #expect(sectors[4]["k"] as? String == "KV_OAI_AG16")
-        #expect(sectors[6]["k"] as? String == "KV_OAI_AG17")
+        #expect(sectors[2]["k"] as? String == "E")
+        #expect(sectors[4]["k"] as? String == "S")
+        #expect(sectors[6]["k"] as? String == "W")
     }
 
     @Test("Semantic verification tolerates JSON formatting but detects changed values")

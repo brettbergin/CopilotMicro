@@ -42,7 +42,7 @@ struct DeviceSnapshotTests {
         let status = try DeviceSnapshotParser.status(
             from: ["battery": 0.75, "is_charging": true, "layer_index": 2]
         )
-        #expect(status == DeviceStatusSummary(battery: 0.75, charging: true, activeLayerIndex: 2))
+        #expect(status == DeviceStatusSummary(battery: 0.75, charging: true, activeLayerIndex: 1))
         #expect(throws: DeviceSnapshotError.malformedFirmware) {
             _ = try DeviceSnapshotParser.firmwareVersion(
                 from: ["version": String(repeating: "x", count: 65)]
@@ -55,7 +55,12 @@ struct DeviceSnapshotTests {
         }
         #expect(throws: DeviceSnapshotError.malformedStatus) {
             _ = try DeviceSnapshotParser.status(
-                from: ["battery": 99, "is_charging": true, "layer_index": 256]
+                from: ["battery": 99, "is_charging": true, "layer_index": 257]
+            )
+        }
+        #expect(throws: DeviceSnapshotError.malformedStatus) {
+            _ = try DeviceSnapshotParser.status(
+                from: ["battery": 99, "is_charging": true, "layer_index": 0]
             )
         }
     }

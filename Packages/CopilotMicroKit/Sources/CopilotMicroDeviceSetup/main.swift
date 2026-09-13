@@ -1,4 +1,3 @@
-import AppKit
 import CopilotMicroDevice
 import CopilotMicroStorage
 import Foundation
@@ -14,7 +13,6 @@ private enum SetupError: Error, LocalizedError {
     case associationUnavailable
     case deviceNotFound
     case invalidArguments
-    case knownConfiguratorRunning(String)
     case multipleDevices
     case originalWouldBeManaged
 
@@ -26,8 +24,6 @@ private enum SetupError: Error, LocalizedError {
             "No qualified Creator Micro 2 candidate is currently visible."
         case .invalidArguments:
             "The setup command or required consent arguments are invalid."
-        case .knownConfiguratorRunning(let name):
-            "Quit \(name) before configuring the device, then generate a fresh preview."
         case .multipleDevices:
             "Multiple qualified Creator Micro 2 candidates are visible."
         case .originalWouldBeManaged:
@@ -133,7 +129,7 @@ private struct CopilotMicroDeviceSetup {
                 ? .sharedConfiguration
                 : .sharedReadOnly
             if options.command == .apply || options.command == .restore {
-                try rejectKnownConfigurators()
+                try DeviceConfiguratorGuard.requireNoKnownConfiguratorRunning()
             }
             let context = try openDevice(accessMode: accessMode)
             defer { context.connection.close() }
@@ -457,7 +453,7 @@ private struct CopilotMicroDeviceSetup {
             return try context.connection.apply(
                 plan,
                 authorization: authorization,
-                beforeWrite: rejectKnownConfigurators
+                beforeWrite: DeviceConfiguratorGuard.requireNoKnownConfiguratorRunning
             )
         } catch HIDConnectionError.timeout(let method) where method == "fs.write" {
             var lastError: Error = DeviceConfigurationWriteError.readBackMismatch
@@ -494,24 +490,6 @@ private struct CopilotMicroDeviceSetup {
             return "\(completed)-with-contention-warning"
         }
         return completed
-    }
-
-    private static func rejectKnownConfigurators() throws {
-        let currentProcessID = ProcessInfo.processInfo.processIdentifier
-        let running = NSWorkspace.shared.runningApplications.filter {
-            $0.processIdentifier != currentProcessID && !$0.isTerminated
-        }
-        if let application = running.first(where: {
-            let name = $0.localizedName?.lowercased() ?? ""
-            let bundleIdentifier = $0.bundleIdentifier?.lowercased() ?? ""
-            return name == "input"
-                || name == "work louder input"
-                || bundleIdentifier.contains("worklouder")
-        }) {
-            throw SetupError.knownConfiguratorRunning(
-                application.localizedName ?? "Work Louder Input"
-            )
-        }
     }
 
     private static func backupMetadata(context: DeviceContext) throws -> DeviceBackupMetadata {
@@ -589,6 +567,8 @@ private struct CopilotMicroDeviceSetup {
         case HIDConnectionError.configuration:
             "write_guard_failed"
         case is SetupError:
+            "setup_invalid"
+        case is DeviceConfiguratorGuardError:
             "setup_invalid"
         case is DeviceBackupError:
             "backup_invalid"

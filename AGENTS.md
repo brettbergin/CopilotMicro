@@ -17,9 +17,11 @@ JSON-RPC qualification now exist as explicit developer tools. A separate
 guarded setup tool can create and verify the durable original backup, preview
 the exact managed map, and perform one guarded shared-transport write only
 when its device-bound transaction digest, closed-configurator declaration and
-exact consent are supplied. The app does
-not open HID, and no physical input or lighting integration exists. Preserve
-the emulator/live boundary while promoting only qualified behavior.
+exact consent are supplied. USB input observation now normalizes all keys,
+dial detents and native radial joystick notifications, and a bounded lighting
+probe drives the key LEDs without changing flash or ambient underglow. The app
+still does not open HID or route physical actions to Copilot CLI. Preserve the
+emulator/live boundary while promoting only qualified behavior.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -55,6 +57,14 @@ the repository could load it into a real session.
   open non-exclusively and read bounded identity/status/keymap metadata from
   one Creator Micro 2 candidate. It performs no configuration or lighting
   mutation.
+- `make observe-device-input CONSENT=I-own-this-device-observe-input
+  SECONDS=30`: print normalized keys, dial detents and joystick transitions
+  from the managed map without routing actions.
+- `make qualify-device-lighting
+  CONSENT=I-closed-other-device-configurators-and-authorize-key-lighting-test
+  HOLD_SECONDS=2`: reject known configurators, display a bounded all-key color
+  sequence, then clear the key LEDs without modifying ambient underglow or
+  device flash.
 - `make preview-device-mapping CONSENT=I-own-this-device-read`: create or
   verify the original keymap backup and print the exact non-mutating map plus
   its device/source/backup-bound transaction digest.

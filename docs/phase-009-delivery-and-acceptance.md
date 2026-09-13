@@ -9,13 +9,15 @@ part of stage 3 also has native/Node mock evidence for private authenticated
 IPC, bounded frames, roles, generations, sequences and rejection cases. The app
 does not start it. A separate source-only probe joined owned disposable Copilot
 CLI `1.0.84-5` sessions and produced a conservative compatibility report.
-USB HID discovery/read, durable original backup, one guarded managed mapping
-write, exact independent read-back and an original-map restore preview now
-have real-device evidence. Firmware omitted the write acknowledgement, so the
-transport path reconciles that timeout through a fresh read-only connection.
-This does not qualify the production bridge, terminal, physical input,
-lighting, a real restore, Bluetooth or updater, and it does not convert
-simulated acceptance journeys into hardware evidence.
+USB HID discovery/read, durable original backup, guarded restore, reduced
+15-change mapping and complete read-back now have real-device evidence.
+Firmware omitted both write acknowledgements, so the transport reconciled each
+timeout through a fresh read-only connection. All keys, both dial directions,
+native radial joystick cardinals and steady all-key colors are physically
+qualified through bounded developer tools. This does not qualify the
+production app device service, terminal targeting, live CLI actions,
+host-driven blink/pulse, Bluetooth or updater, and it does not convert
+simulated acceptance journeys into production evidence.
 
 ## Delivery strategy
 
@@ -61,7 +63,7 @@ contract was not.
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
 | U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | Partial | USB transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; the original keymap is durably backed up, the 19-change map was written and independently read back at its exact target hash, and restore was previewed; exact Pro behavior, physical input, lighting, Bluetooth qualification and a real restore remain unproven | Visible LED/input behavior and reversible map on exact hardware |
+| U-09 | Current Pro firmware and both transports | Partial | USB PID `0x8298`, firmware `0.6.2`, layer normalization, original restore, reduced 15-change map, all keys/dial directions, native radial joystick cardinals and steady key colors are physically verified; ambient underglow was preserved | Bluetooth, sleep/wake, animated lighting, event-to-light latency and production app service wiring remain |
 | U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
 Qualification probes must not authorize production tools, alter real work, flash
@@ -156,12 +158,12 @@ contract/integration tests with owned disposable CLI sessions for bridge and
 terminal behavior. Use real-device qualification for physical geometry,
 lighting, transport and restore.
 
-The hardware probe and guarded setup path provide partial U-09 evidence and
-validate byte-fragment reassembly, request bounds, active profile identity, a
-non-first active layer, durable backup, one exact USB map write/read-back and
-a restore preview. They do not fully satisfy A-22, A-24, A-30 or A-33 because
-physical input, light output, transport recovery and an actual restore remain
-unexercised.
+The hardware tools provide partial U-09 evidence and validate byte-fragment
+reassembly, request bounds, active profile identity, a non-first active layer,
+durable backup, an actual restore, the reduced managed map, complete read-back,
+physical input and steady light output. They do not fully satisfy A-22, A-24,
+A-30 or A-33 because interruption recovery, Bluetooth, sleep/wake, production
+service ownership, animated output and latency remain unexercised.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
@@ -213,7 +215,9 @@ support claims and unsafe substitutes are not.
 ## Current completion boundary
 
 The phase-00 documentation, native foundation, GUI/emulator, local storage,
-diagnostics, authenticated IPC contract and disposable CLI qualification are
-implemented. Production CLI control, terminal targeting, HID, updater and
-their acceptance journeys remain future work. The compatibility report is a
-work-package result, not a claim that the live controller is complete.
+diagnostics, authenticated IPC contract, disposable CLI qualification and a
+developer-qualified USB device slice are implemented. Production app hardware
+ownership, CLI action routing, terminal targeting, Bluetooth, animated
+lighting, updater and their complete acceptance journeys remain future work.
+Compatibility evidence is work-package evidence, not a claim that the live
+controller is complete.

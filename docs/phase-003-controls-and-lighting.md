@@ -3,10 +3,13 @@
 Scope: F-02, F-03, F-05, F-08 through F-17.
 Status: agreed UX; exact wire behavior requires hardware qualification.
 
-Implementation status: `CopilotMicroCore` now contains the deterministic
+Implementation status: `CopilotMicroCore` contains the deterministic
 physical-contact normalization, session reducer and all-key lighting
-projection used by the emulator. This is model-level evidence only; no HID
-device has been opened and no physical color/effect is qualified yet.
+projection used by the emulator. USB firmware `0.6.2` now has physical evidence
+for all key contacts, both dial directions, native radial joystick cardinals
+and steady all-key white/blue/purple/amber/green/red/off output. The production
+app does not yet own the device service, and host-driven blink/pulse,
+Bluetooth, sleep/wake and event-to-light latency remain unqualified.
 
 ## Physical model
 
@@ -74,6 +77,15 @@ Exact debounce/deadzone parameters are engineering settings derived from
 observed hardware, not fabricated physical specifications. Record them and
 exercise slow, rapid, held and simultaneous input.
 
+On the qualified USB firmware, key and dial events use `v.oai.hid`; the
+joystick uses `kb.radial` with normalized angle/distance. Measured cardinal
+centers are approximately east `0.013`, south `0.238`, west `0.487` and north
+`0.762`. The current normalizer activates at distance `0.5`, releases at `0.2`,
+accepts angles within `0.0625` of a cardinal center and ignores diagonals.
+A controlled held-key test produced one press/release pair without repeat.
+Center, far-left and far-right presses of the two-contact wide key each
+produced one logical Submit pair.
+
 ## Mode colors
 
 | Product mode | Runtime meaning | Default hue |
@@ -139,6 +151,13 @@ No additional underglow behavior is required. Do not silently repurpose or
 overwrite the user's underglow settings. If safe key lighting requires taking
 over a lighting zone, disclose that exact change in setup and preserve its
 original settings.
+
+The first physical lighting sequence used `v.oai.thstatus` at 35% brightness.
+All 13 key LEDs visibly followed white, blue, purple, amber, green, red and
+off. The bottom ambient LEDs deliberately did not follow because the probe
+never called the zone API. This confirms that per-key status lighting can
+preserve the underglow contract. Firmware acknowledgement alone is not the
+physical evidence; the observed sequence is recorded separately.
 
 A crash, sleeping host or lost device transport may prevent the final off
 write and leave the firmware's previous light visible. Qualify any firmware

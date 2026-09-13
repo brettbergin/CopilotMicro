@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import CopilotMicroDevice
 
 @Suite("Creator Micro 2 HID framing")

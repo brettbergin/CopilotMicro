@@ -96,6 +96,8 @@ public final class HIDRPCConnection {
     public let descriptor: HIDDeviceDescriptor
     public private(set) var unexpectedResponseCount = 0
     public private(set) var notificationCount = 0
+    public var onNotification: ((String, Any?) -> Void)?
+    public var onRawReport: ((UInt32, [UInt8]) -> Void)?
 
     private enum Response {
         case error(String)
@@ -227,6 +229,42 @@ public final class HIDRPCConnection {
         try request(method: method.method, params: method.params, timeoutSeconds: timeoutSeconds)
     }
 
+    public func setKeyLighting(
+        _ lighting: [DeviceKeyLighting],
+        timeoutSeconds: Double = 8
+    ) throws -> DeviceLightingReceipt {
+        guard accessMode.allowsConfiguration else {
+            throw HIDConnectionError.configuration(.configurationAccessRequired)
+        }
+        return try DeviceLightingReceipt(
+            result: request(
+                method: "v.oai.thstatus",
+                params: lighting.map(\.wireValue),
+                timeoutSeconds: timeoutSeconds
+            )
+        )
+    }
+
+    public func setLightingZones(
+        keys: DeviceLightingZone,
+        ambient: DeviceLightingZone,
+        timeoutSeconds: Double = 8
+    ) throws -> DeviceLightingReceipt {
+        guard accessMode.allowsConfiguration else {
+            throw HIDConnectionError.configuration(.configurationAccessRequired)
+        }
+        return try DeviceLightingReceipt(
+            result: request(
+                method: "v.oai.rgbcfg",
+                params: [
+                    "keys": keys.wireValue,
+                    "ambient": ambient.wireValue,
+                ],
+                timeoutSeconds: timeoutSeconds
+            )
+        )
+    }
+
     public func apply(
         _ plan: DeviceConfigurationWritePlan,
         authorization: DeviceWriteAuthorization,
@@ -328,6 +366,7 @@ public final class HIDRPCConnection {
     }
 
     private func receive(reportID: UInt32, bytes: [UInt8]) {
+        onRawReport?(reportID, bytes)
         do {
             guard let fragment = try HIDInboundFragment.decode(reportID: reportID, bytes: bytes) else {
                 return
@@ -347,7 +386,13 @@ public final class HIDRPCConnection {
             throw HIDConnectionError.malformedResponse
         }
         guard let rawRequestID = object["id"] else {
+            guard let method = (object["m"] as? String) ?? (object["method"] as? String) else {
+                unexpectedResponseCount += 1
+                return
+            }
+            let params = object["m"] == nil ? object["params"] : object["p"]
             notificationCount += 1
+            onNotification?(method, params)
             return
         }
         guard
@@ -391,6 +436,9 @@ public final class HIDRPCConnection {
         case "fs.write":
             guard let object = result as? [String: Any] else { return false }
             return HIDJSONNumber.integer(object["ok"]) != nil
+        case "v.oai.thstatus", "v.oai.rgbcfg":
+            guard let object = result as? [String: Any] else { return false }
+            return HIDJSONNumber.integer(object["ok"]) == 1
         default:
             return true
         }

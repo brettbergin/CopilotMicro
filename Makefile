@@ -5,7 +5,7 @@ SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
 SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
-.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-hardware preview-device-mapping apply-device-mapping preview-device-restore restore-device-mapping lint format check
+.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-hardware observe-device-input qualify-device-lighting preview-device-mapping apply-device-mapping preview-device-restore restore-device-mapping lint format check
 
 help:
 	@printf '%s\n' \
@@ -22,6 +22,8 @@ help:
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
 		'qualify-cli   Explicitly launch an owned disposable CLI capability probe' \
 		'qualify-hardware Run the read-only Creator Micro 2 hardware probe with exact consent' \
+		'observe-device-input Print normalized physical input for a bounded interval' \
+		'qualify-device-lighting Run a bounded all-key color sequence without changing underglow or flash' \
 		'preview-device-mapping Save/verify the original backup and print the exact non-mutating mapping plan' \
 		'apply-device-mapping Apply one reviewed mapping plan, then verify read-back' \
 		'preview-device-restore Print the exact non-mutating original-map restore plan' \
@@ -76,6 +78,14 @@ qualify-cli:
 qualify-hardware:
 	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi
 	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroHardwareProbe
+
+observe-device-input:
+	@if [ "$(CONSENT)" != "I-own-this-device-observe-input" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-observe-input' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroInputObserver --consent="$(CONSENT)" --seconds="$(or $(SECONDS),30)"
+
+qualify-device-lighting:
+	@if [ "$(CONSENT)" != "I-closed-other-device-configurators-and-authorize-key-lighting-test" ]; then printf '%s\n' 'CONSENT must be I-closed-other-device-configurators-and-authorize-key-lighting-test' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroLightingProbe --consent="$(CONSENT)" --hold-seconds="$(or $(HOLD_SECONDS),2)"
 
 preview-device-mapping:
 	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi

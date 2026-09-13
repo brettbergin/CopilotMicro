@@ -78,15 +78,15 @@ public enum DeviceSnapshotParser {
             battery >= 0,
             battery <= 100,
             let charging = dictionary["is_charging"] as? Bool,
-            let activeLayerIndex = integer(dictionary["layer_index"]),
-            (0...255).contains(activeLayerIndex)
+            let activeLayerNumber = integer(dictionary["layer_index"]),
+            (1...256).contains(activeLayerNumber)
         else {
             throw DeviceSnapshotError.malformedStatus
         }
         return DeviceStatusSummary(
             battery: battery,
             charging: charging,
-            activeLayerIndex: activeLayerIndex
+            activeLayerIndex: activeLayerNumber - 1
         )
     }
 

@@ -137,6 +137,6 @@ test("committed hardware evidence is read-only and schema-valid", () => {
   assert.equal(report.outcome, "read-only-qualified");
   assert.equal(report.mutatingOperationsPerformed, false);
   assert.deepEqual(report.keymap.activeLayerKeyRowLengths, [2, 4, 4, 3]);
-  assert.equal(report.status.activeLayerIndex, 2);
+  assert.equal(report.status.activeLayerIndex, 1);
   assert.equal(Object.hasOwn(report, "serialNumber"), false);
 });

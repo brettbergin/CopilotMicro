@@ -11,7 +11,7 @@
   "serialPresent": true,
   "firmwareVersion": "0.6.2",
   "status": {
-    "activeLayerIndex": 2,
+    "activeLayerIndex": 1,
     "battery": 99,
     "charging": true
   },

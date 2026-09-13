@@ -9,11 +9,13 @@ discovery, bounded HID framing/reassembly and an explicit read-only hardware
 probe are implemented. The guarded setup tool now implements durable original
 backup, bounded recovery history, exact mapping/restore previews, guarded
 one-write authorization and complete read-back verification. The original USB
-keymap has been backed up, the managed mapping was written over USB and
-independently read back at its exact target hash, and an original-map restore
-was previewed. The firmware omitted the `fs.write` response, so timeout
-reconciliation is now part of the guarded path. Physical input, lighting and a
-real restore remain unqualified.
+keymap has been backed up, restored with full read-back, and followed by a
+reduced 15-change active-layer mapping that preserves all joystick sectors.
+The firmware omitted both `fs.write` responses, so timeout reconciliation is
+part of the guarded path. USB keys, dial, native radial joystick input and
+steady per-key colors are physically qualified through bounded developer
+tools. Bluetooth, sleep/wake, animated lighting and production app ownership
+remain unqualified.
 
 ## Supported hardware boundary
 
@@ -56,16 +58,17 @@ The non-exclusive transport successfully called only `sys.version`,
 - Firmware `0.6.2`.
 - USB transport, battery `99`, charging true.
 - Active profile ID `0`, matched by identity rather than array position.
-- Active layer index `2`, proving the active layer is not necessarily first.
+- Firmware layer number `2`, normalized to zero-based active array index `1`,
+  proving the active layer is not necessarily first.
 - One profile, three layers and active key rows `[2,4,4,3]`.
 - No unexpected response IDs or notifications during the bounded probe.
 - No configuration, lighting or other mutating RPC.
 
 The evidence is
 [`Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json`](../Compatibility/creator-micro-2-0x8298-firmware-0.6.2-usb.json).
-The OS product string does not include `Pro`; exact Pro feature qualification
-therefore still depends on reversible mapping, input and lighting behavior.
-Bluetooth remains untested.
+The OS product string does not include `Pro`. Reversible mapping, input and key
+lighting behavior now match the intended Pro feature set on USB, but marketing
+identity and Bluetooth remain unqualified.
 
 ### Initial mapping preview and backup
 
@@ -75,19 +78,18 @@ envelope stores product, firmware, keymap schema, timestamp, base64 payload and
 payload checksum; it contains no raw serial field. A second preview loaded and
 verified the existing backup rather than replacing it.
 
-The exact preview contains 19 changes:
+The corrected preview contains 15 changes:
 
-- Active layer `2`: 13 key contacts become `KV_OAI_AG00` through
+- Active array index `1` (firmware layer number `2`): 13 key contacts become `KV_OAI_AG00` through
   `KV_OAI_AG12`.
-- Active layer `2`: encoder clockwise/counter-clockwise become
+- Active array index `1`: encoder clockwise/counter-clockwise become
   `KV_OAI_AG13` and `KV_OAI_AG14`; encoder press is preserved.
-- Layer `0`: the unique radial joystick layer's four cardinal sectors become
-  `KV_OAI_AG15` through `KV_OAI_AG18`; diagonals are preserved.
 
-The current configuration has radial joystick sectors only on layer `0`, while
-the active key/encoder layer is `2`. The implementation therefore selects the
-active layer for keys/encoder and requires exactly one structurally complete
-joystick layer rather than assuming all controls occupy layer zero.
+The implementation converts the 1-based status value before selecting the
+active layer. All joystick sectors are preserved exactly. Firmware `0.6.2`
+emits native `kb.radial` notifications with normalized angle and distance, so
+the host can normalize joystick cardinal input without changing another
+layer's radial bindings.
 
 The preview transaction digest binds the operation, private device
 association, source and target hashes, verified backup hash, active
@@ -95,6 +97,14 @@ profile/layer and normalized changes. Apply/restore reacquire the HID device
 through the stock firmware's shared transport, reject known configurators,
 regenerate that digest from a fresh read, save a fresh pre-change snapshot,
 write the complete keymap once and verify a complete read-back.
+
+The live correction restored the verified original SHA-256
+`fb3407ca0c14a44caf205c83b6949604c8776634a35757800bf3057ba518e77e`,
+then applied and fully read back the reduced target
+`960f81df54396b8000c564b8d8e2a717d010e1699151cc83170966b67d7d1285`.
+Neither operation received the firmware acknowledgement; both succeeded only
+after bounded reconnect-and-read reconciliation. No competing traffic was
+observed.
 
 ## Managed bindings
 
@@ -110,6 +120,16 @@ lighting settings.
 Do not silently manage controls the product has not qualified, such as touch
 or diagonal joystick actions. Persistent remapping must not depend on an
 unverified physical matrix.
+
+On USB firmware `0.6.2`, `v.oai.hid` carries mapped key contacts `0...12` and
+dial directions `13...14`. The native joystick stream is `kb.radial`; it does
+not require `AG15...AG18`. Cardinal angles and hysteresis are recorded in
+phase 003 and the sanitized live compatibility evidence.
+
+Per-key runtime lighting uses `v.oai.thstatus` with abbreviated fields and a
+strict `{"ok":1}` acknowledgement. The bounded probe displayed every required
+steady color across all 13 key LEDs and then cleared them. It does not call
+`v.oai.rgbcfg`, modify flash or alter the ambient underglow.
 
 Stock firmware is the baseline. Firmware installation/flashing is outside
 initial scope. Explain a required compatible firmware version and leave any

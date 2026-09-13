@@ -162,12 +162,6 @@ public struct DeviceKeymapDocument: Equatable, Sendable {
             encoderBindings: [
                 0: "KV_OAI_AG13",
                 1: "KV_OAI_AG14",
-            ],
-            joystickBindings: [
-                0.25: "KV_OAI_AG15",
-                0.50: "KV_OAI_AG16",
-                0.75: "KV_OAI_AG17",
-                0.00: "KV_OAI_AG18",
             ]
         )
     }
