@@ -193,11 +193,15 @@ extension in a private owned disposable repository, strips GitHub/Copilot token
 environment variables and cleans only marker-verified paths. The default probe
 registers no tools, hooks or permission handler.
 
-No I-07 command installs or loads `Bridge/src/extension.mjs`, and `make check`
-does not launch Copilot CLI or open HID. The shipped app resource enables the
-direct device service and authenticated CLI listener during normal launches.
-It still does not install the extension, launch Copilot or enable stateful CLI
-actions.
+No default check installs or loads `Bridge/src/extension.mjs`, launches Copilot
+CLI or opens HID. Packaging seals the reviewed observer modules into the app,
+and smoke validates that inert resource while suppressing bridge and hardware
+access. During a normal launch, separate user actions are required to confirm
+installation at the displayed user-extension path and to choose a project
+before opening a new Ghostty Copilot window. Collision, modified-file and
+project-shadow checks fail closed. No real packaged-path registration has been
+qualified, plugin-origin collision preflight remains pending, and all stateful
+CLI actions remain unavailable.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence

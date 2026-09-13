@@ -139,6 +139,15 @@ Never overwrite a pre-existing unrelated or user-modified extension. Surface
 project/user/plugin name collisions and require resolution. Install and update
 atomically, retaining a recoverable app-owned prior version.
 
+Implementation status: packaging includes only the five reviewed observer
+modules under an inert app resource. The app shows
+`~/.copilot/extensions/copilot-micro-session-bridge` before installation,
+requires confirmation, records a versioned SHA-256 receipt outside portable
+configuration, blocks unowned or modified destinations, rejects a matching
+project extension before launch, swaps owned updates atomically and retains a
+private prior copy. Plugin-origin collision preflight and verified uninstall
+remain pending.
+
 Negotiate application/bridge protocol compatibility independently of app
 version. If a changed bridge cannot activate safely in the current CLI,
 report Reload required and explain the host's supported reload path. Do not

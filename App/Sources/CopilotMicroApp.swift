@@ -1,4 +1,5 @@
 import AppKit
+import CopilotMicroBridge
 import CopilotMicroCore
 import Foundation
 
@@ -11,6 +12,7 @@ private enum StartupError: String, StartupFailure {
     case invalidArguments = "invalid_arguments"
     case invalidBundle = "invalid_bundle"
     case missingResource = "missing_resource"
+    case missingBridgeExtension = "missing_bridge_extension"
     case invalidConfiguration = "invalid_application_configuration"
     case activationPolicyRejected = "activation_policy_rejected"
 
@@ -24,6 +26,8 @@ private enum StartupError: String, StartupFailure {
             "The executable is not running from the expected Copilot Micro app bundle."
         case .missingResource:
             "The packaged application resource is missing or outside the app bundle."
+        case .missingBridgeExtension:
+            "The packaged Copilot CLI bridge extension is missing or invalid."
         case .invalidConfiguration:
             "The packaged resource does not enable the Creator Micro device assembly."
         case .activationPolicyRejected:
@@ -81,6 +85,7 @@ private struct SmokeReport: Encodable {
     let directDeviceUIValidated: Bool
     let deviceServiceSuppressedForSmoke: Bool
     let bridgeServiceSuppressedForSmoke: Bool
+    let bridgeExtensionResourceValidated: Bool
     let fittingWidth: Double
     let fittingHeight: Double
 }
@@ -156,6 +161,7 @@ struct CopilotMicroApp {
         guard resource == expectedResource else {
             throw StartupError.missingResource
         }
+        let bridgeExtensionResource = try validatedBridgeExtensionResource(in: bundle)
         let configuration: ApplicationConfiguration
         do {
             configuration = try JSONDecoder().decode(
@@ -174,7 +180,8 @@ struct CopilotMicroApp {
         )
         let controller = MenuBarController(
             hardwareEnabled: smokeMode == nil && configuration.deviceIntegrationEnabled,
-            bridgeEnabled: smokeMode == nil
+            bridgeEnabled: smokeMode == nil,
+            bridgeExtensionPackageURL: bridgeExtensionResource
         )
         if smokeMode == .hidden {
             try smokeTest(
@@ -231,6 +238,56 @@ struct CopilotMicroApp {
 
     private static func normalizedFileURL(_ url: URL) -> URL {
         url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    private static func validatedBridgeExtensionResource(in bundle: Bundle) throws -> URL {
+        do {
+            guard let resources = bundle.resourceURL else {
+                throw StartupError.missingBridgeExtension
+            }
+            let directory = resources.appendingPathComponent(
+                BridgeExtensionPackage.resourceDirectoryName,
+                isDirectory: true
+            )
+            let values = try directory.resourceValues(forKeys: [
+                .isDirectoryKey,
+                .isSymbolicLinkKey,
+            ])
+            guard values.isDirectory == true, values.isSymbolicLink != true else {
+                throw StartupError.missingBridgeExtension
+            }
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: []
+            )
+            guard
+                Set(contents.map(\.lastPathComponent)) == Set(BridgeExtensionPackage.filenames)
+            else {
+                throw StartupError.missingBridgeExtension
+            }
+            for filename in BridgeExtensionPackage.filenames {
+                let file = directory.appendingPathComponent(filename)
+                let fileValues = try file.resourceValues(forKeys: [
+                    .isRegularFileKey,
+                    .isSymbolicLinkKey,
+                    .fileSizeKey,
+                ])
+                guard
+                    fileValues.isRegularFile == true,
+                    fileValues.isSymbolicLink != true,
+                    let size = fileValues.fileSize,
+                    size <= BridgeExtensionInstaller.maximumFileBytes
+                else {
+                    throw StartupError.missingBridgeExtension
+                }
+            }
+            return directory
+        } catch let error as StartupError {
+            throw error
+        } catch {
+            throw StartupError.missingBridgeExtension
+        }
     }
 
     @MainActor
@@ -304,6 +361,7 @@ struct CopilotMicroApp {
             ("direct_device_ui", directDeviceUIValidated),
             ("device_service_suppressed", deviceServiceSuppressed),
             ("bridge_service_suppressed", bridgeServiceSuppressed),
+            ("bridge_extension_resource", true),
             ("finite_layout", size.width.isFinite && size.height.isFinite),
             ("minimum_layout", size.width >= 600 && size.height >= 380),
         ]
@@ -337,6 +395,7 @@ struct CopilotMicroApp {
             directDeviceUIValidated: directDeviceUIValidated,
             deviceServiceSuppressedForSmoke: deviceServiceSuppressed,
             bridgeServiceSuppressedForSmoke: bridgeServiceSuppressed,
+            bridgeExtensionResourceValidated: true,
             fittingWidth: size.width,
             fittingHeight: size.height
         )

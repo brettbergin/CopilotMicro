@@ -9,6 +9,17 @@ export const IDENTITY = Object.freeze({
   appName: "CopilotMicro.app",
   version: "0.1.0",
 });
+export const BRIDGE_EXTENSION = Object.freeze({
+  name: "copilot-micro-session-bridge",
+  version: "0.1.0",
+  filenames: Object.freeze([
+    "client.mjs",
+    "extension-runtime.mjs",
+    "extension.mjs",
+    "protocol.mjs",
+    "session-observer.mjs",
+  ]),
+});
 export const LIMITS = Object.freeze({
   buildMs: 180000,
   commandMs: 10000,
@@ -20,6 +31,8 @@ export const HELP = `Usage: node scripts/package-app.mjs [options]
 
 Build and ad-hoc sign the Creator Micro 2 Copilot Micro app using SwiftPM.
 No XcodeGen, asset compiler, external packages or CLI extension installation.
+The reviewed observer extension is bundled as an inert app resource; only the
+running app's explicit confirmation flow may install it.
 
   --configuration debug|release  Default: release; arm64, macOS 26, Swift 6.
   --output-dir PATH              Default: build/package. Must be a strict
@@ -221,6 +234,7 @@ export function validateSmokeReport(report, app, mode = "hidden", canonicalize =
     directDeviceUIValidated: true,
     deviceServiceSuppressedForSmoke: true,
     bridgeServiceSuppressedForSmoke: true,
+    bridgeExtensionResourceValidated: true,
   };
   for (const [key, value] of Object.entries(expected)) {
     if (report?.[key] !== value) throw new PackagingError("smoke_failed", `Smoke invariant failed: ${key}.`);
@@ -249,6 +263,23 @@ function readInput(filename) {
   return fs.readFileSync(filename);
 }
 
+function readBridgeExtension(root) {
+  const source = path.join(root, "Bridge", "src");
+  const sourceStat = inspect(source);
+  if (!sourceStat?.isDirectory() || sourceStat.isSymbolicLink()) {
+    throw new PackagingError("invalid_input", "Bridge extension source must be a regular directory.");
+  }
+  const entries = fs.readdirSync(source);
+  if (entries.length !== BRIDGE_EXTENSION.filenames.length
+      || entries.some((entry) => !BRIDGE_EXTENSION.filenames.includes(entry))) {
+    throw new PackagingError("invalid_input", "Bridge extension source contains unexpected files.");
+  }
+  return new Map(BRIDGE_EXTENSION.filenames.map((filename) => [
+    filename,
+    readInput(path.join(source, filename)),
+  ]));
+}
+
 export function packageApplication(options, {
   root = fileURLToPath(new URL("..", import.meta.url)),
   environment = process.env, platform = process.platform, run = runCommand,
@@ -273,6 +304,7 @@ export function packageApplication(options, {
   const resource = path.join(root, "App", "Resources", "foundation.json");
   const infoData = readInput(info);
   const resourceData = readInput(resource);
+  const bridgeExtension = readBridgeExtension(root);
   validateConfiguration(JSON.parse(resourceData.toString("utf8")));
   for (const directory of directories) fs.mkdirSync(directory, { recursive: true });
 
@@ -319,6 +351,18 @@ export function packageApplication(options, {
   fs.chmodSync(executable, 0o755);
   fs.writeFileSync(path.join(contents, "Info.plist"), infoData, { flag: "wx", mode: 0o644 });
   fs.writeFileSync(path.join(contents, "Resources", "foundation.json"), resourceData, { flag: "wx", mode: 0o644 });
+  const bridgeExtensionDirectory = path.join(
+    contents,
+    "Resources",
+    BRIDGE_EXTENSION.name,
+  );
+  fs.mkdirSync(bridgeExtensionDirectory);
+  for (const [filename, data] of bridgeExtension) {
+    fs.writeFileSync(path.join(bridgeExtensionDirectory, filename), data, {
+      flag: "wx",
+      mode: 0o644,
+    });
+  }
   invoke("/usr/bin/xcrun", ["strip", "-S", executable]);
   invoke("/usr/bin/plutil", ["-lint", path.join(contents, "Info.plist")]);
   invoke("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", app]);
@@ -338,7 +382,13 @@ export function packageApplication(options, {
   return {
     outcome: "packaged", appPath: app, bundleIdentifier: IDENTITY.bundleIdentifier,
     configuration: options.configuration, architecture: "arm64", minimumMacOS: "26.0",
-    developerDirectory: developerDir, signing: "ad-hoc", smoke,
+    developerDirectory: developerDir, signing: "ad-hoc",
+    bridgeExtension: {
+      name: BRIDGE_EXTENSION.name,
+      version: BRIDGE_EXTENSION.version,
+      installed: false,
+    },
+    smoke,
   };
 }
 

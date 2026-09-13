@@ -13,11 +13,15 @@ lighting. The packaged app opens the Creator Micro 2 vendor HID interface,
 validates the managed keymap, shows real key, dial and radial joystick events,
 and applies matching runtime color/brightness to the 13 key LEDs and ambient
 underglow. It does not write device flash. The owner-restricted IPC package,
-uninstalled read-only extension entry point and native session reconciler
+read-only extension entry point and native session reconciler
 implement the qualified Copilot CLI `1.0.84-5` observation subset. Normal app
 launches now start the private authenticated listener and display its state,
-but the app does not install the extension or launch Copilot yet. All stateful
-CLI actions remain disabled.
+and the signed app bundles the observer as an inert resource. An explicit
+confirmation flow can install that exact observer into the user extension
+directory with a versioned hash receipt; collisions and externally modified
+files are preserved and blocked. After installation, the user can choose a
+project and explicitly open a new token-bearing Copilot window in the one
+qualified Ghostty installation. All stateful CLI actions remain disabled.
 Validated terminal and CLI discovery plus the shared exact-target contract are
 implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
 are qualified through its documented AppleScript API, including focus from
@@ -28,8 +32,8 @@ native registry resolves either launch/registration ordering without allowing
 token reassignment. Live qualification proved exact child environment
 inheritance and cleanup. Automatic association of an already running Copilot
 CLI instance remains disabled because Ghostty exposes neither the terminal
-child PID nor TTY. The packaged app does not yet start the bridge or launch
-and claim a real Copilot CLI registration.
+child PID nor TTY. The packaged installation and launch flow has not yet been
+used to claim a real Copilot CLI registration.
 
 ## Developer setup
 
@@ -72,10 +76,11 @@ make package
 `make check` runs source checks, shared contract fixtures, isolated Node IPC
 tests, Swift package unit tests, hidden AppKit/SwiftUI and resource smoke, and a
 bounded accessory startup smoke through the production app-delegate, main-menu
-and status-item wiring. It does not display a window, open the production IPC
-listener, load a CLI extension, request permissions or touch a device, and the
-accessory process exits immediately. Hardware access is explicitly suppressed
-only for smoke validation. Its generated smoke
+and status-item wiring. It validates the inert bundled observer resource but
+does not display a window, open the production IPC listener, inspect or change
+the user extension directory, load a CLI extension, request permissions or
+touch a device, and the accessory process exits immediately. Hardware access
+is explicitly suppressed only for smoke validation. Its generated smoke
 package directory is removed by an exact-path safety check. Swift tests use the
 pinned official Swift Testing dependency; first resolution downloads public
 packages.
@@ -85,8 +90,10 @@ uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
 bar item and choose Open Manager. A normal launch immediately attempts the
 qualified non-exclusive HID connection. Close Work Louder Input and grant the
 app Input Monitoring when macOS requests it. The manager then shows live
-physical input and controls both key lighting and ambient underglow. To choose
-an output location explicitly:
+physical input and controls both key lighting and ambient underglow. The
+Diagnostics view shows the exact user extension destination before offering
+installation; installation and Open Copilot both require separate explicit
+user actions. To choose an output location explicitly:
 
 ```sh
 make package PACKAGE_OUTPUT=build/my-preview
@@ -133,10 +140,16 @@ registry. The menu and Diagnostics view report listener/connection state.
 Smoke mode suppresses all bridge filesystem and socket access.
 
 `make test-bridge` and `make test-core` exercise these paths using isolated
-mocks and temporary real sockets. Nothing under `Bridge/` is placed in
-`.github/extensions/` or loaded into a real Copilot CLI session. Extension
-installation, explicit Open Copilot and a real app-to-CLI registration remain
-pending.
+mocks and temporary real sockets. Packaging copies only the five reviewed
+`Bridge/src/` modules into the signed app resources. The app never installs
+them automatically: after confirmation it writes the exact files to
+`~/.copilot/extensions/copilot-micro-session-bridge`, records their version
+and SHA-256 hashes under application support, blocks unrelated or modified
+destinations, retains an app-owned prior version on update, and refuses a
+project that shadows the same extension name. Explicit Open Copilot creates a
+new Ghostty surface instead of typing into an existing shell. Plugin-origin
+name-collision preflight, uninstall, terminal selection UI and a real
+app-to-CLI registration remain pending.
 
 ## Disposable CLI qualification
 
@@ -245,11 +258,11 @@ The live macOS `26.6.2` result is recorded in
 [`Compatibility/ghostty-1.3.1-macos-26.6.2.json`](Compatibility/ghostty-1.3.1-macos-26.6.2.json).
 Ghostty's scripting dictionary has no terminal child PID or TTY, so existing
 manually launched CLI sessions cannot be bound safely. App-created surface
-token transport is implemented and live-qualified, but the packaged app has
-not yet started the authenticated bridge, launched Copilot through this path
-or claimed a real extension registration. Composer, picker, permission and
-question context also remain unavailable rather than being approximated with
-terminal text or global keystrokes.
+token transport is implemented and live-qualified. The packaged app now starts
+the authenticated bridge and exposes an explicit install-and-launch path, but
+that path has not yet claimed a real extension registration. Composer, picker,
+permission and question context also remain unavailable rather than being
+approximated with terminal text or global keystrokes.
 
 ## Live hardware app and qualification
 

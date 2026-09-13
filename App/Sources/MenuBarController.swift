@@ -15,11 +15,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let pauseItem = NSMenuItem()
     private let reconnectItem = NSMenuItem()
     private let restartBridgeItem = NSMenuItem()
+    private let installBridgeItem = NSMenuItem()
+    private let openCopilotItem = NSMenuItem()
 
-    init(hardwareEnabled: Bool, bridgeEnabled: Bool) {
+    init(
+        hardwareEnabled: Bool,
+        bridgeEnabled: Bool,
+        bridgeExtensionPackageURL: URL
+    ) {
         manager = ManagerWindow(
             hardwareEnabled: hardwareEnabled,
-            bridgeEnabled: bridgeEnabled
+            bridgeEnabled: bridgeEnabled,
+            bridgeExtensionPackageURL: bridgeExtensionPackageURL
         )
         super.init()
         configureMainMenu()
@@ -43,6 +50,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         restartBridgeItem.target = self
         restartBridgeItem.action = #selector(restartBridge)
         menu.addItem(restartBridgeItem)
+        installBridgeItem.target = self
+        installBridgeItem.action = #selector(reviewBridgeInstallation)
+        menu.addItem(installBridgeItem)
+        openCopilotItem.target = self
+        openCopilotItem.action = #selector(openCopilot)
+        menu.addItem(openCopilotItem)
         pauseItem.target = self
         pauseItem.action = #selector(togglePause)
         menu.addItem(pauseItem)
@@ -109,6 +122,12 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             && restartBridgeItem.action == #selector(restartBridge)
             && restartBridgeItem.target === self
             && restartBridgeItem.isEnabled == manager.bridgeStore.bridgeEnabled
+            && installBridgeItem.action == #selector(reviewBridgeInstallation)
+            && installBridgeItem.target === self
+            && installBridgeItem.isEnabled == manager.bridgeStore.installationState.canInstall
+            && openCopilotItem.action == #selector(openCopilot)
+            && openCopilotItem.target === self
+            && openCopilotItem.isEnabled == manager.bridgeStore.canOpenCopilot
             && pauseItem.action == #selector(togglePause)
             && pauseItem.target === self
             && pauseItem.isEnabled == manager.store.hardwareEnabled
@@ -209,8 +228,48 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         manager.bridgeStore.restart()
     }
 
+    @objc private func reviewBridgeInstallation() {
+        guard
+            manager.bridgeStore.installationState.canInstall,
+            let destinationURL = manager.bridgeStore.installationState.destinationURL
+        else {
+            return
+        }
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Install Copilot CLI Bridge?"
+        alert.informativeText =
+            "Copilot Micro will install its read-only observer at \(destinationURL.path). "
+            + "It registers no tools, hooks, permission handler, or stateful actions. "
+            + "Existing unrelated or modified files are never overwritten."
+        alert.addButton(withTitle: "Install")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        manager.bridgeStore.installExtension()
+    }
+
+    @objc private func openCopilot() {
+        guard let projectDirectoryURL = chooseProjectDirectory() else { return }
+        manager.bridgeStore.openCopilot(projectDirectoryURL: projectDirectoryURL)
+    }
+
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
+    }
+
+    private func chooseProjectDirectory() -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a project for Copilot CLI"
+        panel.prompt = "Open Copilot"
+        panel.message =
+            "Copilot Micro will create a new Ghostty window for this directory. "
+            + "It will not type into an existing terminal."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.resolvesAliases = true
+        return panel.runModal() == .OK ? panel.url?.standardizedFileURL : nil
     }
 
     private func refreshMenu() {
@@ -228,6 +287,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pauseItem.keyEquivalent = "p"
         reconnectItem.isEnabled = store.hardwareEnabled
         restartBridgeItem.isEnabled = manager.bridgeStore.bridgeEnabled
+        installBridgeItem.title =
+            manager.bridgeStore.installationState.canInstall
+            ? "Install CLI Bridge..."
+            : "CLI Bridge: \(manager.bridgeStore.installationState.label)"
+        installBridgeItem.isEnabled = manager.bridgeStore.installationState.canInstall
+        openCopilotItem.title = "Open Copilot in Ghostty..."
+        openCopilotItem.isEnabled = manager.bridgeStore.canOpenCopilot
         pauseItem.isEnabled = store.hardwareEnabled
         statusItem?.button?.toolTip =
             "Copilot Micro: device \(store.connectionState.label.lowercased()), bridge \(manager.bridgeStore.connectionState.label.lowercased()). \(store.lastInput)"

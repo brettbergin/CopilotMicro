@@ -8,8 +8,10 @@ source-only Node client, shared negative IPC fixtures, disposable CLI
 capability probe, uninstalled production observer source and native session
 reconciler now exist. The packaged app starts the private authenticated socket
 on normal launches, while smoke mode suppresses bridge filesystem/socket
-access. No production extension is installed. I-07 implements only the qualified read-only session
-subset and rejects stateful actions. The device boundary now includes bounded
+access. Packaging seals the five reviewed observer modules as inert resources;
+the app installs them only after explicit confirmation, with an app-owned hash
+receipt and collision checks. I-07 implements only the qualified read-only
+session subset and rejects stateful actions. The device boundary now includes bounded
 IOKit HID transport, guarded original backup/restore, a reduced 15-change
 active-layer map, normalized `v.oai.hid` keys/dial and native `kb.radial`
 joystick input, plus physically qualified steady all-key color output through
@@ -158,10 +160,16 @@ snapshots advertise no supported stateful action, and the native reconciler
 rejects any production snapshot that does.
 
 The native app now owns this server lifecycle and exposes bounded
-listener/connection status. Production source is not installed under
-`.github/extensions/`, no real CLI registration has connected through the app,
-and no live CLI qualification was rerun for this integration. The disposable
-probe's existing `1.0.84-5` evidence is the compatibility ceiling.
+listener/connection status. Production source is never installed under the
+development repository's `.github/extensions/`. The packaged app can install
+the reviewed files at
+`~/.copilot/extensions/copilot-micro-session-bridge` after confirmation, then
+open a chosen project in a new token-bearing Ghostty window. A receipt under
+application support records version and hashes; unowned, modified or
+project-shadowing paths block rather than overwrite or launch. No real CLI
+registration has connected through this packaged path, and no live CLI
+qualification was rerun for this integration. The disposable probe's existing
+`1.0.84-5` evidence is the compatibility ceiling.
 
 ### Registration
 

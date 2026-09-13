@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  IDENTITY, LIMITS, PackagingError, main, packageApplication, parseArguments,
+  BRIDGE_EXTENSION, IDENTITY, LIMITS, PackagingError, main, packageApplication, parseArguments,
   runCommand, validateConfiguration, validateMetadata, validateOutputDirectory, validateSmokeReport,
 } from "../package-app.mjs";
 import { CleanupError, removeTemporarySmokeOutput } from "../clean-smoke-output.mjs";
@@ -38,6 +38,7 @@ const report = (app, smokeMode = "hidden") => ({
   directDeviceUIValidated: true,
   deviceServiceSuppressedForSmoke: true,
   bridgeServiceSuppressedForSmoke: true,
+  bridgeExtensionResourceValidated: true,
   fittingWidth: 600, fittingHeight: 380,
 });
 
@@ -50,8 +51,15 @@ function fixture(t) {
     fs.rmSync(root, { recursive: true });
   });
   fs.mkdirSync(path.join(root, "App/Resources"), { recursive: true });
+  fs.mkdirSync(path.join(root, "Bridge/src"), { recursive: true });
   fs.copyFileSync(path.join(repository, "App/Info.plist"), path.join(root, "App/Info.plist"));
   fs.writeFileSync(path.join(root, "App/Resources/foundation.json"), JSON.stringify(configuration));
+  for (const filename of BRIDGE_EXTENSION.filenames) {
+    fs.writeFileSync(
+      path.join(root, "Bridge/src", filename),
+      `export const filename = ${JSON.stringify(filename)};\n`,
+    );
+  }
   const developer = path.join(root, "developer tools ; not a shell");
   fs.mkdirSync(developer);
   const binaryDirectory = path.join(root, ".build/arm64-apple-macosx/release");
@@ -80,6 +88,15 @@ function fixture(t) {
       if (command === "/usr/bin/codesign") {
         const app = args.at(-1);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(app, "Contents/Resources/foundation.json"))), configuration);
+        const packagedBridge = path.join(
+          app,
+          "Contents/Resources",
+          BRIDGE_EXTENSION.name,
+        );
+        assert.deepEqual(
+          fs.readdirSync(packagedBridge).sort(),
+          [...BRIDGE_EXTENSION.filenames].sort(),
+        );
         return "";
       }
       if (path.basename(command) === IDENTITY.executable) {
@@ -238,7 +255,21 @@ test("packaging builds arm64, seals resources and signs only the newly generated
   assert.equal(result.appPath, app);
   assert.equal(result.smoke.hidden.outcome, "passed");
   assert.equal(result.smoke.accessory.outcome, "passed");
+  assert.deepEqual(result.bridgeExtension, {
+    name: BRIDGE_EXTENSION.name,
+    version: BRIDGE_EXTENSION.version,
+    installed: false,
+  });
   assert.equal(fs.readFileSync(path.join(app, "Contents/MacOS/CopilotMicro"), "utf8"), "fake arm64 binary");
+  for (const filename of BRIDGE_EXTENSION.filenames) {
+    assert.equal(
+      fs.readFileSync(
+        path.join(app, "Contents/Resources", BRIDGE_EXTENSION.name, filename),
+        "utf8",
+      ),
+      `export const filename = ${JSON.stringify(filename)};\n`,
+    );
+  }
   for (const call of calls) {
     assert.equal(call.env.DEVELOPER_DIR, developer);
     for (const name of ["GH_TOKEN", "COPILOT_SDK_TOKEN", "DYLD_LIBRARY_PATH", "SDKROOT"]) {
@@ -306,6 +337,21 @@ test("resource symlinks cannot smuggle a source-path fallback into the package",
   assert.equal(calls.length, 0);
 });
 
+test("bridge resources reject missing, extra, or symlinked source files", (t) => {
+  const { root, deps, calls } = fixture(t);
+  const source = path.join(root, "Bridge/src");
+  fs.unlinkSync(path.join(source, "extension.mjs"));
+  assert.throws(() => packageApplication(parseArguments([]), deps), { code: "invalid_input" });
+  fs.writeFileSync(path.join(source, "extension.mjs"), "restored");
+  fs.writeFileSync(path.join(source, "unexpected.mjs"), "unexpected");
+  assert.throws(() => packageApplication(parseArguments([]), deps), { code: "invalid_input" });
+  fs.unlinkSync(path.join(source, "unexpected.mjs"));
+  fs.unlinkSync(path.join(source, "extension.mjs"));
+  fs.symlinkSync(path.join(source, "client.mjs"), path.join(source, "extension.mjs"));
+  assert.throws(() => packageApplication(parseArguments([]), deps), { code: "invalid_input" });
+  assert.equal(calls.length, 0);
+});
+
 test("invalid inputs, symlinked caches and escaped SwiftPM output never reach signing", (t) => {
   const { root, deps, calls } = fixture(t);
   fs.symlinkSync(path.join(root, "App"), path.join(root, ".build"));
@@ -365,6 +411,7 @@ test("smoke invariants require hidden UI and production accessory lifecycle wiri
       { managerAreasValidated: false }, { directDeviceUIValidated: false },
       { deviceServiceSuppressedForSmoke: false },
       { bridgeServiceSuppressedForSmoke: false },
+      { bridgeExtensionResourceValidated: false },
       { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
       { configuration: { ...configuration, deviceIntegrationEnabled: false } },
     ]) {

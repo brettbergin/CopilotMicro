@@ -8,12 +8,15 @@ paths, bounded schemas, atomic replacement, recovery copies, deterministic
 diagnostic rotation and explicit redacted export. The isolated local IPC layer
 now enforces private filesystem modes, same-user peer checks, bootstrap
 authentication, strict roles, bounded frames, generations, ordered sequences
-and liveness. I-07 adds an uninstalled passive production observer and native
-reconciler. Normal app launches now start the owner-restricted listener and
-smoke mode suppresses it, but the extension remains uninstalled and no real
-registration has used the production path. A separate passive probe has joined
-owned disposable CLI sessions without using that path. Stateful
-production extension authority and updater boundaries remain design
+and liveness. I-07 adds a passive production observer and native reconciler.
+Normal app launches start the owner-restricted listener and smoke mode
+suppresses it. The observer is bundled inertly and can be installed only after
+an explicit path-disclosing confirmation. Installation uses private
+app-owned staging, exact file allowlists, SHA-256 receipts, collision and
+modified-file refusal, atomic directory exchange for updates and a retained
+prior copy. No real registration has used the production path. A separate
+passive probe has joined owned disposable CLI sessions without using that path.
+Stateful production extension authority and updater boundaries remain design
 requirements. The read-only
 hardware qualifier now opens one exact candidate non-exclusively and allowlists
 only version, status and keymap reads. Its evidence excludes the serial number
@@ -141,10 +144,10 @@ routine device/session control. The CLI retains its authentication. Store
 bridge bootstrap material separately from portable configuration and exclude
 it from logs/exports.
 
-The uninstalled extension reads only the owner-restricted bridge directory,
-socket and bootstrap file. It accepts only the non-secret, strict surface
-association token from its inherited environment; it does not request or read
-GitHub/Copilot credentials or log paths, identifiers or raw SDK errors.
+The extension reads only the owner-restricted bridge directory, socket and
+bootstrap file. It accepts only the non-secret, strict surface association
+token from its inherited environment; it does not request or read GitHub/
+Copilot credentials or log paths, identifiers or raw SDK errors.
 Host events cross IPC only as allowlisted categories followed by bounded state
 reconciliation. Pending permission counts are retained without request IDs,
 tool details or command text.
@@ -152,6 +155,11 @@ tool details or command text.
 Show the extension's installed path and ownership. Project/user/plugin
 extension name collisions or unexpected shadowing are errors to diagnose,
 not reasons to silently overwrite another extension.
+
+The current installer detects user-path collisions and project shadowing for
+the chosen launch directory. Plugin-origin collision preflight remains an
+explicit gap until the qualified CLI exposes a stable external inventory
+surface; a missing or rejected registration is not reported as success.
 
 These controls reduce accidental/cross-process misuse. They do not claim
 isolation from malware already running as the same macOS user or a compromised

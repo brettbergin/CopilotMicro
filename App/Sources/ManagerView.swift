@@ -62,9 +62,16 @@ final class ManagerWindow {
     let window: NSWindow
     let hostingView: NSHostingView<ManagerView>
 
-    init(hardwareEnabled: Bool, bridgeEnabled: Bool) {
+    init(
+        hardwareEnabled: Bool,
+        bridgeEnabled: Bool,
+        bridgeExtensionPackageURL: URL
+    ) {
         store = LiveDeviceStore(hardwareEnabled: hardwareEnabled)
-        bridgeStore = LiveBridgeStore(bridgeEnabled: bridgeEnabled)
+        bridgeStore = LiveBridgeStore(
+            bridgeEnabled: bridgeEnabled,
+            bridgeExtensionPackageURL: bridgeExtensionPackageURL
+        )
         hostingView = NSHostingView(
             rootView: ManagerView(store: store, bridgeStore: bridgeStore)
         )
@@ -173,6 +180,18 @@ private struct OverviewView: View {
                     value: bridgeStore.connectionState.label,
                     detail: bridgeStore.connectionState.detail,
                     symbol: "point.3.connected.trianglepath.dotted"
+                )
+                StatusCard(
+                    title: "Bridge extension",
+                    value: bridgeStore.installationState.label,
+                    detail: bridgeStore.installationState.detail,
+                    symbol: "shippingbox"
+                )
+                StatusCard(
+                    title: "Copilot launch",
+                    value: bridgeStore.launchState.label,
+                    detail: bridgeStore.launchState.detail,
+                    symbol: "terminal"
                 )
             }
 
@@ -365,6 +384,16 @@ private struct DiagnosticsView: View {
                     VStack(spacing: 12) {
                         LabeledContent("State", value: bridgeStore.connectionState.label)
                         LabeledContent("Detail", value: bridgeStore.connectionState.detail)
+                        LabeledContent(
+                            "Extension",
+                            value: bridgeStore.installationState.label
+                        )
+                        LabeledContent(
+                            "Extension detail",
+                            value: bridgeStore.installationState.detail
+                        )
+                        LabeledContent("Open Copilot", value: bridgeStore.launchState.label)
+                        LabeledContent("Launch detail", value: bridgeStore.launchState.detail)
                     }
                     .padding(8)
                 }
@@ -379,6 +408,14 @@ private struct DiagnosticsView: View {
                     bridgeStore.restart()
                 }
                 .disabled(!bridgeStore.bridgeEnabled)
+                Button("Install CLI bridge...") {
+                    reviewBridgeInstallation()
+                }
+                .disabled(!bridgeStore.installationState.canInstall)
+                Button("Open Copilot in Ghostty...") {
+                    chooseProjectAndOpenCopilot()
+                }
+                .disabled(!bridgeStore.canOpenCopilot)
                 Button("Clear event list") {
                     store.clearEvents()
                 }
@@ -386,6 +423,46 @@ private struct DiagnosticsView: View {
 
             EventList(entries: store.eventLog)
         }
+    }
+
+    private func reviewBridgeInstallation() {
+        guard
+            bridgeStore.installationState.canInstall,
+            let destinationURL = bridgeStore.installationState.destinationURL
+        else {
+            return
+        }
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Install Copilot CLI Bridge?"
+        alert.informativeText =
+            "Install the read-only observer at \(destinationURL.path)? It registers no "
+            + "tools, hooks, permission handler, or stateful actions. Existing unrelated "
+            + "or modified files are never overwritten."
+        alert.addButton(withTitle: "Install")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        bridgeStore.installExtension()
+    }
+
+    private func chooseProjectAndOpenCopilot() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a project for Copilot CLI"
+        panel.prompt = "Open Copilot"
+        panel.message =
+            "Copilot Micro will create a new Ghostty window for this directory. "
+            + "It will not type into an existing terminal."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        panel.resolvesAliases = true
+        guard panel.runModal() == .OK, let projectDirectoryURL = panel.url else {
+            return
+        }
+        bridgeStore.openCopilot(
+            projectDirectoryURL: projectDirectoryURL.standardizedFileURL
+        )
     }
 }
 

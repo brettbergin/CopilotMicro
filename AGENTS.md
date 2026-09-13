@@ -12,15 +12,19 @@ underglow without writing device flash. Input Monitoring is required and Work
 Louder Input must remain closed. The managed keymap backup/restore tools remain
 separate and guarded. The normal packaged app starts the owner-restricted
 authenticated CLI socket and reports bridge state; smoke mode suppresses bridge
-filesystem and socket access. It does not install the production extension,
-and every stateful Copilot CLI action remains rejected until I-15. The terminal
-module validates supported installations, exact saved
+filesystem and socket access. The signed app bundles the passive observer but
+installs it only after an explicit confirmation that shows the resolved
+user-extension path. Hash receipts, collision checks and retained app-owned
+backups prevent unrelated or modified files from being overwritten. Every
+stateful Copilot CLI action remains rejected until I-15. The terminal module
+validates supported installations, exact saved
 preferences, CLI paths and typed process/window/tab/pane evidence. Its Ghostty
 1.3.1 adapter is qualified for exact stable-surface observation and focus.
 App-created Ghostty surfaces now receive a one-time association token that the
 bridge registration can return to a race-safe native registry; exact child
-environment inheritance is live-qualified. The packaged app has not yet
-installed the extension, launched Copilot or received a real registration.
+environment inheritance is live-qualified. The app can explicitly open a new
+Ghostty Copilot window after a project is selected, but this packaged path has
+not yet received a real registration.
 Do not reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
