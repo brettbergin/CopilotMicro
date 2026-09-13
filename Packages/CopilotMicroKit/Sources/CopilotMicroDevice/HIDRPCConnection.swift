@@ -4,6 +4,7 @@ import IOKit
 import IOKit.hid
 
 public enum HIDAccessMode: Equatable, Sendable {
+    case sharedConfiguration
     case exclusiveConfiguration
     case sharedReadOnly
 
@@ -11,9 +12,13 @@ public enum HIDAccessMode: Equatable, Sendable {
         switch self {
         case .exclusiveConfiguration:
             IOOptionBits(kIOHIDOptionsTypeSeizeDevice)
-        case .sharedReadOnly:
+        case .sharedConfiguration, .sharedReadOnly:
             IOOptionBits(kIOHIDOptionsTypeNone)
         }
+    }
+
+    var allowsConfiguration: Bool {
+        self == .sharedConfiguration || self == .exclusiveConfiguration
     }
 }
 
@@ -79,9 +84,9 @@ public enum HIDConnectionError: Error, LocalizedError {
         case .requestFailed(let message):
             return message
         case .timeout(let method):
-            return "Timed out waiting for the read-only \(method) response."
+            return "Timed out waiting for the \(method) response."
         case .writeFailed(let code):
-            return String(format: "Sending the read-only HID request failed with 0x%08X.", code)
+            return String(format: "Sending the HID request failed with 0x%08X.", code)
         }
     }
 }
@@ -218,13 +223,15 @@ public final class HIDRPCConnection {
     public func apply(
         _ plan: DeviceConfigurationWritePlan,
         authorization: DeviceWriteAuthorization,
+        beforeWrite: () throws -> Void = {},
         timeoutSeconds: Double = 8
     ) throws -> DeviceWriteReceipt {
-        guard accessMode == .exclusiveConfiguration else {
-            throw HIDConnectionError.configuration(.exclusiveAccessRequired)
+        guard accessMode.allowsConfiguration else {
+            throw HIDConnectionError.configuration(.configurationAccessRequired)
         }
+        let initialUnexpectedResponseCount = unexpectedResponseCount
         do {
-            return try DeviceConfigurationExecutor.apply(
+            let receipt = try DeviceConfigurationExecutor.apply(
                 plan: plan,
                 authorization: authorization,
                 associationID: descriptor.associationID,
@@ -243,7 +250,19 @@ public final class HIDRPCConnection {
                         ],
                         timeoutSeconds: timeoutSeconds
                     )
+                },
+                preWriteCheck: {
+                    guard self.unexpectedResponseCount == initialUnexpectedResponseCount else {
+                        throw DeviceConfigurationWriteError.competingTrafficDetected
+                    }
+                    try beforeWrite()
+                    guard self.unexpectedResponseCount == initialUnexpectedResponseCount else {
+                        throw DeviceConfigurationWriteError.competingTrafficDetected
+                    }
                 }
+            )
+            return receipt.recordingCompetingTrafficAfterWrite(
+                unexpectedResponseCount != initialUnexpectedResponseCount
             )
         } catch let error as DeviceConfigurationWriteError {
             throw HIDConnectionError.configuration(error)
@@ -348,9 +367,26 @@ public final class HIDRPCConnection {
             pending.response = .error(String(message.prefix(256)))
         } else {
             let result = object["result"]
+            guard Self.isPlausibleResult(result, for: pending.method) else {
+                unexpectedResponseCount += 1
+                return
+            }
             pending.response = .result(result is NSNull ? nil : result)
         }
         responses[requestID] = pending
+    }
+
+    private static func isPlausibleResult(_ result: Any?, for method: String) -> Bool {
+        switch method {
+        case "fs.read":
+            guard let object = result as? [String: Any] else { return false }
+            return object["data"] is String
+        case "fs.write":
+            guard let object = result as? [String: Any] else { return false }
+            return HIDJSONNumber.integer(object["ok"]) != nil
+        default:
+            return true
+        }
     }
 
     private func deviceWasRemoved() {

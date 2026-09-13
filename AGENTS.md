@@ -15,8 +15,9 @@ disposable Copilot CLI `1.0.84-5` sessions. Its evidence does not enable live
 app control. Native read-only Creator Micro 2 discovery and bounded HID
 JSON-RPC qualification now exist as explicit developer tools. A separate
 guarded setup tool can create and verify the durable original backup, preview
-the exact managed map, and perform one exclusively owned write only when its
-device-bound transaction digest and exact consent are supplied. The app does
+the exact managed map, and perform one guarded shared-transport write only
+when its device-bound transaction digest, closed-configurator declaration and
+exact consent are supplied. The app does
 not open HID, and no physical input or lighting integration exists. Preserve
 the emulator/live boundary while promoting only qualified behavior.
 
@@ -58,12 +59,12 @@ the repository could load it into a real session.
   verify the original keymap backup and print the exact non-mutating map plus
   its device/source/backup-bound transaction digest.
 - `make apply-device-mapping PLAN_SHA=<preview digest>
-  CONSENT=I-reviewed-the-device-mapping-and-authorize-one-write`: acquire
-  exclusive configuration access, revalidate the reviewed transaction, save a
-  pre-change snapshot, write once and verify full read-back.
+  CONSENT=I-closed-other-device-configurators-and-authorize-one-write`:
+  reject known configurators, revalidate the reviewed transaction, save a
+  fresh pre-change snapshot, write once and verify full read-back.
 - `make preview-device-restore CONSENT=I-own-this-device-read` and
   `make restore-device-mapping PLAN_SHA=<preview digest>
-  CONSENT=I-reviewed-the-original-backup-and-authorize-one-restore`: preview
+  CONSENT=I-closed-other-device-configurators-and-authorize-one-restore`: preview
   or explicitly restore the verified original backup.
 
 Use `PACKAGE_OUTPUT=build/<new-name>` for a chosen packaging destination.

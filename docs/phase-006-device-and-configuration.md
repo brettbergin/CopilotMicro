@@ -7,7 +7,7 @@ atomic user-only settings store, bounded recovery history, strict import
 preview/confirmation flow and GUI wiring are implemented. Native IOKit
 discovery, bounded HID framing/reassembly and an explicit read-only hardware
 probe are implemented. The guarded setup tool now implements durable original
-backup, bounded recovery history, exact mapping/restore previews, exclusive
+backup, bounded recovery history, exact mapping/restore previews, guarded
 one-write authorization and complete read-back verification. The original USB
 keymap has been backed up and a managed mapping preview generated; no mapping
 write has been authorized or performed. Physical input, lighting, Bluetooth
@@ -88,8 +88,9 @@ joystick layer rather than assuming all controls occupy layer zero.
 The preview transaction digest binds the operation, private device
 association, source and target hashes, verified backup hash, active
 profile/layer and normalized changes. Apply/restore reacquire the HID device
-exclusively, regenerate that digest from a fresh read, save a pre-change
-snapshot, write the complete keymap once and verify a complete read-back.
+through the stock firmware's shared transport, reject known configurators,
+regenerate that digest from a fresh read, save a fresh pre-change snapshot,
+write the complete keymap once and verify a complete read-back.
 
 ## Managed bindings
 
@@ -131,12 +132,16 @@ Before later configuration writes, keep a bounded pre-change recovery
 snapshot. Detect external changes made by Input or another configurator;
 do not overwrite them silently with a stale cached copy.
 
-Mutating transactions must seize exclusive access to the vendor HID interface.
-If another configurator prevents exclusive ownership, stop before the backup
-snapshot or write and ask the user to close it. Non-exclusive read access is
-used only for discovery and preview. macOS may require Input Monitoring for
-exclusive access; denial blocks the write rather than falling back to an
-unprotected non-exclusive transaction.
+macOS restricts `kIOHIDOptionsTypeSeizeDevice` for keyboard-class devices
+beyond ordinary Input Monitoring, so the stock-firmware configuration path
+cannot depend on exclusive access in an unprivileged menu bar app. Before a
+shared-transport write, require the user to close other configurators, block
+known Work Louder Input processes, verify the device/source/backup-bound
+transaction, save a fresh pre-change snapshot, reject unexpected response IDs,
+and verify the complete read-back. Competing traffic detected before the write
+blocks mutation; traffic first observed afterward preserves the verified
+receipt but reports an explicit contention warning. Do not add a root helper
+or silently widen privileges for this setup operation.
 
 Ordinary light changes and local action reassignment must not rewrite the
 device keymap when its event bindings are already correct.

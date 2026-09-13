@@ -8,9 +8,9 @@ public enum DeviceWriteOperation: String, Codable, Sendable {
     public var consent: String {
         switch self {
         case .managedMapping:
-            "I-reviewed-the-device-mapping-and-authorize-one-write"
+            "I-closed-other-device-configurators-and-authorize-one-write"
         case .restoreOriginal:
-            "I-reviewed-the-original-backup-and-authorize-one-restore"
+            "I-closed-other-device-configurators-and-authorize-one-restore"
         }
     }
 }
@@ -18,7 +18,8 @@ public enum DeviceWriteOperation: String, Codable, Sendable {
 public enum DeviceConfigurationWriteError: Error, Equatable, LocalizedError, Sendable {
     case authorizationMismatch
     case backupMismatch
-    case exclusiveAccessRequired
+    case competingTrafficDetected
+    case configurationAccessRequired
     case invalidAuthorization
     case noChanges
     case readBackMismatch
@@ -32,8 +33,10 @@ public enum DeviceConfigurationWriteError: Error, Equatable, LocalizedError, Sen
             "The device write authorization does not match this device and plan."
         case .backupMismatch:
             "The verified backup does not match the requested restore."
-        case .exclusiveAccessRequired:
-            "Device configuration writes require an exclusive hardware connection."
+        case .competingTrafficDetected:
+            "Another client exchanged device RPC traffic during the configuration transaction."
+        case .configurationAccessRequired:
+            "Device configuration writes require the guarded configuration connection."
         case .invalidAuthorization:
             "The exact one-write consent and plan digest are required."
         case .noChanges:
@@ -132,7 +135,7 @@ public struct DeviceConfigurationWritePlan: Equatable, Sendable {
         verifiedBackupSHA256: String
     ) -> String {
         let fields = [
-            "copilot-micro-device-transaction-v1",
+            "copilot-micro-device-transaction-v2",
             operation.rawValue,
             associationID,
             sourceSHA256,
@@ -245,6 +248,20 @@ public struct DeviceWriteReceipt: Codable, Equatable, Sendable {
     public let activeProfileID: Int
     public let activeLayerIndex: Int
     public let readBackVerified: Bool
+    public let competingTrafficObservedAfterWrite: Bool
+
+    func recordingCompetingTrafficAfterWrite(_ observed: Bool) -> DeviceWriteReceipt {
+        DeviceWriteReceipt(
+            operation: operation,
+            sourceSHA256: sourceSHA256,
+            expectedResultSHA256: expectedResultSHA256,
+            observedResultSHA256: observedResultSHA256,
+            activeProfileID: activeProfileID,
+            activeLayerIndex: activeLayerIndex,
+            readBackVerified: readBackVerified,
+            competingTrafficObservedAfterWrite: observed
+        )
+    }
 }
 
 enum DeviceConfigurationExecutor {
@@ -253,7 +270,8 @@ enum DeviceConfigurationExecutor {
         authorization: DeviceWriteAuthorization,
         associationID: String?,
         readKeymap: () throws -> Any?,
-        writeKeymap: (Data) throws -> Any?
+        writeKeymap: (Data) throws -> Any?,
+        preWriteCheck: () throws -> Void = {}
     ) throws -> DeviceWriteReceipt {
         guard
             associationID == authorization.associationID,
@@ -274,6 +292,7 @@ enum DeviceConfigurationExecutor {
         guard current.sha256 == plan.sourceSHA256 else {
             throw DeviceConfigurationWriteError.stalePlan
         }
+        try preWriteCheck()
         let response = try writeKeymap(plan.resultData)
         guard
             let object = response as? [String: Any],
@@ -298,7 +317,8 @@ enum DeviceConfigurationExecutor {
             observedResultSHA256: readBack.sha256,
             activeProfileID: readBack.activeProfileID,
             activeLayerIndex: readBack.activeLayerIndex,
-            readBackVerified: true
+            readBackVerified: true,
+            competingTrafficObservedAfterWrite: false
         )
     }
 }

@@ -1,3 +1,4 @@
+import AppKit
 import CopilotMicroDevice
 import CopilotMicroStorage
 import Foundation
@@ -13,6 +14,7 @@ private enum SetupError: Error, LocalizedError {
     case associationUnavailable
     case deviceNotFound
     case invalidArguments
+    case knownConfiguratorRunning(String)
     case multipleDevices
     case originalWouldBeManaged
 
@@ -24,6 +26,8 @@ private enum SetupError: Error, LocalizedError {
             "No qualified Creator Micro 2 candidate is currently visible."
         case .invalidArguments:
             "The setup command or required consent arguments are invalid."
+        case .knownConfiguratorRunning(let name):
+            "Quit \(name) before configuring the device, then generate a fresh preview."
         case .multipleDevices:
             "Multiple qualified Creator Micro 2 candidates are visible."
         case .originalWouldBeManaged:
@@ -93,6 +97,7 @@ private struct SetupReport: Encodable {
     let changes: [SetupChange]
     let requiredConsent: String?
     let readBackVerified: Bool
+    let competingTrafficObserved: Bool
     let mutatingOperationsPerformed: Bool
 }
 
@@ -123,8 +128,11 @@ private struct CopilotMicroDeviceSetup {
                 options.command == .apply || options.command == .restore
             let accessMode: HIDAccessMode =
                 options.command == .apply || options.command == .restore
-                ? .exclusiveConfiguration
+                ? .sharedConfiguration
                 : .sharedReadOnly
+            if options.command == .apply || options.command == .restore {
+                try rejectKnownConfigurators()
+            }
             let context = try openDevice(accessMode: accessMode)
             defer { context.connection.close() }
             let store = DeviceBackupStore(rootURL: try DeviceBackupStore.defaultRootURL())
@@ -221,11 +229,17 @@ private struct CopilotMicroDeviceSetup {
             expectedTransactionSHA256: expectedTransactionSHA256,
             consent: consent
         )
-        try await savePreChange(context: context, store: store)
-        let receipt = try context.connection.apply(plan, authorization: authorization)
+        try await saveFreshPreChange(context: context, store: store, plan: plan)
+        let receipt = try context.connection.apply(
+            plan,
+            authorization: authorization,
+            beforeWrite: rejectKnownConfigurators
+        )
         emit(
             report(
-                outcome: "applied",
+                outcome: receipt.competingTrafficObservedAfterWrite
+                    ? "applied-with-contention-warning"
+                    : "applied",
                 context: context,
                 targetSHA256: plan.resultSHA256,
                 transactionSHA256: authorization.transactionSHA256,
@@ -237,6 +251,7 @@ private struct CopilotMicroDeviceSetup {
                 activeProfileID: receipt.activeProfileID,
                 activeLayerIndex: receipt.activeLayerIndex,
                 readBackVerified: receipt.readBackVerified,
+                competingTrafficObserved: receipt.competingTrafficObservedAfterWrite,
                 mutated: true
             )
         )
@@ -299,11 +314,17 @@ private struct CopilotMicroDeviceSetup {
             expectedTransactionSHA256: expectedTransactionSHA256,
             consent: consent
         )
-        try await savePreChange(context: context, store: store)
-        let receipt = try context.connection.apply(plan, authorization: authorization)
+        try await saveFreshPreChange(context: context, store: store, plan: plan)
+        let receipt = try context.connection.apply(
+            plan,
+            authorization: authorization,
+            beforeWrite: rejectKnownConfigurators
+        )
         emit(
             report(
-                outcome: "restored",
+                outcome: receipt.competingTrafficObservedAfterWrite
+                    ? "restored-with-contention-warning"
+                    : "restored",
                 context: context,
                 targetSHA256: plan.resultSHA256,
                 transactionSHA256: authorization.transactionSHA256,
@@ -321,6 +342,7 @@ private struct CopilotMicroDeviceSetup {
                 activeProfileID: receipt.activeProfileID,
                 activeLayerIndex: receipt.activeLayerIndex,
                 readBackVerified: receipt.readBackVerified,
+                competingTrafficObserved: receipt.competingTrafficObservedAfterWrite,
                 mutated: true
             )
         )
@@ -403,14 +425,45 @@ private struct CopilotMicroDeviceSetup {
         )
     }
 
-    private static func savePreChange(
+    private static func saveFreshPreChange(
         context: DeviceContext,
-        store: DeviceBackupStore
+        store: DeviceBackupStore,
+        plan: DeviceConfigurationWritePlan
     ) async throws {
-        _ = try await store.savePreChangeSnapshot(
-            context.keymap.data,
-            metadata: backupMetadata(context: context)
+        let current = try DeviceKeymapDocument(
+            rpcResult: context.connection.read(.keymap),
+            activeLayerIndex: plan.activeLayerIndex
         )
+        guard current.sha256 == plan.sourceSHA256 else {
+            throw DeviceConfigurationWriteError.stalePlan
+        }
+        _ = try await store.savePreChangeSnapshot(
+            current.data,
+            metadata: DeviceBackupMetadata(
+                deviceAssociationID: context.associationID,
+                productID: context.descriptor.productID,
+                firmwareVersion: context.firmwareVersion,
+                keymapSchemaVersion: current.schemaVersion
+            )
+        )
+    }
+
+    private static func rejectKnownConfigurators() throws {
+        let currentProcessID = ProcessInfo.processInfo.processIdentifier
+        let running = NSWorkspace.shared.runningApplications.filter {
+            $0.processIdentifier != currentProcessID && !$0.isTerminated
+        }
+        if let application = running.first(where: {
+            let name = $0.localizedName?.lowercased() ?? ""
+            let bundleIdentifier = $0.bundleIdentifier?.lowercased() ?? ""
+            return name == "input"
+                || name == "work louder input"
+                || bundleIdentifier.contains("worklouder")
+        }) {
+            throw SetupError.knownConfiguratorRunning(
+                application.localizedName ?? "Work Louder Input"
+            )
+        }
     }
 
     private static func backupMetadata(context: DeviceContext) throws -> DeviceBackupMetadata {
@@ -435,6 +488,7 @@ private struct CopilotMicroDeviceSetup {
         activeProfileID: Int? = nil,
         activeLayerIndex: Int? = nil,
         readBackVerified: Bool,
+        competingTrafficObserved: Bool = false,
         mutated: Bool
     ) -> SetupReport {
         let keyChangeReports = keyChanges.map {
@@ -468,6 +522,7 @@ private struct CopilotMicroDeviceSetup {
             changes: keyChangeReports + peripheralChangeReports,
             requiredConsent: requiredConsent,
             readBackVerified: readBackVerified,
+            competingTrafficObserved: competingTrafficObserved,
             mutatingOperationsPerformed: mutated
         )
     }
@@ -481,6 +536,8 @@ private struct CopilotMicroDeviceSetup {
 
     private static func errorCode(_ error: Error) -> String {
         switch error {
+        case HIDConnectionError.configuration:
+            "write_guard_failed"
         case is SetupError:
             "setup_invalid"
         case is DeviceBackupError:

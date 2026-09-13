@@ -179,6 +179,7 @@ public struct HIDRequestIDAllocator: Sendable {
             let candidate = nextID
             nextID = candidate == Self.maximumRequestID ? 1 : candidate + 1
             if outstanding.insert(candidate).inserted {
+                nextID = Int.random(in: 1...Self.maximumRequestID)
                 return candidate
             }
         }

@@ -83,7 +83,7 @@ preview-device-mapping:
 
 apply-device-mapping:
 	@if [ -z "$(PLAN_SHA)" ]; then printf '%s\n' 'PLAN_SHA is required from preview-device-mapping' >&2; exit 2; fi
-	@if [ "$(CONSENT)" != "I-reviewed-the-device-mapping-and-authorize-one-write" ]; then printf '%s\n' 'CONSENT must be I-reviewed-the-device-mapping-and-authorize-one-write' >&2; exit 2; fi
+	@if [ "$(CONSENT)" != "I-closed-other-device-configurators-and-authorize-one-write" ]; then printf '%s\n' 'CONSENT must be I-closed-other-device-configurators-and-authorize-one-write' >&2; exit 2; fi
 	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup apply --plan-sha="$(PLAN_SHA)" --consent="$(CONSENT)"
 
 preview-device-restore:
@@ -92,7 +92,7 @@ preview-device-restore:
 
 restore-device-mapping:
 	@if [ -z "$(PLAN_SHA)" ]; then printf '%s\n' 'PLAN_SHA is required from preview-device-restore' >&2; exit 2; fi
-	@if [ "$(CONSENT)" != "I-reviewed-the-original-backup-and-authorize-one-restore" ]; then printf '%s\n' 'CONSENT must be I-reviewed-the-original-backup-and-authorize-one-restore' >&2; exit 2; fi
+	@if [ "$(CONSENT)" != "I-closed-other-device-configurators-and-authorize-one-restore" ]; then printf '%s\n' 'CONSENT must be I-closed-other-device-configurators-and-authorize-one-restore' >&2; exit 2; fi
 	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroDeviceSetup restore --plan-sha="$(PLAN_SHA)" --consent="$(CONSENT)"
 
 lint:

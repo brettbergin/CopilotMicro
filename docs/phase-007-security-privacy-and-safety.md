@@ -15,10 +15,12 @@ requirements. The read-only
 hardware qualifier now opens one exact candidate non-exclusively and allowlists
 only version, status and keymap reads. Its evidence excludes the serial number
 and full configuration. The separate device setup path stores a private
-integrity-checked original backup and requires exclusive HID ownership, a
-device/source/target/backup/change-bound transaction digest, exact consent and
-complete read-back before reporting a write as successful. No real mapping
-write has been performed yet.
+integrity-checked original backup and requires a closed-configurator
+declaration, known-configurator rejection, a
+device/source/target/backup/change-bound transaction digest, fresh pre-change
+snapshot, competing-response detection, exact consent and complete read-back
+before reporting a write as successful. No real mapping write has been
+performed yet.
 
 ## Trust boundaries
 

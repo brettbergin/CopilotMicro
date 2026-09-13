@@ -19,18 +19,50 @@ struct DeviceConfigurationWriteTests {
                 associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256
             ),
-            consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+            consent: "I-closed-other-device-configurators-and-authorize-one-write"
         )
         #expect(authorization.associationID == associationID)
         #expect(authorization.resultSHA256 == plan.resultSHA256)
 
+        let legacyTransactionSHA256 = DeviceKeymapDocument.digest(
+            Data(
+                [
+                    "copilot-micro-device-transaction-v1",
+                    plan.operation.rawValue,
+                    Self.associationID,
+                    plan.sourceSHA256,
+                    plan.resultSHA256,
+                    backupSHA256,
+                    String(plan.activeProfileID),
+                    String(plan.activeLayerIndex),
+                    String(plan.changeCount),
+                    plan.changeManifestSHA256,
+                ].joined(separator: "\n").utf8
+            )
+        )
+        #expect(
+            legacyTransactionSHA256
+                != plan.transactionSHA256(
+                    associationID: Self.associationID,
+                    verifiedBackupSHA256: backupSHA256
+                )
+        )
+        #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
+            _ = try DeviceWriteAuthorization.authorize(
+                plan: plan,
+                associationID: Self.associationID,
+                verifiedBackupSHA256: backupSHA256,
+                expectedTransactionSHA256: legacyTransactionSHA256,
+                consent: "I-closed-other-device-configurators-and-authorize-one-write"
+            )
+        }
         #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
             _ = try DeviceWriteAuthorization.authorize(
                 plan: plan,
                 associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256,
                 expectedTransactionSHA256: plan.sourceSHA256,
-                consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+                consent: "I-closed-other-device-configurators-and-authorize-one-write"
             )
         }
         #expect(throws: DeviceConfigurationWriteError.invalidAuthorization) {
@@ -45,6 +77,40 @@ struct DeviceConfigurationWriteTests {
                 consent: "yes"
             )
         }
+    }
+
+    @Test("Read-only HID access cannot apply configuration")
+    func configurationRequiresConfigurationAccess() {
+        #expect(!HIDAccessMode.sharedReadOnly.allowsConfiguration)
+        #expect(HIDAccessMode.sharedConfiguration.allowsConfiguration)
+        #expect(HIDAccessMode.exclusiveConfiguration.allowsConfiguration)
+    }
+
+    @Test("Competing traffic detected before write leaves the device untouched")
+    func competingTrafficBlocksWrite() throws {
+        let preview = try keymapDocument(valuePrefix: "preview")
+        let plan = try DeviceConfigurationWritePlan(
+            managedMapping: preview.planForCopilotMicro()
+        )
+        let authorization = try authorize(plan: plan, backupSHA256: preview.sha256)
+        var writeCount = 0
+
+        #expect(throws: DeviceConfigurationWriteError.competingTrafficDetected) {
+            _ = try DeviceConfigurationExecutor.apply(
+                plan: plan,
+                authorization: authorization,
+                associationID: Self.associationID,
+                readKeymap: { Self.rpcResult(preview.data) },
+                writeKeymap: { _ in
+                    writeCount += 1
+                    return ["ok": 1]
+                },
+                preWriteCheck: {
+                    throw DeviceConfigurationWriteError.competingTrafficDetected
+                }
+            )
+        }
+        #expect(writeCount == 0)
     }
 
     @Test("A reviewed transaction cannot authorize a different source or device")
@@ -71,7 +137,7 @@ struct DeviceConfigurationWriteTests {
                 associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256,
                 expectedTransactionSHA256: reviewedTransaction,
-                consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+                consent: "I-closed-other-device-configurators-and-authorize-one-write"
             )
         }
         #expect(
@@ -104,7 +170,7 @@ struct DeviceConfigurationWriteTests {
                 associationID: associationID,
                 verifiedBackupSHA256: original.sha256
             ),
-            consent: "I-reviewed-the-original-backup-and-authorize-one-restore"
+            consent: "I-closed-other-device-configurators-and-authorize-one-restore"
         )
         #expect(authorization.operation == .restoreOriginal)
         #expect(authorization.verifiedBackupSHA256 == original.sha256)
@@ -118,7 +184,7 @@ struct DeviceConfigurationWriteTests {
                     associationID: associationID,
                     verifiedBackupSHA256: String(repeating: "b", count: 64)
                 ),
-                consent: "I-reviewed-the-original-backup-and-authorize-one-restore"
+                consent: "I-closed-other-device-configurators-and-authorize-one-restore"
             )
         }
     }
@@ -198,6 +264,7 @@ struct DeviceConfigurationWriteTests {
         #expect(receipt.observedResultSHA256 == plan.resultSHA256)
         #expect(receipt.activeProfileID == plan.activeProfileID)
         #expect(receipt.activeLayerIndex == plan.activeLayerIndex)
+        #expect(!receipt.competingTrafficObservedAfterWrite)
     }
 
     private func keymapDocument(valuePrefix: String) throws -> DeviceKeymapDocument {
@@ -257,7 +324,7 @@ struct DeviceConfigurationWriteTests {
                 associationID: Self.associationID,
                 verifiedBackupSHA256: backupSHA256
             ),
-            consent: "I-reviewed-the-device-mapping-and-authorize-one-write"
+            consent: "I-closed-other-device-configurators-and-authorize-one-write"
         )
     }
 
