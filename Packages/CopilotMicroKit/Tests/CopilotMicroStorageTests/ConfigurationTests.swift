@@ -1,4 +1,5 @@
 import CopilotMicroCore
+import CopilotMicroTerminal
 import Foundation
 import Testing
 
@@ -10,7 +11,7 @@ struct ConfigurationTests {
     func portableExportExcludesPrivateLocalFields() throws {
         var configuration = StoredConfiguration()
         configuration.terminal = StoredTerminalPreferences(
-            preferredBundleIdentifier: "com.example.Terminal",
+            preferredBundleIdentifier: SupportedTerminal.terminal.bundleIdentifier,
             preferredApplicationPath: "/Applications/Terminal.app",
             cliExecutableHint: "/opt/homebrew/bin/copilot"
         )
@@ -87,7 +88,7 @@ struct ConfigurationTests {
     func importPlanPreservesMachineSpecificFields() throws {
         var current = StoredConfiguration()
         current.terminal = StoredTerminalPreferences(
-            preferredBundleIdentifier: "com.example.Terminal",
+            preferredBundleIdentifier: SupportedTerminal.terminal.bundleIdentifier,
             preferredApplicationPath: "/Applications/Terminal.app",
             cliExecutableHint: "/usr/local/bin/copilot"
         )
@@ -118,6 +119,41 @@ struct ConfigurationTests {
         changedAfterPreview.preferences.notificationsEnabled = true
         #expect(throws: ConfigurationError.staleImportPreview) {
             _ = try plan.applying(to: changedAfterPreview)
+        }
+    }
+
+    @Test("Terminal preferences require a complete supported exact selection")
+    func terminalPreferenceValidation() async throws {
+        let terminal = try TerminalPreference(
+            bundleIdentifier: SupportedTerminal.ghostty.bundleIdentifier,
+            applicationPath: "/Applications/Ghostty.app"
+        )
+        let cli = try CLIExecutablePreference(
+            executablePath: "/opt/homebrew/bin/copilot"
+        )
+        var configuration = StoredConfiguration()
+        configuration.terminal = StoredTerminalPreferences(
+            terminalPreference: terminal,
+            cliExecutablePreference: cli
+        )
+        let decoded = try ConfigurationCodec.decodeStored(
+            ConfigurationCodec.encodeStored(configuration)
+        )
+        #expect(decoded.terminal.preferredBundleIdentifier == terminal.bundleIdentifier)
+        #expect(decoded.terminal.preferredApplicationPath == terminal.applicationPath)
+        #expect(decoded.terminal.cliExecutableHint == cli.executablePath)
+
+        try await withTemporaryDirectory { root in
+            let store = LocalConfigurationStore(rootURL: root)
+            try await store.save(configuration)
+            #expect(try await store.load().terminal == configuration.terminal)
+        }
+
+        configuration.terminal = StoredTerminalPreferences(
+            preferredBundleIdentifier: terminal.bundleIdentifier
+        )
+        #expect(throws: ConfigurationError.invalidString) {
+            _ = try ConfigurationCodec.encodeStored(configuration)
         }
     }
 

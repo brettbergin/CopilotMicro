@@ -115,7 +115,7 @@ brainstorm. Technical probes below do not reopen settled product choices.
 | D-21: distribution | Internal unsigned/ad-hoc builds first; code signing/notarization later |
 | D-22: updates | Built-in updater with explicit approval; internal GitHub Releases using existing `gh` authentication where needed |
 | D-23: privacy | Local configuration/diagnostics; no telemetry; user-requested redacted export |
-| D-24: licensing | Internal-only for now; no copying unlicensed reference code/assets |
+| D-24: licensing | MIT-licensed repository; no copying unlicensed reference code/assets |
 | D-25: unsupported features | Skip unsafe/unreliable features and report each gap explicitly |
 | D-26: quit behavior | Keep managed device mapping; explicit Restore Original Mapping; no routine flash rewrite on quit |
 

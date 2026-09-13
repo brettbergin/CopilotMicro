@@ -258,6 +258,14 @@ No arbitrary global Enter, Escape or `y` event is an acceptable generic API.
 Report terminal-specific gaps separately. Success in Ghostty does not qualify
 iTerm2 or Terminal.app.
 
+I-08 now provides `CopilotMicroTerminal` as the shared native boundary. It
+validates supported application metadata and in-bundle executables, discovers
+approved Copilot CLI paths without evaluating shell startup files, preserves
+explicit exact-path preferences, and defines typed process/window/tab/pane,
+UI-context and argument-vector launch contracts. The contract does not claim
+that an adapter has established exact focus: `.applicationOnly`, wrong-surface,
+unavailable and unknown evidence remain distinct from `.exact`.
+
 ## Deterministic state and observability
 
 Implement LED projection and action preconditions as testable deterministic

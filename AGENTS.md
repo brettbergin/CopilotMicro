@@ -12,7 +12,10 @@ underglow without writing device flash. Input Monitoring is required and Work
 Louder Input must remain closed. The managed keymap backup/restore tools remain
 separate and guarded. The app does not start the CLI socket or install the
 production extension; every stateful Copilot CLI action remains rejected until
-I-15. Do not reintroduce simulated device state or widen CLI authority.
+I-15. The terminal module validates supported installations, exact saved
+preferences, CLI paths and typed process/window/tab/pane evidence, but no
+terminal-specific focus adapter is qualified yet. Do not reintroduce simulated
+device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -45,6 +48,9 @@ the repository could load it into a real session.
 - `make qualify-cli CONSENT=I-own-this-disposable-session`: explicitly launch
   the passive probe in an owned disposable project. Add `ACTIVE=1` only for
   the fixed reversible mode/effort probes.
+- `make qualify-terminals`: read supported terminal bundle metadata and
+  approved Copilot CLI paths without launching a terminal, CLI, or shell
+  startup file.
 - `make qualify-hardware CONSENT=I-own-this-device-read`: explicitly discover,
   open non-exclusively and read bounded identity/status/keymap metadata from
   one Creator Micro 2 candidate. It performs no configuration or lighting

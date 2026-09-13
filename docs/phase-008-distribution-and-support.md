@@ -17,9 +17,9 @@ Explain Gatekeeper and Input Monitoring/Accessibility/Automation onboarding,
 including possible grant churn after ad-hoc updates. Use normal macOS
 approval flows, not quarantine stripping or security-database edits.
 
-There is no open-source license grant yet. Review licenses for every
-dependency actually adopted; public visibility of micro-manager is not
-permission to copy its implementation or artwork.
+The repository is licensed under the MIT license in `LICENSE`. Review licenses
+for every dependency actually adopted; public visibility of micro-manager is
+not permission to copy its implementation or artwork.
 
 ## Compatibility policy
 

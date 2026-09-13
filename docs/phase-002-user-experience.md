@@ -59,6 +59,15 @@ CLI discovery must account for GUI applications' restricted PATH. Inspect
 approved/common installation paths and user-selected executable locations;
 do not run arbitrary shell startup files just to guess a binary.
 
+The I-08 foundation now validates and deduplicates supported bundles from
+these locations, validates manually selected bundles and approved Copilot CLI
+paths, and represents a saved terminal as an exact bundle ID plus canonical
+application path. If that path disappears, resolution reports the missing
+selection and possible alternatives without selecting one. The live macOS
+26.6.2 probe found Ghostty and Terminal.app; iTerm2 was not installed. The
+onboarding selection UI and terminal-specific focus behavior remain later
+work.
+
 ## Menu bar panel
 
 Clicking the status item opens a compact panel containing:

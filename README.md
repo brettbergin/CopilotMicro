@@ -16,6 +16,9 @@ underglow. It does not write device flash. The owner-restricted IPC package,
 uninstalled read-only extension entry point and native session reconciler
 implement the qualified Copilot CLI `1.0.84-5` observation subset, but the app
 does not start that bridge and all stateful CLI actions remain disabled.
+Validated terminal and CLI discovery plus the shared exact-target contract are
+implemented; terminal-specific focus and window/tab/pane adapters are not yet
+qualified.
 
 ## Developer setup
 
@@ -162,6 +165,36 @@ GitHub/Copilot token environment variables and removes only its marker-verified
 workspace unless explicitly kept. Normal `make check` stages/tests the probe
 but never launches Copilot CLI.
 
+## Terminal and CLI discovery
+
+Run the read-only local discovery probe with:
+
+```sh
+make qualify-terminals
+```
+
+The probe inspects supported application bundles in `/Applications`,
+`~/Applications`, `/System/Applications` and
+`/System/Applications/Utilities`, plus approved Copilot CLI executable paths.
+It reads bundle metadata and executable attributes only. It does not launch a
+terminal, run Copilot, inspect shell startup files or select a preferred
+terminal.
+
+On macOS `26.6.2` it found Ghostty `1.3.1` at
+`/Applications/Ghostty.app`, Terminal `2.15` at
+`/System/Applications/Utilities/Terminal.app`, and Copilot CLI `1.0.84-5` at
+the stable Homebrew path `/opt/homebrew/bin/copilot`. iTerm2 was not installed.
+The discovery model validates manual selections, deduplicates canonical paths
+and requires explicit reselection if a saved application or CLI path moves;
+it never silently switches to another installation with the same bundle ID.
+See
+[`Compatibility/terminal-discovery-macos-26.6.2.json`](Compatibility/terminal-discovery-macos-26.6.2.json).
+
+`CopilotMicroTerminal` also defines the shared process/window/tab/pane target,
+UI-context evidence and argument-array Open Copilot launch contracts. These
+types do not establish that any terminal-specific adapter can yet focus an
+exact surface or execute a launch plan.
+
 ## Live hardware app and qualification
 
 `CopilotMicroDevice` implements native IOKit discovery and a bounded,
@@ -304,5 +337,5 @@ The initial target is an internal team using Apple Silicon Macs on macOS Tahoe
 Ghostty, iTerm2 and Terminal.app; both USB and Bluetooth are intended for the
 Creator Micro 2 Pro. GitHub Copilot desktop-app integration is out of scope.
 
-This is an internal project. No open-source license is granted at this stage.
-Do not copy unlicensed reference code or assets into it.
+This project is available under the MIT license in [`LICENSE`](LICENSE). Do not
+copy unlicensed reference code or assets into it.

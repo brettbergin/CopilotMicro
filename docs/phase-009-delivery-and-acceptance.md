@@ -60,7 +60,7 @@ contract was not.
 | U-01 | Foreground-session extension lifecycle | Partial | `joinSession()` and `/clear` replacement/reload worked under one host; arbitrary existing-session selection was not tested | Join/replacement/selection synchronization demonstrated |
 | U-02 | Authoritative initial state and acknowledgement | Partial | Mode/task/queue/pending snapshots and activity boundaries were observable; verified user acknowledgement was not | Mode, activity, pending requests and user acknowledgement qualified; unsupported signals disclosed |
 | U-03 | Native list/switch/new/archive operations | Unavailable | No callable extension surface demonstrated these host UI operations | Real host behavior, not fabricated commands or private-file edits |
-| U-04 | Exact terminal window/tab/pane targeting | Not in scope | Deferred to terminal adapters | Separate evidence for each terminal |
+| U-04 | Exact terminal window/tab/pane targeting | Contract only | Validated installation/CLI discovery, exact preference revalidation and typed process/window/tab/pane evidence are implemented; no terminal adapter is qualified | Separate evidence for each terminal |
 | U-05 | Existing composer focus/submit | Unavailable | Completion trigger metadata was readable; no actual draft focus/submit API was demonstrated | Preserve and submit the actual draft once; no `session.send()` substitute |
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
@@ -227,9 +227,11 @@ support claims and unsafe substitutes are not.
 
 The phase-00 documentation, native foundation, direct-device GUI, local storage,
 diagnostics, authenticated IPC contract, disposable CLI qualification and I-07
-read-only observer/reconciler source are implemented. Production USB hardware
-ownership, normalized input display and matching key/ambient runtime lighting
-are physically verified. Stateful CLI control, terminal targeting, Bluetooth,
-animated lighting, sleep/wake, latency, updater and their complete acceptance
-journeys remain future work. Compatibility evidence and mock I-07 checks are
-work-package results, not a claim that the CLI controller is complete.
+read-only observer/reconciler source are implemented. I-08 validated terminal
+and CLI installation discovery and the shared exact-target contract. Production
+USB hardware ownership, normalized input display and matching key/ambient
+runtime lighting are physically verified. Stateful CLI control,
+terminal-specific targeting, Bluetooth, animated lighting, sleep/wake, latency,
+updater and their complete acceptance journeys remain future work.
+Compatibility evidence and mock I-07 checks are work-package results, not a
+claim that the CLI controller is complete.

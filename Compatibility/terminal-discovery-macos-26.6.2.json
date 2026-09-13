@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-13T06:42:25Z",
+  "outcome": "terminal-discovery-contract-qualified",
+  "source": "live read-only probe plus deterministic filesystem fixtures",
+  "macOS": {
+    "productVersion": "26.6.2",
+    "buildVersion": "25G83"
+  },
+  "terminals": [
+    {
+      "terminal": "ghostty",
+      "displayName": "Ghostty",
+      "bundleIdentifier": "com.mitchellh.ghostty",
+      "applicationPath": "/Applications/Ghostty.app",
+      "executablePath": "/Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "version": "1.3.1"
+    },
+    {
+      "terminal": "terminal",
+      "displayName": "Terminal",
+      "bundleIdentifier": "com.apple.Terminal",
+      "applicationPath": "/System/Applications/Utilities/Terminal.app",
+      "executablePath": "/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal",
+      "version": "2.15"
+    }
+  ],
+  "notInstalled": [
+    "iTerm2"
+  ],
+  "copilotCLI": {
+    "candidatePath": "/opt/homebrew/bin/copilot",
+    "resolvedPath": "/opt/homebrew/Caskroom/copilot-cli/0.0.374/copilot",
+    "reportedVersion": "1.0.84-5"
+  },
+  "contractEvidence": {
+    "commonLocationsInspected": [
+      "/Applications",
+      "~/Applications",
+      "/System/Applications",
+      "/System/Applications/Utilities"
+    ],
+    "renamedSupportedBundlesAccepted": true,
+    "canonicalPathDeduplicationTested": true,
+    "manualSelectionValidationTested": true,
+    "removedSelectionRequiresReselection": true,
+    "silentSameBundleFallbackBlocked": true,
+    "shellStartupFilesExecuted": false,
+    "argumentVectorLaunchContract": true,
+    "targetIdentityFields": [
+      "cliInstanceID",
+      "processIdentifier",
+      "windowIdentifier",
+      "tabIdentifier",
+      "paneIdentifier"
+    ]
+  },
+  "remainingGaps": [
+    "Ghostty exact window, tab, and surface targeting",
+    "iTerm2 installation and exact session targeting",
+    "Terminal.app exact window and tab targeting",
+    "terminal-specific Open Copilot launch execution",
+    "terminal context observation and focus qualification"
+  ]
+}

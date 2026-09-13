@@ -9,10 +9,12 @@ let package = Package(
         .library(name: "CopilotMicroBridge", targets: ["CopilotMicroBridge"]),
         .library(name: "CopilotMicroDevice", targets: ["CopilotMicroDevice"]),
         .library(name: "CopilotMicroStorage", targets: ["CopilotMicroStorage"]),
+        .library(name: "CopilotMicroTerminal", targets: ["CopilotMicroTerminal"]),
         .executable(name: "CopilotMicroHardwareProbe", targets: ["CopilotMicroHardwareProbe"]),
         .executable(name: "CopilotMicroDeviceSetup", targets: ["CopilotMicroDeviceSetup"]),
         .executable(name: "CopilotMicroInputObserver", targets: ["CopilotMicroInputObserver"]),
         .executable(name: "CopilotMicroLightingProbe", targets: ["CopilotMicroLightingProbe"]),
+        .executable(name: "CopilotMicroTerminalProbe", targets: ["CopilotMicroTerminalProbe"]),
     ],
     dependencies: [
         // Keep the verified CLT-compatible runtime pinned and confined to the test target.
@@ -26,6 +28,13 @@ let package = Package(
         ),
         .target(
             name: "CopilotMicroStorage",
+            dependencies: [
+                "CopilotMicroCore",
+                "CopilotMicroTerminal",
+            ]
+        ),
+        .target(
+            name: "CopilotMicroTerminal",
             dependencies: ["CopilotMicroCore"]
         ),
         .target(
@@ -55,6 +64,10 @@ let package = Package(
                 "CopilotMicroDevice",
             ]
         ),
+        .executableTarget(
+            name: "CopilotMicroTerminalProbe",
+            dependencies: ["CopilotMicroTerminal"]
+        ),
         .testTarget(
             name: "CopilotMicroCoreTests",
             dependencies: [
@@ -73,6 +86,13 @@ let package = Package(
             name: "CopilotMicroStorageTests",
             dependencies: [
                 "CopilotMicroStorage",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
+        ),
+        .testTarget(
+            name: "CopilotMicroTerminalTests",
+            dependencies: [
+                "CopilotMicroTerminal",
                 .product(name: "Testing", package: "swift-testing"),
             ]
         ),

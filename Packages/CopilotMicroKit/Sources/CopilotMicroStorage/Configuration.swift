@@ -1,4 +1,5 @@
 import CopilotMicroCore
+import CopilotMicroTerminal
 import Foundation
 
 public struct StoredLightingPreferences: Codable, Equatable, Sendable {
@@ -32,6 +33,15 @@ public struct StoredTerminalPreferences: Codable, Equatable, Sendable {
         self.preferredBundleIdentifier = preferredBundleIdentifier
         self.preferredApplicationPath = preferredApplicationPath
         self.cliExecutableHint = cliExecutableHint
+    }
+
+    public init(
+        terminalPreference: TerminalPreference?,
+        cliExecutablePreference: CLIExecutablePreference?
+    ) {
+        preferredBundleIdentifier = terminalPreference?.bundleIdentifier
+        preferredApplicationPath = terminalPreference?.applicationPath
+        cliExecutableHint = cliExecutablePreference?.executablePath
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -464,11 +474,38 @@ public enum ConfigurationCodec {
     }
 
     private static func validateTerminal(_ terminal: StoredTerminalPreferences) throws {
+        guard
+            (terminal.preferredBundleIdentifier == nil)
+                == (terminal.preferredApplicationPath == nil)
+        else {
+            throw ConfigurationError.invalidString
+        }
         guard validOptionalBundleIdentifier(terminal.preferredBundleIdentifier),
             validOptionalPath(terminal.preferredApplicationPath),
             validOptionalPath(terminal.cliExecutableHint)
         else {
             throw ConfigurationError.invalidString
+        }
+        if let bundleIdentifier = terminal.preferredBundleIdentifier {
+            guard SupportedTerminal(bundleIdentifier: bundleIdentifier) != nil else {
+                throw ConfigurationError.invalidString
+            }
+        }
+        if let applicationPath = terminal.preferredApplicationPath {
+            guard
+                applicationPath.hasPrefix("/"),
+                URL(fileURLWithPath: applicationPath).pathExtension.lowercased() == "app"
+            else {
+                throw ConfigurationError.invalidString
+            }
+        }
+        if let executablePath = terminal.cliExecutableHint {
+            guard
+                executablePath.hasPrefix("/"),
+                URL(fileURLWithPath: executablePath).lastPathComponent == "copilot"
+            else {
+                throw ConfigurationError.invalidString
+            }
         }
     }
 

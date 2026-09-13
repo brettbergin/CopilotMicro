@@ -32,6 +32,34 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "preferredBundleIdentifier": {
+              "type": "null"
+            },
+            "preferredApplicationPath": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "preferredBundleIdentifier": {
+              "enum": [
+                "com.mitchellh.ghostty",
+                "com.googlecode.iterm2",
+                "com.apple.Terminal"
+              ]
+            },
+            "preferredApplicationPath": {
+              "type": "string",
+              "maxLength": 4096,
+              "pattern": "^/.+\\.app/?$"
+            }
+          }
+        }
+      ],
       "required": [
         "preferredBundleIdentifier",
         "preferredApplicationPath",
@@ -57,7 +85,8 @@
             "string",
             "null"
           ],
-          "maxLength": 4096
+          "maxLength": 4096,
+          "pattern": "^/.*/copilot$"
         }
       }
     },
