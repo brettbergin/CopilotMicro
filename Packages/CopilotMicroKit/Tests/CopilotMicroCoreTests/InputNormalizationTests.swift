@@ -12,6 +12,8 @@ struct InputNormalizationTests {
         #expect(PhysicalLayout.contactToControl.count == 13)
         #expect(PhysicalLayout.contactToControl[try contact(1)] == .sessions)
         #expect(PhysicalLayout.contactToControl[try contact(0)] == .newSession)
+        #expect(layout.first(where: { $0.id == .newSession })?.visualPosition == "top-left")
+        #expect(layout.first(where: { $0.id == .sessions })?.visualPosition == "top-right")
     }
 
     @Test("The two wide-key contacts produce one press and one release")

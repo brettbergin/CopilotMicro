@@ -8,19 +8,14 @@ session management, model/effort, voice, input, cancellation and permission
 controls. A graphical manager provides onboarding, remapping, diagnostics and
 local configuration.
 
-**Status:** interactive GUI emulator plus developer-qualified USB hardware
-slice. The menu panel, seven-area manager,
-original pad editor, session/control simulator, lighting preview, app packaging,
-versioned contracts, deterministic reducers, atomic local settings, previewed
-portable import/export and bounded redacted diagnostics exist. Live product
-hardware/CLI control remains unavailable and clearly disabled. The
-owner-restricted IPC package, uninstalled read-only extension entry point and
-native session reconciler implement the qualified Copilot CLI `1.0.84-5`
-observation subset while rejecting every stateful action. Developer tools can
-discover an explicitly owned Creator Micro 2, preserve and restore its
-original keymap, apply the reduced managed map, observe normalized physical
-input and run a bounded key-lighting sequence. The app starts neither live
-service, and no production extension is installed.
+**Status:** direct-device macOS GUI with physically verified USB input and
+lighting. The packaged app opens the Creator Micro 2 vendor HID interface,
+validates the managed keymap, shows real key, dial and radial joystick events,
+and applies matching runtime color/brightness to the 13 key LEDs and ambient
+underglow. It does not write device flash. The owner-restricted IPC package,
+uninstalled read-only extension entry point and native session reconciler
+implement the qualified Copilot CLI `1.0.84-5` observation subset, but the app
+does not start that bridge and all stateful CLI actions remain disabled.
 
 ## Developer setup
 
@@ -64,19 +59,20 @@ make package
 tests, Swift package unit tests, hidden AppKit/SwiftUI and resource smoke, and a
 bounded accessory startup smoke through the production app-delegate, main-menu
 and status-item wiring. It does not display a window, open the production IPC
-listener, load a CLI extension, request permissions or touch a device/CLI
-session, and the accessory process exits immediately. Its generated smoke
+listener, load a CLI extension, request permissions or touch a device, and the
+accessory process exits immediately. Hardware access is explicitly suppressed
+only for smoke validation. Its generated smoke
 package directory is removed by an exact-path safety check. Swift tests use the
 pinned official Swift Testing dependency; first resolution downloads public
 packages.
 
 `make package` prints the signed app's absolute `appPath` as JSON. Each call
 uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
-bar item and choose Open Manager. In the manager, choose demo scenarios,
-edit local key assignments, use the separate input simulator and inspect the
-all-key lighting projection. These interactions never open HID, attach to a
-CLI, install an extension or request macOS permissions. To choose an output
-location explicitly:
+bar item and choose Open Manager. A normal launch immediately attempts the
+qualified non-exclusive HID connection. Close Work Louder Input and grant the
+app Input Monitoring when macOS requests it. The manager then shows live
+physical input and controls both key lighting and ambient underglow. To choose
+an output location explicitly:
 
 ```sh
 make package PACKAGE_OUTPUT=build/my-preview
@@ -84,25 +80,17 @@ make package PACKAGE_OUTPUT=build/my-preview
 
 The output must be a new app location under `build/`; existing bundles are
 never overwritten or removed. Ad-hoc signing is not notarization. No Apple
-account is required for these local builds.
+account is required for these local builds. Because ad-hoc signatures are tied
+to the built binary's code hash, replacing a development build requires a fresh
+Input Monitoring grant. Install a build at a stable path before granting it.
 
 ## Local data
 
-Ordinary app launches store versioned settings under
-`~/Library/Application Support/Copilot Micro/`. Configuration writes are
-atomic and user-only. Malformed or legacy input is preserved in bounded
-recovery copies before the user explicitly installs safe defaults or a
-migration replaces it.
-
-Portable JSON includes all twelve control bindings, brightness, reduced motion
-and the notification preference. Import validates the complete allowlist,
-shows every change and requires confirmation. Exports omit terminal and CLI
-paths, recent directories, backups, live identifiers and diagnostics.
-
-Structured diagnostics use bounded categories and redacted messages, rotate at
-three 5 MiB segments and never upload automatically. Export and clearing are
-explicit manager actions; clearing diagnostics does not remove configuration
-recovery material. Packaging smoke disables local storage entirely.
+The direct-device manager keeps its current connection and input event list in
+memory only. It does not upload telemetry or store raw HID reports. The
+versioned configuration and bounded diagnostic libraries remain available for
+later onboarding and CLI integration, but they are not exposed as pretend
+device state in the current GUI.
 
 ## Local IPC foundation
 
@@ -126,8 +114,8 @@ frame contract. Replacement keeps host, session and generation identities
 separate; stale generations, out-of-order state and liveness expiry invalidate
 the binding. `make test-bridge` and `make test-core` exercise these paths using
 isolated mocks. Nothing under `Bridge/` is placed in `.github/extensions/` or
-loaded into a real Copilot CLI session. The emulator app assembly still starts
-no production listener or live service.
+loaded into a real Copilot CLI session. The direct-device app still starts no
+production CLI listener or session service.
 
 ## Disposable CLI qualification
 
@@ -174,7 +162,7 @@ GitHub/Copilot token environment variables and removes only its marker-verified
 workspace unless explicitly kept. Normal `make check` stages/tests the probe
 but never launches Copilot CLI.
 
-## Read-only hardware qualification
+## Live hardware app and qualification
 
 `CopilotMicroDevice` implements native IOKit discovery and a bounded,
 byte-oriented 64-byte HID JSON-RPC transport. Candidate selection requires
@@ -200,10 +188,10 @@ the active layer is the first layer. Follow-on USB qualification has also
 verified reversible keymap writes, physical input and key lighting. Bluetooth
 and exact Pro marketing identity remain unqualified.
 
-If opening the vendor collection is denied, grant Input Monitoring to the
-terminal running the probe, wake the device and retry. `make check` never opens
-HID. The packaged GUI remains emulator-only until the later live service
-assembly is complete.
+If opening the vendor collection is denied, grant Input Monitoring to the app
+or terminal running the probe, wake the device and retry. `make check` never
+opens HID. A normal packaged app launch now opens the qualified USB device,
+checks firmware/status/keymap state and displays normalized input in the GUI.
 
 ## Reversible device mapping preview
 
@@ -275,10 +263,11 @@ make qualify-device-lighting \
 
 On the qualified USB tuple, all 13 key LEDs physically displayed white, blue,
 purple, amber, green, red and off at 35% brightness. Every command returned
-`{"ok":1}`. The probe does not modify device flash or the bottom ambient
-underglow, matching the product requirement to preserve that user setting.
-Host-driven blink/pulse timing, Bluetooth, sleep/wake and app-owned live
-device-service wiring remain unqualified. Sanitized evidence is recorded in
+`{"ok":1}`. The original probe left the ambient zone unchanged. The production
+GUI now writes the key and ambient zones together, and physical testing
+confirmed that both match the selected color. Neither path writes device
+flash. Host-driven blink/pulse timing, Bluetooth, sleep/wake and latency remain
+unqualified. Sanitized probe evidence is recorded in
 [`Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json`](Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json).
 
 ## Production session observation source
@@ -307,9 +296,8 @@ The ten `docs/phase-00*.md` documents record the product decisions from the
 contracts. Their numbering is a reading order, not a claim that any engineering
 phase has shipped.
 
-Implementation begins with the native GUI/emulator after developer setup,
-then adds qualified live integrations. Simulation is never presented as
-successful CLI or hardware control.
+The current app is a live hardware manager. CLI integration is added only
+after its targeting and action contracts are qualified.
 
 The initial target is an internal team using Apple Silicon Macs on macOS Tahoe
 26.x, with 26.6.2 as the first qualification baseline. Intended terminals are

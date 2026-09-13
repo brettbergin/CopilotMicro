@@ -98,6 +98,7 @@ public final class HIDRPCConnection {
     public private(set) var notificationCount = 0
     public var onNotification: ((String, Any?) -> Void)?
     public var onRawReport: ((UInt32, [UInt8]) -> Void)?
+    public var onRemoval: (() -> Void)?
 
     private enum Response {
         case error(String)
@@ -199,7 +200,7 @@ public final class HIDRPCConnection {
         IOHIDDeviceScheduleWithRunLoop(
             device,
             CFRunLoopGetMain(),
-            CFRunLoopMode.defaultMode.rawValue
+            CFRunLoopMode.commonModes.rawValue
         )
     }
 
@@ -219,7 +220,7 @@ public final class HIDRPCConnection {
         IOHIDDeviceUnscheduleFromRunLoop(
             device,
             CFRunLoopGetMain(),
-            CFRunLoopMode.defaultMode.rawValue
+            CFRunLoopMode.commonModes.rawValue
         )
         IOHIDDeviceClose(device, accessMode.options)
         IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -447,6 +448,7 @@ public final class HIDRPCConnection {
     private func deviceWasRemoved() {
         removed = true
         failOutstanding(HIDConnectionError.deviceRemoved.localizedDescription)
+        onRemoval?()
     }
 
     private func failOutstanding(_ message: String) {

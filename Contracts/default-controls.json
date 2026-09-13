@@ -4,7 +4,7 @@
   "controls": [
     {
       "id": "key.sessions",
-      "visualPosition": "top-left",
+      "visualPosition": "top-right",
       "matrixContacts": [
         1
       ],
@@ -13,7 +13,7 @@
     },
     {
       "id": "key.new",
-      "visualPosition": "top-right",
+      "visualPosition": "top-left",
       "matrixContacts": [
         0
       ],

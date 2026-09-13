@@ -1,5 +1,5 @@
 {
   "schemaVersion": 1,
-  "mode": "emulator",
-  "liveIntegrationsEnabled": false
+  "mode": "device",
+  "deviceIntegrationEnabled": true
 }

@@ -12,8 +12,11 @@ subset and rejects stateful actions. The device boundary now includes bounded
 IOKit HID transport, guarded original backup/restore, a reduced 15-change
 active-layer map, normalized `v.oai.hid` keys/dial and native `kb.radial`
 joystick input, plus physically qualified steady all-key color output through
-`v.oai.thstatus`. No app-owned device service, terminal targeting or physical
-input routing to Copilot CLI is enabled.
+`v.oai.thstatus`. The app-owned USB device service now connects at normal
+launch, validates the managed map, projects normalized physical input into the
+GUI and applies matching key/ambient runtime lighting through
+`v.oai.thstatus` and `v.oai.rgbcfg`. Terminal targeting and physical input
+routing to Copilot CLI remain disabled.
 
 ## Component boundaries
 

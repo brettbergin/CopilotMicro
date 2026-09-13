@@ -3,13 +3,14 @@
 Scope: F-02, F-03, F-05, F-08 through F-17.
 Status: agreed UX; exact wire behavior requires hardware qualification.
 
-Implementation status: `CopilotMicroCore` contains the deterministic
-physical-contact normalization, session reducer and all-key lighting
-projection used by the emulator. USB firmware `0.6.2` now has physical evidence
-for all key contacts, both dial directions, native radial joystick cardinals
-and steady all-key white/blue/purple/amber/green/red/off output. The production
-app does not yet own the device service, and host-driven blink/pulse,
-Bluetooth, sleep/wake and event-to-light latency remain unqualified.
+Implementation status: `CopilotMicroCore` contains deterministic
+physical-contact normalization, session reduction and lighting projection.
+USB firmware `0.6.2` has physical evidence for all key contacts, both dial
+directions, native radial joystick cardinals and steady
+white/blue/purple/amber/green/red/off output. The production app owns the USB
+device service and renders real controls while driving matching key/ambient
+colors. Host-driven blink/pulse, Bluetooth, sleep/wake and event-to-light
+latency remain unqualified.
 
 ## Physical model
 
@@ -24,8 +25,8 @@ promise for every firmware/hardware revision.
 
 | Visual position | Logical control | Reference matrix ID | Default action |
 |---|---|---|---|
-| Top left | `key.sessions` | 1 | Open native Sessions list |
-| Top right | `key.new` | 0 | New session/project chooser |
+| Top left | `key.new` | 0 | New session/project chooser |
+| Top right | `key.sessions` | 1 | Open native Sessions list |
 | Second row, first | `key.previous` | 2 | Previous session |
 | Second row, second | `key.next` | 3 | Next session |
 | Second row, third | `key.archive` | 4 | Archive selected session |
@@ -147,17 +148,18 @@ Brightness is user-adjustable. Clamp to the qualified device range. Setting
 brightness to zero does not disable textual status. Avoid maximum brightness
 as an unexplained default.
 
-No additional underglow behavior is required. Do not silently repurpose or
-overwrite the user's underglow settings. If safe key lighting requires taking
-over a lighting zone, disclose that exact change in setup and preserve its
-original settings.
+The ambient underglow is part of the selected-session status display and must
+match the key LEDs in color, brightness and effect. The app owns both runtime
+lighting zones while connected, discloses that behavior in the manager and
+does not write lighting state to device flash.
 
 The first physical lighting sequence used `v.oai.thstatus` at 35% brightness.
 All 13 key LEDs visibly followed white, blue, purple, amber, green, red and
 off. The bottom ambient LEDs deliberately did not follow because the probe
-never called the zone API. This confirms that per-key status lighting can
-preserve the underglow contract. Firmware acknowledgement alone is not the
-physical evidence; the observed sequence is recorded separately.
+never called the zone API. The production app subsequently used
+`v.oai.rgbcfg` and `v.oai.thstatus` together; physical testing confirmed that
+the key LEDs and bottom ambient underglow match. Firmware acknowledgement alone
+is not the physical evidence; the observed behavior is recorded separately.
 
 A crash, sleeping host or lost device transport may prevent the final off
 write and leave the firmware's previous light visible. Qualify any firmware

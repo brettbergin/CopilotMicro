@@ -3,13 +3,10 @@
 Scope: F-01, F-04 through F-21, F-24 through F-26.
 Detailed action semantics live in [phase 004](phase-004-session-lifecycle.md).
 
-Implementation status: the compact menu and seven-area manager now provide an
-interactive, explicitly labeled emulator with editable pad assignments,
-separate physical-input controls, scenario-driven lighting and bounded demo
-diagnostics. Its configuration area now exposes real local persistence,
-previewed portable import/export, recovery status and redacted diagnostic
-export. Live terminal, CLI, HID, update and permission features remain visible
-but unavailable.
+Implementation status: the compact menu and four-area manager now connect
+directly to one qualified Creator Micro 2 over USB. The GUI displays real key,
+dial and radial joystick events and controls matching key/ambient runtime
+lighting. Terminal and stateful CLI features remain explicitly unavailable.
 
 ## Interaction principles
 
@@ -185,6 +182,6 @@ Error, Disconnected and Unsupported. A red light alone is not sufficient
 diagnosis. Respect reduced-motion preferences with a clear, documented
 non-animated alternative; do not disable the meaning of attention states.
 
-Onboarding and core manager flows must be usable without the physical device
-through an explicitly labeled emulator. Emulator state never masquerades as
-connected hardware or a verified production CLI session.
+Onboarding and core manager flows must explain disconnected and permission
+states without inventing device events. The GUI must never present synthetic
+hardware as connected or as a verified production CLI session.

@@ -65,8 +65,8 @@ public struct PhysicalControlDescriptor: Equatable, Sendable {
 
 public enum PhysicalLayout {
     public static let creatorMicro2Pro: [PhysicalControlDescriptor] = [
-        descriptor(.sessions, "top-left", [1], .openSessionList),
-        descriptor(.newSession, "top-right", [0], .createSession),
+        descriptor(.sessions, "top-right", [1], .openSessionList),
+        descriptor(.newSession, "top-left", [0], .createSession),
         descriptor(.previous, "second-row-first", [2], .previousSession),
         descriptor(.next, "second-row-second", [3], .nextSession),
         descriptor(.archive, "second-row-third", [4], .archiveSession),

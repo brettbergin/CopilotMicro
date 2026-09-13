@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-09-13T03:50:05Z",
-  "outcome": "input-and-key-lighting-qualified",
-  "source": "operator-guided bounded developer probes",
+  "outcome": "production-app-input-and-lighting-qualified",
+  "source": "operator-guided developer probes and production app",
   "product": "Creator Micro 2",
   "productID": "0x8298",
   "firmwareVersion": "0.6.2",
@@ -61,13 +61,15 @@
     "radialActivationDistance": 0.5,
     "radialReleaseDistance": 0.2,
     "radialCardinalHalfWidth": 0.0625,
+    "nativeRadialSupersedesHIDFallback": true,
+    "managerDirectionalHighlightVerified": true,
     "wideKeyCenterPressCoalesced": true,
     "heldKeyRepeated": false,
     "invalidNotificationCount": 0,
     "unexpectedResponseCount": 0
   },
   "lighting": {
-    "method": "v.oai.thstatus",
+    "method": "v.oai.thstatus + v.oai.rgbcfg",
     "visibleKeyLEDCount": 13,
     "brightness": 0.35,
     "colorsPhysicallyObserved": [
@@ -80,7 +82,9 @@
       "off"
     ],
     "allCommandsAcknowledged": true,
-    "ambientUnderglowModified": false,
+    "ambientUnderglowModified": true,
+    "ambientUnderglowMatchedKeys": true,
+    "productionAppPhysicallyVerified": true,
     "flashWritePerformed": false,
     "hostDrivenBlinkAndPulsePhysicallyQualified": false
   },
@@ -88,7 +92,7 @@
     "Bluetooth",
     "sleep and wake recovery",
     "host-driven blink and pulse timing",
-    "production app device-service wiring",
-    "event-to-light latency"
+    "event-to-light latency",
+    "stable release signing identity for durable Input Monitoring grants"
   ]
 }

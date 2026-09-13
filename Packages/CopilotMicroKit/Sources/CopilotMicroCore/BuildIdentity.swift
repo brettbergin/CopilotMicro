@@ -4,26 +4,26 @@ public enum BuildIdentity {
     public static let version = "0.1.0"
 }
 
-public struct EmulatorConfiguration: Codable, Equatable, Sendable {
+public struct ApplicationConfiguration: Codable, Equatable, Sendable {
     public enum Mode: String, Codable, Sendable {
-        case emulator
+        case device
     }
 
     public enum ValidationError: Error, Equatable {
         case unsupportedSchema
-        case liveIntegrationsForbidden
+        case deviceIntegrationRequired
     }
 
     public let schemaVersion: Int
     public let mode: Mode
-    public let liveIntegrationsEnabled: Bool
+    public let deviceIntegrationEnabled: Bool
 
     public func validate() throws {
         guard schemaVersion == 1 else {
             throw ValidationError.unsupportedSchema
         }
-        guard !liveIntegrationsEnabled else {
-            throw ValidationError.liveIntegrationsForbidden
+        guard deviceIntegrationEnabled else {
+            throw ValidationError.deviceIntegrationRequired
         }
     }
 }

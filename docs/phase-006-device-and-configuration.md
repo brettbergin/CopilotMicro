@@ -131,6 +131,10 @@ strict `{"ok":1}` acknowledgement. The bounded probe displayed every required
 steady color across all 13 key LEDs and then cleared them. It does not call
 `v.oai.rgbcfg`, modify flash or alter the ambient underglow.
 
+The production app uses `v.oai.rgbcfg` and `v.oai.thstatus` together to keep
+the key LEDs and ambient underglow synchronized. This runtime lighting path was
+physically verified on USB firmware `0.6.2` and does not call `fs.write`.
+
 Stock firmware is the baseline. Firmware installation/flashing is outside
 initial scope. Explain a required compatible firmware version and leave any
 vendor update to an explicit separate user operation.
@@ -286,6 +290,6 @@ Bluetooth sleep/pairing, switching transport, wide-key duplicate events, fast
 dial input, joystick neutral transitions, non-ASCII/large configurations,
 missing grants, concurrent clients and interrupted writes.
 
-The emulator must reproduce important negative cases, including ACK-only
-lighting success and unbound controls. It does not establish physical HID,
+Automated fakes must reproduce important negative cases, including ACK-only
+lighting success and unbound controls. They do not establish physical HID,
 Bluetooth or LED correctness.

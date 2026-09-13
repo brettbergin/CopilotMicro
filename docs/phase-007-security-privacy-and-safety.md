@@ -26,7 +26,9 @@ target was applied and fully read back. Both missing acknowledgements were
 resolved through bounded reconnect-and-read reconciliation. Physical input
 observation records only bounded control identifiers and numeric radial
 samples. The lighting probe changes runtime key LEDs only, never device flash
-or ambient underglow, and clears owned key lighting on normal exit.
+or ambient underglow. The production app now takes explicit runtime ownership
+of both key and ambient zones so they match; it performs no flash write and
+attempts to clear both zones when pausing or quitting.
 
 ## Trust boundaries
 

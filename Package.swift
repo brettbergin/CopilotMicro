@@ -15,7 +15,7 @@ let package = Package(
             name: "CopilotMicro",
             dependencies: [
                 .product(name: "CopilotMicroCore", package: "CopilotMicroKit"),
-                .product(name: "CopilotMicroStorage", package: "CopilotMicroKit"),
+                .product(name: "CopilotMicroDevice", package: "CopilotMicroKit"),
             ],
             path: "App/Sources"
         )

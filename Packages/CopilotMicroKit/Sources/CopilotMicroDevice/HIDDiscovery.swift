@@ -31,6 +31,11 @@ public enum HIDDeviceDiscovery {
         }
     }
 
+    @discardableResult
+    public static func requestListenAccess() -> Bool {
+        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+    }
+
     public static func discover() throws -> [HIDDeviceDescriptor] {
         let manager = IOHIDManagerCreate(
             kCFAllocatorDefault,

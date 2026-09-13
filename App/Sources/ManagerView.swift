@@ -1,11 +1,10 @@
 import AppKit
 import CopilotMicroCore
-import CopilotMicroStorage
 import SwiftUI
 
 @MainActor
 struct ManagerView: View {
-    @ObservedObject var store: EmulatorStore
+    @ObservedObject var store: LiveDeviceStore
 
     var body: some View {
         NavigationSplitView {
@@ -15,10 +14,10 @@ struct ManagerView: View {
                     .accessibilityLabel(area.title)
             }
             .navigationTitle(BuildIdentity.productName)
-            .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 260)
         } detail: {
             VStack(spacing: 0) {
-                DemoBanner(store: store)
+                DeviceBanner(store: store)
                 Divider()
                 ScrollView {
                     detail
@@ -30,18 +29,14 @@ struct ManagerView: View {
             .navigationTitle(store.selectedArea.title)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Picker("Demo scenario", selection: scenarioBinding) {
-                        ForEach(EmulatorScenario.allCases) { scenario in
-                            Text(scenario.title).tag(scenario)
-                        }
+                    Button("Reconnect") {
+                        store.reconnect()
                     }
-                    .labelsHidden()
-                    .frame(width: 210)
-                    .accessibilityLabel("Demo scenario")
+                    .disabled(!store.hardwareEnabled)
                 }
             }
         }
-        .frame(minWidth: 980, minHeight: 650)
+        .frame(minWidth: 940, minHeight: 620)
     }
 
     @ViewBuilder
@@ -53,51 +48,31 @@ struct ManagerView: View {
             ControlsView(store: store)
         case .lighting:
             LightingView(store: store)
-        case .connection:
-            ConnectionSettingsView(store: store)
-        case .configuration:
-            ConfigurationView(store: store)
-        case .updates:
-            UpdatesView(store: store)
         case .diagnostics:
             DiagnosticsView(store: store)
         }
-    }
-
-    private var scenarioBinding: Binding<EmulatorScenario> {
-        Binding(get: { store.scenario }, set: { store.selectScenario($0) })
     }
 }
 
 @MainActor
 final class ManagerWindow {
-    let store: EmulatorStore
+    let store: LiveDeviceStore
     let window: NSWindow
     let hostingView: NSHostingView<ManagerView>
 
-    init(
-        configuration: EmulatorConfiguration,
-        localConfigurationStore: LocalConfigurationStore? = nil,
-        diagnosticStore: DiagnosticStore? = nil,
-        initialStorageError: String? = nil
-    ) {
-        store = EmulatorStore(
-            configuration: configuration,
-            localConfigurationStore: localConfigurationStore,
-            diagnosticStore: diagnosticStore,
-            initialStorageError: initialStorageError
-        )
+    init(hardwareEnabled: Bool) {
+        store = LiveDeviceStore(hardwareEnabled: hardwareEnabled)
         hostingView = NSHostingView(rootView: ManagerView(store: store))
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1_060, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: 1_020, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.isReleasedWhenClosed = false
-        window.title = "Copilot Micro - Demo"
+        window.title = "Copilot Micro"
         window.contentView = hostingView
-        window.contentMinSize = NSSize(width: 900, height: 600)
+        window.contentMinSize = NSSize(width: 860, height: 560)
         window.setFrameAutosaveName("CopilotMicroManager")
     }
 
@@ -111,547 +86,281 @@ final class ManagerWindow {
     }
 }
 
-private struct DemoBanner: View {
-    @ObservedObject var store: EmulatorStore
+private struct DeviceBanner: View {
+    @ObservedObject var store: LiveDeviceStore
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "testtube.2")
-                .foregroundStyle(.orange)
+            Image(systemName: store.statusSymbol)
+                .foregroundStyle(statusColor)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Interactive demo only")
+                Text(store.connectionState.label)
                     .font(.headline)
-                Text("No device, CLI, terminal automation, extension, permissions or network connection is active.")
+                Text(store.connectionState.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
             Spacer()
-            Text(store.lighting.textualState)
-                .font(.callout.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.thinMaterial, in: Capsule())
-                .accessibilityLabel("Simulated session state: \(store.lighting.textualState)")
+            if case .permissionRequired = store.connectionState {
+                Button("Open Input Monitoring") {
+                    store.openInputMonitoringSettings()
+                }
+            }
+            Button(store.isPaused ? "Resume" : "Pause") {
+                store.togglePause()
+            }
+            .disabled(!store.hardwareEnabled)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color.orange.opacity(0.09))
+        .background(statusColor.opacity(0.09))
+    }
+
+    private var statusColor: Color {
+        switch store.connectionState {
+        case .connected:
+            .green
+        case .discovering:
+            .blue
+        case .permissionRequired:
+            .orange
+        case .failed:
+            .red
+        case .inactive, .suppressedForSmoke, .disconnected:
+            .secondary
+        }
     }
 }
 
 private struct OverviewView: View {
-    @ObservedObject var store: EmulatorStore
+    @ObservedObject var store: LiveDeviceStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
-                title: "Overview",
-                subtitle: "Walk the intended experience without connecting to hardware or Copilot CLI."
+                title: "Creator Micro 2",
+                subtitle: "Live hardware status from the device's vendor HID interface."
             )
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], spacing: 14) {
                 StatusCard(
-                    title: "Creator Micro 2 Pro",
-                    value: "Simulated",
-                    detail: "USB/Bluetooth and battery unavailable",
+                    title: "Device",
+                    value: store.connectionState.label,
+                    detail: "\(store.product) \(store.productID)",
                     symbol: "keyboard"
                 )
                 StatusCard(
-                    title: "Copilot CLI",
-                    value: "Not connected",
-                    detail: "Selected demo session: \(store.selectedSession.title)",
-                    symbol: "terminal"
+                    title: "Transport",
+                    value: store.transport,
+                    detail: "Firmware \(store.firmwareVersion)",
+                    symbol: "cable.connector"
                 )
                 StatusCard(
-                    title: "Preferred terminal",
-                    value: "Not configured",
-                    detail: "Ghostty, iTerm2 and Terminal.app are planned",
-                    symbol: "macwindow"
+                    title: "Input Monitoring",
+                    value: store.inputMonitoring.rawValue.capitalized,
+                    detail: "Required for physical key and control events",
+                    symbol: "hand.raised"
                 )
             }
 
-            GroupBox("Simulated selected session") {
+            GroupBox("Live input") {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(store.selectedSession.title)
-                                .font(.title3.weight(.semibold))
-                            Text(store.selectedSession.detail)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        StatePill(projection: store.lighting)
-                    }
-                    Text(store.statusDetail)
-                    Picker("Scenario", selection: scenarioBinding) {
-                        ForEach(EmulatorScenario.allCases) { scenario in
-                            Text(scenario.title).tag(scenario)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    HStack {
-                        Button(store.isPaused ? "Resume demo" : "Pause demo") {
-                            store.togglePause()
-                        }
-                        if store.scenario == .completed, !store.completionAcknowledged {
-                            Button("Acknowledge with verified interaction") {
-                                store.acknowledgeCompletion()
-                            }
-                        }
-                    }
+                    LabeledContent("Last event", value: store.lastInput)
+                    PadView(store: store)
+                        .frame(maxWidth: 620)
                 }
                 .padding(8)
             }
 
-            NoticeBox(
-                title: "Live capability gap",
-                detail: store.prominentIssue,
-                symbol: "exclamationmark.triangle"
-            )
-
-            EventList(entries: Array(store.eventLog.prefix(5)), emptyText: "No demo events yet.")
+            if !store.connectionState.isConnected {
+                NoticeBox(
+                    title: "Device is not ready",
+                    detail: store.connectionState.detail,
+                    symbol: "exclamationmark.triangle"
+                )
+            }
         }
-    }
-
-    private var scenarioBinding: Binding<EmulatorScenario> {
-        Binding(get: { store.scenario }, set: { store.selectScenario($0) })
     }
 }
 
 private struct ControlsView: View {
-    @ObservedObject var store: EmulatorStore
+    @ObservedObject var store: LiveDeviceStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
                 title: "Controls",
-                subtitle: "Select a drawn key to edit its local assignment. Selection never executes the action."
+                subtitle:
+                    "Press the physical keys, turn the dial, or move the joystick. This view reflects real HID events."
             )
 
             HStack(alignment: .top, spacing: 26) {
-                PadView(store: store, editingEnabled: true)
-                    .frame(maxWidth: 560)
+                PadView(store: store)
+                    .frame(maxWidth: 620)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    GroupBox("Selected control") {
+                    GroupBox("Current input") {
                         VStack(alignment: .leading, spacing: 12) {
-                            LabeledContent("Physical position", value: store.selectedControl.displayName)
-                            Picker("Assigned action", selection: assignmentBinding) {
-                                ForEach(ActionID.allCases, id: \.self) { action in
-                                    Text(action.displayName).tag(action)
-                                }
-                                .disabled(!store.canEditConfiguration)
-                            }
-                            Text(
-                                "Editing changes the demo configuration only. It does not run the action or write device flash."
+                            LabeledContent("Last event", value: store.lastInput)
+                            LabeledContent(
+                                "Pressed keys",
+                                value:
+                                    store.pressedControls.isEmpty
+                                    ? "None"
+                                    : store.pressedControls
+                                        .map(\.displayName)
+                                        .sorted()
+                                        .joined(separator: ", ")
                             )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            HStack {
-                                Button("Simulate selected press") {
-                                    store.simulateSelectedControl()
-                                }
-                                .keyboardShortcut(.return, modifiers: [.command])
-                                Button("Reset all defaults") {
-                                    store.resetAssignments()
-                                }
-                                .disabled(!store.canEditConfiguration)
-                            }
+                            LabeledContent(
+                                "Joystick",
+                                value: store.activeJoystick?.rawValue.capitalized ?? "Neutral"
+                            )
+                            LabeledContent(
+                                "Dial",
+                                value: store.dialDirection?.displayName.capitalized ?? "Idle"
+                            )
                         }
                         .padding(8)
                     }
 
-                    GroupBox("Physical input simulator") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("These controls are separate from the assignment editor.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack {
-                                Button("Dial left") {
-                                    store.simulateDial(delta: -1)
-                                }
-                                Button("Dial right") {
-                                    store.simulateDial(delta: 1)
-                                }
-                            }
-                            HStack {
-                                Button("Up") {
-                                    store.simulateJoystick(.north)
-                                }
-                                Button("Down") {
-                                    store.simulateJoystick(.south)
-                                }
-                                Button("Confirm") {
-                                    store.simulateJoystick(.east)
-                                }
-                                Button("Back") {
-                                    store.simulateJoystick(.west)
-                                }
-                            }
-                            Button("Wide key: contacts 10 and 11") {
-                                store.simulateWideKeyPress()
-                            }
-                            if store.sessionPickerOpen {
-                                LabeledContent("Highlighted", value: store.highlightedSession.title)
-                                Text("Selected remains \(store.selectedSession.title) until Confirm.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(8)
-                    }
+                    NoticeBox(
+                        title: "CLI actions are intentionally disabled",
+                        detail:
+                            "Hardware input is live. Copilot CLI actions remain blocked until exact terminal and session targeting guards are complete.",
+                        symbol: "lock.shield"
+                    )
                 }
-                .frame(minWidth: 320, maxWidth: 390)
+                .frame(minWidth: 300, maxWidth: 360)
             }
-        }
-    }
 
-    private var assignmentBinding: Binding<ActionID> {
-        Binding(
-            get: { store.assignments[store.selectedControl] ?? .focusComposer },
-            set: { store.assign($0, to: store.selectedControl) }
-        )
+            EventList(entries: Array(store.eventLog.prefix(12)))
+        }
     }
 }
 
 private struct LightingView: View {
-    @ObservedObject var store: EmulatorStore
+    @ObservedObject var store: LiveDeviceStore
+
+    private let colors: [LightingColor] = [
+        .white,
+        .blue,
+        .purple,
+        .amber,
+        .green,
+        .red,
+        .off,
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
                 title: "Lighting",
                 subtitle:
-                    "Preview the deterministic all-key projection. It is not evidence of physical hardware output."
+                    "Set the 13 key LEDs and ambient underglow to one matching live state."
             )
 
             HStack(alignment: .top, spacing: 28) {
-                PadView(store: store, editingEnabled: false)
-                    .frame(maxWidth: 560)
+                PadView(store: store)
+                    .frame(maxWidth: 620)
+
                 VStack(alignment: .leading, spacing: 18) {
-                    GroupBox("Preview settings") {
+                    GroupBox("Key lighting") {
                         VStack(alignment: .leading, spacing: 14) {
-                            LabeledContent("Textual state", value: store.lighting.textualState)
-                            Slider(value: brightnessBinding, in: 0...1) {
+                            Text("Color")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 82))], spacing: 8) {
+                                ForEach(colors, id: \.rawValue) { color in
+                                    Button(color.displayName) {
+                                        store.setLightingColor(color)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(store.lightingColor == color ? .accentColor : nil)
+                                }
+                            }
+                            Slider(value: $store.brightness, in: 0...1) {
                                 Text("Brightness")
                             } minimumValueLabel: {
                                 Text("0")
                             } maximumValueLabel: {
                                 Text("100")
                             }
-                            .disabled(!store.canEditConfiguration)
                             Text("Brightness \(Int(store.brightness * 100)) percent")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Toggle("Reduce motion", isOn: reducedMotionBinding)
-                                .disabled(!store.canEditConfiguration)
-                            Text("At zero brightness, the textual state remains available.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Button("Apply to device") {
+                                store.applyLighting()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!store.canControlLighting)
                         }
                         .padding(8)
                     }
-                    GroupBox("Scenario") {
-                        Picker("Scenario", selection: scenarioBinding) {
-                            ForEach(EmulatorScenario.allCases) { scenario in
-                                Text(scenario.title).tag(scenario)
-                            }
-                        }
-                        .labelsHidden()
-                        .padding(8)
-                    }
-                }
-                .frame(minWidth: 300, maxWidth: 360)
-            }
 
-            GroupBox("State legend") {
-                VStack(spacing: 10) {
-                    LightingLegendRow(color: .white, title: "Default", detail: "Steady white")
-                    LightingLegendRow(color: .blue, title: "Plan", detail: "Steady blue")
-                    LightingLegendRow(color: .purple, title: "Autopilot", detail: "Steady purple")
-                    LightingLegendRow(
-                        color: .orange, title: "Needs input", detail: "Amber pulse, steady with reduced motion")
-                    LightingLegendRow(
-                        color: .green, title: "Completed", detail: "Steady until verified acknowledgement")
-                    LightingLegendRow(color: .red, title: "Error", detail: "Steady red")
-                    LightingLegendRow(color: .black, title: "Disconnected or unknown", detail: "Key lights off")
-                }
-                .padding(8)
-            }
-        }
-    }
-
-    private var brightnessBinding: Binding<Double> {
-        Binding(get: { store.brightness }, set: { store.setBrightness($0) })
-    }
-
-    private var reducedMotionBinding: Binding<Bool> {
-        Binding(get: { store.reducedMotion }, set: { store.setReducedMotion($0) })
-    }
-
-    private var scenarioBinding: Binding<EmulatorScenario> {
-        Binding(get: { store.scenario }, set: { store.selectScenario($0) })
-    }
-}
-
-private struct ConnectionSettingsView: View {
-    @ObservedObject var store: EmulatorStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            PageHeading(
-                title: "Connection and Settings",
-                subtitle: "Live dependencies remain visible and unavailable instead of being simulated as connected."
-            )
-            GroupBox("Environment") {
-                VStack(spacing: 12) {
-                    SettingRow("Assembly", value: "Emulator only", status: .available)
-                    SettingRow("Preferred terminal", value: "Not configured", status: .unavailable)
-                    SettingRow("Copilot CLI", value: "Bridge not installed", status: .unavailable)
-                    SettingRow("Creator Micro 2 Pro", value: "HID not opened", status: .unavailable)
-                }
-                .padding(8)
-            }
-            GroupBox("Behavior") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Toggle("Launch at login", isOn: .constant(false))
-                        .disabled(true)
-                    Text("Unavailable until persistent settings are implemented.")
-                        .font(.caption)
+                    Text(store.lightingStatus)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                    Toggle("Show notifications", isOn: notificationsBinding)
-                        .disabled(!store.canEditConfiguration)
-                    Text("The preference is stored locally. Delivery remains unavailable in this milestone.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button(store.isPaused ? "Resume demo" : "Pause demo") {
-                        store.togglePause()
-                    }
-                }
-                .padding(8)
-            }
-            NoticeBox(
-                title: "Pause scope",
-                detail:
-                    "Pause discards simulated hardware-triggered actions and turns off state lighting. It does not restore a keymap.",
-                symbol: "pause.circle"
-            )
-        }
-    }
 
-    private var notificationsBinding: Binding<Bool> {
-        Binding(
-            get: { store.notificationsEnabled },
-            set: { store.setNotificationsEnabled($0) }
-        )
-    }
-}
-
-private struct ConfigurationView: View {
-    @ObservedObject var store: EmulatorStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            PageHeading(
-                title: "Configuration",
-                subtitle: "One personal configuration is stored locally with private, recoverable writes."
-            )
-            GroupBox("Current demo mapping") {
-                VStack(alignment: .leading, spacing: 12) {
-                    LabeledContent("Assigned controls", value: "\(store.assignments.count)")
-                    LabeledContent("Persistence", value: store.storageState.label)
-                    Text(store.storageStatusDetail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Reset local demo assignments") {
-                        store.resetAssignments()
-                    }
-                    .disabled(!store.canEditConfiguration)
-                    if case .recoveryRequired = store.storageState {
-                        Button("Preserve malformed file and restore safe defaults") {
-                            store.recoverConfigurationWithDefaults()
-                        }
-                    }
-                }
-                .padding(8)
-            }
-            GroupBox("Portable JSON") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(
-                        "Import validates every control and preference, previews changes and requires confirmation."
+                    NoticeBox(
+                        title: "Runtime lighting only",
+                        detail:
+                            "The app updates both lighting zones together without writing keymap flash.",
+                        symbol: "checkmark.shield"
                     )
-                    HStack {
-                        Button("Import JSON") {
-                            store.choosePortableImport()
-                        }
-                        Button("Export JSON") {
-                            store.choosePortableExport()
-                        }
-                    }
-                    .disabled(!store.canManagePortableConfiguration)
-                    Text(
-                        "Exports exclude terminal paths, CLI hints, recent directories, backups, live IDs and diagnostics."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    if let notice = store.configurationNotice {
-                        Text(notice)
-                            .font(.caption)
-                    }
-                    if let plan = store.pendingImport {
-                        ImportPreview(plan: plan)
-                        HStack {
-                            Button("Apply imported settings") {
-                                store.confirmImport()
-                            }
-                            .disabled(!plan.hasChanges)
-                            Button("Cancel") {
-                                store.cancelImport()
-                            }
-                        }
-                    }
                 }
-                .padding(8)
+                .frame(minWidth: 310, maxWidth: 370)
             }
-            GroupBox("Original device map") {
-                VStack(alignment: .leading, spacing: 12) {
-                    LabeledContent("Backup", value: "Not created; no device was opened")
-                    Button("Restore original map") {}
-                        .disabled(true)
-                    Text("A live write will require a validated backup, preview, explicit consent and read-back.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(8)
-            }
-        }
-    }
-}
-
-private struct UpdatesView: View {
-    @ObservedObject var store: EmulatorStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            PageHeading(
-                title: "Updates",
-                subtitle: "Update discovery and installation are not active in the emulator."
-            )
-            GroupBox("Installed build") {
-                VStack(spacing: 12) {
-                    LabeledContent("Version", value: BuildIdentity.version)
-                    LabeledContent("Architecture", value: "Apple Silicon")
-                    LabeledContent("Signing", value: "Ad-hoc internal build")
-                    LabeledContent("Update source", value: "Not configured")
-                }
-                .padding(8)
-            }
-            Button("Check for updates") {}
-                .disabled(true)
-            NoticeBox(
-                title: "Installation disabled",
-                detail: "No release endpoint, authentication scope or verification key has been qualified.",
-                symbol: "lock.shield"
-            )
         }
     }
 }
 
 private struct DiagnosticsView: View {
-    @ObservedObject var store: EmulatorStore
+    @ObservedObject var store: LiveDeviceStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             PageHeading(
                 title: "Diagnostics",
-                subtitle:
-                    "Demo activity stays in memory; structured operational diagnostics stay local and bounded."
+                subtitle: "Bounded in-memory device status and normalized input events."
             )
-            HStack {
-                LabeledContent("Stored demo events", value: "\(store.eventLog.count) of 40 maximum")
-                Spacer()
-                Button("Clear") {
-                    store.clearDiagnostics()
-                }
-            }
-            EventList(entries: store.eventLog, emptyText: "No demo events.")
-            GroupBox("Private local diagnostics") {
-                VStack(alignment: .leading, spacing: 12) {
+
+            GroupBox("Device details") {
+                VStack(spacing: 12) {
+                    LabeledContent("Connection", value: store.connectionState.label)
+                    LabeledContent("Product", value: store.product)
+                    LabeledContent("Product ID", value: store.productID)
+                    LabeledContent("Transport", value: store.transport)
+                    LabeledContent("Firmware", value: store.firmwareVersion)
+                    LabeledContent("Active layer index", value: store.activeLayer)
+                    LabeledContent("Keymap SHA-256", value: store.keymapSHA256)
+                    LabeledContent("Raw HID reports", value: "\(store.rawReportCount)")
+                    LabeledContent("Decoded notifications", value: "\(store.notificationCount)")
                     LabeledContent(
-                        "Retention",
-                        value: store.diagnosticUsage.map {
-                            "\($0.segmentCount) of \($0.maximumSegmentCount) segments, \($0.bytes) bytes"
-                        } ?? "No stored segments"
+                        "Radial notifications",
+                        value: "\(store.radialNotificationCount)"
                     )
-                    Text("Each segment is limited to 5 MiB. No telemetry or automatic upload is active.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(
-                        "Export includes timestamps, component, operation, bounded outcome/error categories and redacted messages."
+                    LabeledContent("Last radial sample", value: store.lastRadialSample)
+                    LabeledContent(
+                        "Invalid notifications",
+                        value: "\(store.invalidNotificationCount)"
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    HStack {
-                        Button("Export redacted diagnostics") {
-                            store.chooseDiagnosticExport()
-                        }
-                        Button("Clear private diagnostics") {
-                            store.clearPrivateDiagnostics()
-                        }
-                    }
-                    if let notice = store.diagnosticNotice {
-                        Text(notice)
-                            .font(.caption)
-                    }
                 }
                 .padding(8)
             }
+
+            HStack {
+                Button("Reconnect device") {
+                    store.reconnect()
+                }
+                Button("Clear event list") {
+                    store.clearEvents()
+                }
+            }
+
+            EventList(entries: store.eventLog)
         }
-    }
-}
-
-private struct ImportPreview: View {
-    let plan: ConfigurationImportPlan
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Import preview")
-                .font(.headline)
-            if !plan.hasChanges {
-                Text("No portable settings would change.")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(plan.bindingChanges, id: \.control) { change in
-                Text(
-                    "\(change.control.displayName): \(change.currentAction.displayName) -> \(change.importedAction.displayName)"
-                )
-            }
-            if plan.brightnessChanged {
-                Text(
-                    "Brightness: \(percent(plan.baseConfiguration.lighting.brightness)) -> \(percent(plan.portableConfiguration.lighting.brightness))"
-                )
-            }
-            if plan.reducedMotionChanged {
-                Text(
-                    "Reduced motion: \(yesNo(plan.baseConfiguration.lighting.reducedMotion)) -> \(yesNo(plan.portableConfiguration.lighting.reducedMotion))"
-                )
-            }
-            if plan.notificationsChanged {
-                Text(
-                    "Notifications: \(yesNo(plan.baseConfiguration.preferences.notificationsEnabled)) -> \(yesNo(plan.portableConfiguration.preferences.notificationsEnabled))"
-                )
-            }
-        }
-        .padding(12)
-        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func percent(_ value: Double) -> String {
-        "\(Int(value * 100))%"
-    }
-
-    private func yesNo(_ value: Bool) -> String {
-        value ? "On" : "Off"
     }
 }
 
@@ -662,8 +371,7 @@ private struct PageHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.largeTitle.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
+                .font(.largeTitle.bold())
             Text(subtitle)
                 .font(.title3)
                 .foregroundStyle(.secondary)
@@ -678,61 +386,26 @@ private struct StatusCard: View {
     let symbol: String
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(title, systemImage: symbol)
-                    .font(.headline)
-                Text(value)
-                    .font(.title3.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-            .padding(6)
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.title2)
+                .foregroundStyle(.tint)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.semibold))
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
         }
-    }
-}
-
-private struct StatePill: View {
-    let projection: LightingProjection
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Circle()
-                .fill(color)
-                .frame(width: 9, height: 9)
-                .overlay {
-                    Circle().stroke(Color.primary.opacity(0.25), lineWidth: 1)
-                }
-            Text(projection.textualState)
-        }
-        .font(.callout.weight(.semibold))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.thinMaterial, in: Capsule())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(projection.textualState)
-    }
-
-    private var color: Color {
-        switch projection.color {
-        case .off:
-            .clear
-        case .white:
-            .white
-        case .blue:
-            .blue
-        case .purple:
-            .purple
-        case .red:
-            .red
-        case .amber:
-            .orange
-        case .green:
-            .green
-        }
+        .frame(maxWidth: .infinity, minHeight: 128, alignment: .topLeading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
     }
 }
 
@@ -744,7 +417,6 @@ private struct NoticeBox: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
-                .font(.title3)
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -752,95 +424,48 @@ private struct NoticeBox: View {
                 Text(detail)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
 private struct EventList: View {
-    let entries: [EmulatorLogEntry]
-    let emptyText: String
+    let entries: [LiveDeviceEvent]
 
     var body: some View {
-        GroupBox("Recent demo activity") {
-            VStack(alignment: .leading, spacing: 0) {
-                if entries.isEmpty {
-                    Text(emptyText)
-                        .foregroundStyle(.secondary)
-                        .padding(8)
-                } else {
+        GroupBox("Recent hardware events") {
+            if entries.isEmpty {
+                Text("No hardware events observed yet.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+            } else {
+                VStack(spacing: 0) {
                     ForEach(entries) { entry in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.title)
-                                .font(.callout.weight(.semibold))
-                            Text(entry.detail)
-                                .font(.caption)
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(entry.timestamp, style: .time)
+                                .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                                .frame(width: 80, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(entry.title)
+                                    .font(.callout.weight(.semibold))
+                                Text(entry.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 8)
                         if entry.id != entries.last?.id {
                             Divider()
                         }
                     }
                 }
+                .padding(.horizontal, 8)
             }
-            .padding(.horizontal, 8)
         }
-    }
-}
-
-private enum SettingStatus {
-    case available
-    case unavailable
-}
-
-private struct SettingRow: View {
-    let title: String
-    let value: String
-    let status: SettingStatus
-
-    init(_ title: String, value: String, status: SettingStatus) {
-        self.title = title
-        self.value = value
-        self.status = status
-    }
-
-    var body: some View {
-        HStack {
-            Image(systemName: status == .available ? "checkmark.circle.fill" : "minus.circle")
-                .foregroundStyle(status == .available ? .green : .secondary)
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-private struct LightingLegendRow: View {
-    let color: Color
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(color)
-                .frame(width: 28, height: 12)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.primary.opacity(0.2), lineWidth: 1)
-                }
-            Text(title)
-                .frame(width: 140, alignment: .leading)
-            Text(detail)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title): \(detail)")
     }
 }

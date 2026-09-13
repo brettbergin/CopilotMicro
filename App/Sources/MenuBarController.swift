@@ -1,6 +1,4 @@
 import AppKit
-import CopilotMicroCore
-import CopilotMicroStorage
 
 @MainActor
 final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -10,56 +8,38 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private(set) var statusItem: NSStatusItem?
     private(set) var didFinishLaunching = false
     private let deviceItem = NSMenuItem()
-    private let terminalItem = NSMenuItem()
-    private let sessionItem = NSMenuItem()
-    private let stateItem = NSMenuItem()
+    private let inputItem = NSMenuItem()
+    private let lightingItem = NSMenuItem()
     private let issueItem = NSMenuItem()
     private let pauseItem = NSMenuItem()
+    private let reconnectItem = NSMenuItem()
 
-    init(
-        configuration: EmulatorConfiguration,
-        localConfigurationStore: LocalConfigurationStore? = nil,
-        diagnosticStore: DiagnosticStore? = nil,
-        initialStorageError: String? = nil
-    ) {
-        manager = ManagerWindow(
-            configuration: configuration,
-            localConfigurationStore: localConfigurationStore,
-            diagnosticStore: diagnosticStore,
-            initialStorageError: initialStorageError
-        )
+    init(hardwareEnabled: Bool) {
+        manager = ManagerWindow(hardwareEnabled: hardwareEnabled)
         super.init()
         configureMainMenu()
         menu.autoenablesItems = false
         menu.delegate = self
 
-        let title = NSMenuItem(title: "Copilot Micro - Interactive demo", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(title: "Copilot Micro", action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
-        for item in [deviceItem, terminalItem, sessionItem, stateItem] {
+        for item in [deviceItem, inputItem, lightingItem, issueItem] {
             item.isEnabled = false
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        issueItem.isEnabled = false
-        menu.addItem(issueItem)
-        menu.addItem(.separator())
+        reconnectItem.title = "Reconnect Device"
+        reconnectItem.target = self
+        reconnectItem.action = #selector(reconnect)
+        menu.addItem(reconnectItem)
         pauseItem.target = self
         pauseItem.action = #selector(togglePause)
         menu.addItem(pauseItem)
-        let openCopilot = NSMenuItem(title: "Open Copilot (unavailable in demo)", action: nil, keyEquivalent: "")
-        openCopilot.isEnabled = false
-        menu.addItem(openCopilot)
         menu.addItem(item(title: "Open Manager", action: #selector(openManager), key: "m"))
+        menu.addItem(item(title: "Open Lighting", action: #selector(openLighting), key: "l"))
         menu.addItem(item(title: "Open Diagnostics", action: #selector(openDiagnostics), key: "d"))
-        let launchAtLogin = NSMenuItem(title: "Launch at Login (unavailable)", action: nil, keyEquivalent: "")
-        launchAtLogin.state = .off
-        launchAtLogin.isEnabled = false
-        menu.addItem(launchAtLogin)
-        let updates = NSMenuItem(title: "Updates unavailable", action: nil, keyEquivalent: "")
-        updates.isEnabled = false
-        menu.addItem(updates)
         menu.addItem(.separator())
         menu.addItem(item(title: "Quit Copilot Micro", action: #selector(quit), key: "q"))
 
@@ -73,11 +53,22 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         didFinishLaunching = true
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "CM"
-        item.button?.toolTip = "Copilot Micro - Interactive demo"
-        item.button?.setAccessibilityLabel("Copilot Micro, interactive demo")
+        item.button?.toolTip = "Copilot Micro"
+        item.button?.setAccessibilityLabel("Copilot Micro device controller")
         item.menu = menu
         statusItem = item
+        manager.store.start()
         refreshMenu()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        manager.store.stop()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if case .permissionRequired = manager.store.connectionState {
+            manager.store.reconnect()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -86,6 +77,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func hasExpectedMenuActions() -> Bool {
         guard let open = menu.item(withTitle: "Open Manager"),
+            let lighting = menu.item(withTitle: "Open Lighting"),
             let diagnostics = menu.item(withTitle: "Open Diagnostics"),
             let quit = menu.item(withTitle: "Quit Copilot Micro")
         else {
@@ -93,12 +85,18 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         return open.action == #selector(openManager)
             && open.target === self && open.isEnabled
+            && lighting.action == #selector(openLighting)
+            && lighting.target === self && lighting.isEnabled
             && diagnostics.action == #selector(openDiagnostics)
             && diagnostics.target === self && diagnostics.isEnabled
+            && reconnectItem.action == #selector(reconnect)
+            && reconnectItem.target === self
+            && reconnectItem.isEnabled == manager.store.hardwareEnabled
             && pauseItem.action == #selector(togglePause)
-            && pauseItem.target === self && pauseItem.isEnabled
-            && !deviceItem.isEnabled && !terminalItem.isEnabled
-            && !sessionItem.isEnabled && !stateItem.isEnabled && !issueItem.isEnabled
+            && pauseItem.target === self
+            && pauseItem.isEnabled == manager.store.hardwareEnabled
+            && !deviceItem.isEnabled && !inputItem.isEnabled
+            && !lightingItem.isEnabled && !issueItem.isEnabled
             && quit.action == #selector(self.quit)
             && quit.target === self && quit.isEnabled
     }
@@ -174,8 +172,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         manager.show()
     }
 
+    @objc private func openLighting() {
+        manager.show(area: .lighting)
+    }
+
     @objc private func openDiagnostics() {
         manager.show(area: .diagnostics)
+    }
+
+    @objc private func reconnect() {
+        manager.store.reconnect()
     }
 
     @objc private func togglePause() {
@@ -188,17 +194,19 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func refreshMenu() {
         let store = manager.store
-        deviceItem.title = "Device: Creator Micro 2 Pro (simulated)"
-        terminalItem.title = "Terminal: not configured"
-        sessionItem.title = "Session: \(store.selectedSession.title) (simulated)"
-        stateItem.title = "State: \(store.lighting.textualState)"
+        deviceItem.title = "Device: \(store.connectionState.label)"
+        inputItem.title = "Last input: \(store.lastInput)"
+        lightingItem.title =
+            "Key lighting: \(store.lightingApplied ? store.lightingColor.displayName : "Off")"
         issueItem.title =
-            store.storageState == .ready
-            ? "Issue: live CLI and HID unavailable"
-            : "Issue: storage \(store.storageState.label.lowercased())"
-        pauseItem.title = store.isPaused ? "Resume Demo" : "Pause Demo"
+            store.connectionState.isConnected
+            ? "CLI actions: disabled pending target guards"
+            : "Issue: \(store.connectionState.detail)"
+        pauseItem.title = store.isPaused ? "Resume Device" : "Pause Device"
         pauseItem.keyEquivalent = "p"
+        reconnectItem.isEnabled = store.hardwareEnabled
+        pauseItem.isEnabled = store.hardwareEnabled
         statusItem?.button?.toolTip =
-            "Copilot Micro demo: \(store.lighting.textualState). Live integrations unavailable."
+            "Copilot Micro: \(store.connectionState.label). \(store.lastInput)"
     }
 }

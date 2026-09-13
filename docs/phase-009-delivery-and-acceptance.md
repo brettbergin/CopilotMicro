@@ -3,8 +3,8 @@
 Status: implementation plan, current qualification ledger and acceptance
 contract. A feature is implemented or qualified only where evidence is stated.
 
-Current evidence: stage 0, the isolated stage-1 GUI/emulator milestone and the
-local configuration/diagnostic foundation are implemented. I-07 adds
+Current evidence: stage 0, the native manager and the local
+configuration/diagnostic foundation are implemented. I-07 adds
 native/Node mock evidence for an uninstalled read-only stage-3 observer:
 private authenticated IPC, host/session/generation separation, unknown-first
 snapshots, event reconciliation, capability changes, liveness/replacement and
@@ -16,17 +16,17 @@ USB HID discovery/read, durable original backup, guarded restore, reduced
 Firmware omitted both write acknowledgements, so the transport reconciled each
 timeout through a fresh read-only connection. All keys, both dial directions,
 native radial joystick cardinals and steady all-key colors are physically
-qualified through bounded developer tools. This does not qualify the
-production app device service, terminal targeting, live CLI actions,
-host-driven blink/pulse, Bluetooth or updater, and it does not convert
-simulated acceptance journeys into production evidence.
+qualified. The production app now owns the USB device connection, shows real
+input in its GUI and physically drives matching key and ambient colors.
+Terminal targeting, live CLI actions, host-driven blink/pulse, Bluetooth,
+sleep/wake, latency and updater remain unqualified.
 
 ## Delivery strategy
 
-The implementation interview selected GUI/emulator-first: begin by verifying
-the local Swift/macOS toolchain, then the native shell and deterministic
-simulated behavior. A stock Command Line Tools/SwiftPM build path is verified;
-full Xcode is not a universal prerequisite for the native app.
+The implementation began with the native shell and deterministic contracts,
+then replaced its temporary synthetic state with direct device ownership. A
+stock Command Line Tools/SwiftPM build path is verified; full Xcode is not a
+universal prerequisite for the native app.
 Introduce live integrations only after their contracts and safety gates are
 qualified. Preserve the complete agreed scope and report unsupported
 integrations explicitly; do not replace them with dangerous shortcuts.
@@ -34,7 +34,7 @@ integrations explicitly; do not replace them with dangerous shortcuts.
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
 | 0. Developer foundation | Verified Swift/macOS SDK and reproducible SwiftPM native build/package tooling | Local prerequisites, packaged resources and headless scaffold checks succeed; Xcode-only checks remain distinct |
-| 1. Native GUI/emulator | Menu panel, manager, editor, deterministic state/input model and isolated simulator | Core journeys are accessible and clearly simulated; no HID/CLI side effects |
+| 1. Native GUI foundation | Menu panel, manager and deterministic state/input model | Headless layout and lifecycle checks pass without HID/CLI side effects |
 | 2. Contract probes | Exact CLI/terminal/firmware qualification and unsupported-feature ledger | Session identity, native actions, state/visibility evidence and versions recorded without touching production work |
 | 3. Session bridge | Trusted CLI-hosted extension plus private local IPC and mock receiver | Two disposable sessions demonstrate isolation, state correlation, replacement and reconnect |
 | 4. Real device slice | Backed-up managed map, one action and visible mode/activity lighting | USB and Bluetooth behavior, read-back and original-map restoration exercised |
@@ -65,7 +65,7 @@ contract was not.
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
 | U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | Partial | USB PID `0x8298`, firmware `0.6.2`, layer normalization, original restore, reduced 15-change map, all keys/dial directions, native radial joystick cardinals and steady key colors are physically verified; ambient underglow was preserved | Bluetooth, sleep/wake, animated lighting, event-to-light latency and production app service wiring remain |
+| U-09 | Current Pro firmware and both transports | Partial | USB PID `0x8298`, firmware `0.6.2`, layer normalization, original restore, reduced 15-change map, production app ownership, all keys/dial directions, native radial joystick cardinals and matching steady key/ambient colors are physically verified | Bluetooth, sleep/wake, animated lighting and event-to-light latency remain |
 | U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
 Qualification probes must not authorize production tools, alter real work, flash
@@ -103,7 +103,7 @@ test ownership.
 | A-25 | F-24 | Missing auth, tampered/signature-failing artifacts, incompatible versions and failed replacement cannot install; explicit approval, recovery and preserved CLI/config/backups are exercised |
 | A-26 | F-25 | Local diagnostics are bounded; planted tokens/prompts/paths/commands do not leak into export; no telemetry/network upload occurs |
 | A-27 | F-26 | Notifications default off, require opt-in, and omit sensitive content |
-| A-28 | F-19, F-21 | Core onboarding/manager flows work with keyboard/accessibility labels; textual state exists independently of color; emulator is clearly distinguished |
+| A-28 | F-19, F-21 | Core onboarding/manager flows work with keyboard/accessibility labels; textual state exists independently of color; disconnected hardware is never shown as connected |
 | A-29 | F-01, F-15, F-25 | Wrong peers, malformed/oversized/out-of-order messages, duplicate requests and stale generations fail explicitly without action; reconnect requires synchronization |
 | A-30 | F-02, F-03, F-23 | Measure authoritative native event receipt to HID write completion against the 250 ms USB/500 ms Bluetooth targets; separately verify physical output and reduced-motion presentation |
 | A-31 | F-01, F-21, F-25 | Focus-consumed, rejected, timed-out and failed actions show distinct useful feedback without corrupting session-state lighting or silently retrying |
@@ -163,14 +163,15 @@ contract/integration tests with owned disposable CLI sessions for installed
 bridge and terminal behavior. Use real-device qualification for physical
 geometry, lighting, transport and restore.
 
-The hardware tools provide partial U-09 evidence and validate byte-fragment
+The hardware tools and production app provide partial U-09 evidence and validate byte-fragment
 reassembly, request bounds, active profile identity, a non-first active layer,
 durable backup, an actual restore, the reduced managed map, complete read-back,
-physical input and steady light output. They do not fully satisfy A-22, A-24,
-A-30 or A-33 because interruption recovery, Bluetooth, sleep/wake, production
-service ownership, animated output and latency remain unexercised.
+physical input, production USB service ownership and matching steady
+key/ambient output. They do not fully satisfy A-22, A-24, A-30 or A-33 because
+interruption recovery, Bluetooth, sleep/wake, animated output and latency
+remain unexercised.
 
-Emulator tests do not qualify hardware. Mock request responses do not qualify
+Headless UI tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful
 compile does not qualify app onboarding or permissions.
 
@@ -192,8 +193,9 @@ environment variables and cleans only marker-verified paths. The default probe
 registers no tools, hooks or permission handler.
 
 No I-07 command installs or loads `Bridge/src/extension.mjs`, and `make check`
-does not launch Copilot CLI. The shipped app resource remains emulator-only and
-starts no production listener or session service.
+does not launch Copilot CLI or open HID. The shipped app resource enables the
+direct device service during normal launches but starts no production CLI
+listener or session service.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence
@@ -223,11 +225,11 @@ support claims and unsafe substitutes are not.
 
 ## Current completion boundary
 
-The phase-00 documentation, native foundation, GUI/emulator, local storage,
+The phase-00 documentation, native foundation, direct-device GUI, local storage,
 diagnostics, authenticated IPC contract, disposable CLI qualification and I-07
-read-only observer/reconciler source are implemented, together with a
-developer-qualified USB device slice. Production installation, app hardware
-ownership, stateful CLI control, terminal targeting, Bluetooth, animated
-lighting, updater and their complete acceptance journeys remain future work.
-Compatibility evidence and mock I-07 checks are work-package results, not a
-claim that the live controller is complete.
+read-only observer/reconciler source are implemented. Production USB hardware
+ownership, normalized input display and matching key/ambient runtime lighting
+are physically verified. Stateful CLI control, terminal targeting, Bluetooth,
+animated lighting, sleep/wake, latency, updater and their complete acceptance
+journeys remain future work. Compatibility evidence and mock I-07 checks are
+work-package results, not a claim that the CLI controller is complete.

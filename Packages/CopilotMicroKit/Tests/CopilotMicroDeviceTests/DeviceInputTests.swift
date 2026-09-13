@@ -145,6 +145,27 @@ struct DeviceInputTests {
         #expect(normalizer.process(west)?.control == .joystick(.west))
     }
 
+    @Test("Native radial notifications supersede the HID joystick fallback")
+    func radialJoystickSupersedesHIDFallback() throws {
+        var normalizer = CreatorMicroInputNormalizer()
+
+        let hidNorth = try DeviceHIDNotification(keyIndex: 15, isPressed: true)
+        #expect(normalizer.process(hidNorth, atMilliseconds: 0)?.control == .joystick(.north))
+
+        let radialEast = try DeviceRadialNotification(angle: 0.013, distance: 1)
+        let radialPress = normalizer.process(radialEast)
+        #expect(radialPress?.control == .joystick(.east))
+        #expect(radialPress?.phase == .pressed)
+
+        let ignoredHIDRelease = try DeviceHIDNotification(keyIndex: 15, isPressed: false)
+        #expect(normalizer.process(ignoredHIDRelease, atMilliseconds: 1) == nil)
+
+        let neutral = try DeviceRadialNotification(angle: 0.125, distance: 0)
+        let radialRelease = normalizer.process(neutral)
+        #expect(radialRelease?.control == .joystick(.east))
+        #expect(radialRelease?.phase == .released)
+    }
+
     @Test("Radial joystick applies hysteresis and ignores diagonal sectors")
     func filtersRadialJoystickNoiseAndDiagonals() throws {
         var normalizer = CreatorMicroInputNormalizer()

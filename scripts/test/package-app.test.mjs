@@ -18,7 +18,7 @@ const metadata = {
   LSMinimumSystemVersion: "26.0",
   LSUIElement: true,
 };
-const configuration = { schemaVersion: 1, mode: "emulator", liveIntegrationsEnabled: false };
+const configuration = { schemaVersion: 1, mode: "device", deviceIntegrationEnabled: true };
 const report = (app, smokeMode = "hidden") => ({
   schemaVersion: 1, outcome: "passed", bundleIdentifier: IDENTITY.bundleIdentifier,
   bundlePath: app, resourcePath: path.join(app, "Contents/Resources/foundation.json"),
@@ -35,11 +35,8 @@ const report = (app, smokeMode = "hidden") => ({
   menuActionsValidated: true,
   keepsRunningAfterManagerClose: true,
   managerAreasValidated: true,
-  emulatorJourneyValidated: true,
-  liveServicesDisabled: true,
-  storageDisabledForSmoke: true,
-  portableConfigurationValidated: true,
-  diagnosticRedactionValidated: true,
+  directDeviceUIValidated: true,
+  deviceServiceSuppressedForSmoke: true,
   fittingWidth: 600, fittingHeight: 380,
 });
 
@@ -160,14 +157,14 @@ test("temporary smoke cleanup removes only an exact generated direct child", (t)
   assert.ok(fs.existsSync(outside));
 });
 
-test("only expected metadata and emulator-only configuration are accepted", () => {
+test("only expected metadata and direct-device configuration are accepted", () => {
   validateMetadata(metadata);
   validateConfiguration(configuration);
   for (const key of Object.keys(metadata)) {
     assert.throws(() => validateMetadata({ ...metadata, [key]: null }), { code: "invalid_metadata" });
   }
-  for (const value of [null, {}, { ...configuration, mode: "live" },
-    { ...configuration, liveIntegrationsEnabled: true }, { ...configuration, schemaVersion: 2 }]) {
+  for (const value of [null, {}, { ...configuration, mode: "emulator" },
+    { ...configuration, deviceIntegrationEnabled: false }, { ...configuration, schemaVersion: 2 }]) {
     assert.throws(() => validateConfiguration(value), { code: "invalid_configuration" });
   }
 });
@@ -364,11 +361,10 @@ test("smoke invariants require hidden UI and production accessory lifecycle wiri
       { statusItemMenuInstalled: !accessory },
       { windowCreated: false }, { hostingViewCreated: false }, { menuActionsValidated: false },
       { keepsRunningAfterManagerClose: false }, { mainThread: false },
-      { managerAreasValidated: false }, { emulatorJourneyValidated: false },
-      { liveServicesDisabled: false }, { storageDisabledForSmoke: false },
-      { portableConfigurationValidated: false }, { diagnosticRedactionValidated: false },
+      { managerAreasValidated: false }, { directDeviceUIValidated: false },
+      { deviceServiceSuppressedForSmoke: false },
       { fittingWidth: 599 }, { fittingHeight: 379 }, { fittingWidth: Number.NaN }, { processID: 0 },
-      { configuration: { ...configuration, liveIntegrationsEnabled: true } },
+      { configuration: { ...configuration, deviceIntegrationEnabled: false } },
     ]) {
       assert.throws(
         () => validateSmokeReport({ ...report(app, mode), ...change }, app, mode),

@@ -122,8 +122,11 @@ public struct CreatorMicroInputNormalizer: Sendable {
 
     private var keys: KeyInputNormalizer
     private var pressedDialDirections: Set<Int> = []
-    private var joystick = JoystickNormalizer()
-    private var activeJoystick: (keyIndex: Int?, direction: JoystickDirection)?
+    private var hidJoystick = JoystickNormalizer()
+    private var activeHIDJoystick: (keyIndex: Int, direction: JoystickDirection)?
+    private var radialJoystick = JoystickNormalizer()
+    private var activeRadialJoystick: JoystickDirection?
+    private var hasSeenRadialNotification = false
 
     public init(wideKeyCoalescingMilliseconds: UInt64 = 50) {
         keys = KeyInputNormalizer(
@@ -175,27 +178,28 @@ public struct CreatorMicroInputNormalizer: Sendable {
             pressedDialDirections.remove(notification.keyIndex)
             return nil
         case 15...18:
+            guard !hasSeenRadialNotification else { return nil }
             guard let direction = Self.joystickDirection(for: notification.keyIndex) else {
                 return nil
             }
             if notification.isPressed {
-                guard activeJoystick == nil else { return nil }
-                guard let normalized = joystick.process(Self.position(for: direction)) else {
+                guard activeHIDJoystick == nil else { return nil }
+                guard let normalized = hidJoystick.process(Self.position(for: direction)) else {
                     return nil
                 }
-                activeJoystick = (notification.keyIndex, normalized)
+                activeHIDJoystick = (notification.keyIndex, normalized)
                 return NormalizedDeviceInput(
                     rawKeyIndex: notification.keyIndex,
                     control: .joystick(normalized),
                     phase: .pressed
                 )
             }
-            guard activeJoystick?.keyIndex == notification.keyIndex else {
+            guard activeHIDJoystick?.keyIndex == notification.keyIndex else {
                 return nil
             }
-            let released = activeJoystick?.direction
-            activeJoystick = nil
-            _ = joystick.process(.neutral)
+            let released = activeHIDJoystick?.direction
+            activeHIDJoystick = nil
+            _ = hidJoystick.process(.neutral)
             guard let released else { return nil }
             return NormalizedDeviceInput(
                 rawKeyIndex: notification.keyIndex,
@@ -210,30 +214,32 @@ public struct CreatorMicroInputNormalizer: Sendable {
     public mutating func process(
         _ notification: DeviceRadialNotification
     ) -> NormalizedDeviceInput? {
+        let supersededHIDDirection = activeHIDJoystick?.direction
+        if !hasSeenRadialNotification {
+            hasSeenRadialNotification = true
+            activeHIDJoystick = nil
+            hidJoystick.reset()
+        }
         if notification.distance <= Self.radialReleaseDistance {
-            guard
-                let activeJoystick,
-                activeJoystick.keyIndex == nil
-            else {
-                return nil
-            }
-            self.activeJoystick = nil
-            _ = joystick.process(.neutral)
+            let released = activeRadialJoystick ?? supersededHIDDirection
+            activeRadialJoystick = nil
+            _ = radialJoystick.process(.neutral)
+            guard let released else { return nil }
             return NormalizedDeviceInput(
                 rawKeyIndex: nil,
-                control: .joystick(activeJoystick.direction),
+                control: .joystick(released),
                 phase: .released
             )
         }
         guard
             notification.distance >= Self.radialActivationDistance,
-            activeJoystick == nil,
+            activeRadialJoystick == nil,
             let position = Self.radialPosition(for: notification.angle),
-            let direction = joystick.process(position)
+            let direction = radialJoystick.process(position)
         else {
             return nil
         }
-        activeJoystick = (nil, direction)
+        activeRadialJoystick = direction
         return NormalizedDeviceInput(
             rawKeyIndex: nil,
             control: .joystick(direction),
@@ -244,8 +250,11 @@ public struct CreatorMicroInputNormalizer: Sendable {
     public mutating func reset() {
         keys.reset()
         pressedDialDirections.removeAll()
-        activeJoystick = nil
-        joystick.reset()
+        activeHIDJoystick = nil
+        hidJoystick.reset()
+        activeRadialJoystick = nil
+        radialJoystick.reset()
+        hasSeenRadialNotification = false
     }
 
     private static func joystickDirection(for keyIndex: Int) -> JoystickDirection? {

@@ -5,20 +5,14 @@ the ten `docs/phase-00*.md` documents; start with phase 000 for ownership.
 
 ## Current implementation boundary
 
-Developer setup tooling, a complete interactive GUI emulator and the
-deterministic controls/session/lighting contract layer exist. Versioned local
-settings, portable import/export and bounded redacted diagnostics are
-implemented. The authenticated local IPC package and isolated Node client now
-exist, but the app does not start a socket and no production CLI extension is
-installed. A passive source-only probe qualified bounded surfaces in owned
-disposable Copilot CLI `1.0.84-5` sessions. The production source tree contains
-an uninstalled read-only extension entry point and native session reconciler
-for that qualified observation subset; every stateful action remains rejected
-until I-15. Native Creator Micro 2 developer tools now provide guarded backup,
-restore and reduced mapping, normalized keys/dial/native radial joystick input,
-and bounded key lighting without changing flash or ambient underglow. The app
-still starts no live service or routes physical actions to Copilot CLI.
-Preserve the emulator/live boundary and do not widen qualified authority.
+The packaged app now directly owns the qualified Creator Micro 2 USB HID
+connection. Its GUI shows real connection, key, dial and radial joystick input,
+and applies matching runtime color/brightness to the key LEDs and ambient
+underglow without writing device flash. Input Monitoring is required and Work
+Louder Input must remain closed. The managed keymap backup/restore tools remain
+separate and guarded. The app does not start the CLI socket or install the
+production extension; every stateful Copilot CLI action remains rejected until
+I-15. Do not reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -77,7 +71,7 @@ the repository could load it into a real session.
 
 Use `PACKAGE_OUTPUT=build/<new-name>` for a chosen packaging destination.
 Existing apps are never overwritten or deleted. Do not describe headless
-checks, an emulator or a HID acknowledgement as qualified live device support.
+checks, synthetic state or a HID acknowledgement as qualified live device support.
 Use command-scoped `DEVELOPER_DIR`; never silently change global `xcode-select`.
 
 `scripts/swiftpm` is the shared build/run/test entry point. It uses app-owned
@@ -93,7 +87,8 @@ it with a global Git configuration change.
 - Add tests with behavior, use explicit types/guards and keep I/O out of pure
   state reducers. Respect Swift actor/concurrency boundaries.
 - Use shared action/schema fixtures across native and bridge implementations.
-- Keep emulator and live service assemblies mutually exclusive.
+- Automated smoke tests must suppress hardware access; normal app launches
+  must use only the live device assembly.
 - Never add blind approval macros, global keylogging, clipboard scraping,
   allow-all permissions or a replacement agent runtime as a fallback.
 - Device writes require a verified original backup, preview, explicit consent

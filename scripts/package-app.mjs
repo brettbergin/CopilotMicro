@@ -18,8 +18,8 @@ export const LIMITS = Object.freeze({
 });
 export const HELP = `Usage: node scripts/package-app.mjs [options]
 
-Build and ad-hoc sign the emulator-only Copilot Micro app using SwiftPM.
-No XcodeGen, asset compiler, external packages, device or CLI integration.
+Build and ad-hoc sign the Creator Micro 2 Copilot Micro app using SwiftPM.
+No XcodeGen, asset compiler, external packages or CLI integration.
 
   --configuration debug|release  Default: release; arm64, macOS 26, Swift 6.
   --output-dir PATH              Default: build/package. Must be a strict
@@ -188,8 +188,12 @@ export function validateMetadata(metadata) {
 }
 
 export function validateConfiguration(configuration) {
-  if (configuration?.schemaVersion !== 1 || configuration.mode !== "emulator" || configuration.liveIntegrationsEnabled !== false) {
-    throw new PackagingError("invalid_configuration", "Only schema 1 emulator configuration with live integrations disabled is allowed.");
+  if (configuration?.schemaVersion !== 1 || configuration.mode !== "device"
+      || configuration.deviceIntegrationEnabled !== true) {
+    throw new PackagingError(
+      "invalid_configuration",
+      "Only schema 1 Creator Micro device configuration with device integration enabled is allowed.",
+    );
   }
 }
 
@@ -214,11 +218,8 @@ export function validateSmokeReport(report, app, mode = "hidden", canonicalize =
     menuActionsValidated: true,
     keepsRunningAfterManagerClose: true,
     managerAreasValidated: true,
-    emulatorJourneyValidated: true,
-    liveServicesDisabled: true,
-    storageDisabledForSmoke: true,
-    portableConfigurationValidated: true,
-    diagnosticRedactionValidated: true,
+    directDeviceUIValidated: true,
+    deviceServiceSuppressedForSmoke: true,
   };
   for (const [key, value] of Object.entries(expected)) {
     if (report?.[key] !== value) throw new PackagingError("smoke_failed", `Smoke invariant failed: ${key}.`);

@@ -2,7 +2,7 @@ import CopilotMicroCore
 import Foundation
 import Testing
 
-@Suite("Core build metadata and emulator-only invariants")
+@Suite("Core build metadata and device assembly invariants")
 struct FoundationTests {
     private var appDirectory: URL {
         URL(fileURLWithPath: #filePath)
@@ -23,33 +23,33 @@ struct FoundationTests {
         #expect(metadata.menuBarApplication)
     }
 
-    @Test("The app resource permits only the emulator assembly")
-    func shippedResourceIsEmulatorOnly() throws {
+    @Test("The app resource requires the direct device assembly")
+    func shippedResourceRequiresDeviceIntegration() throws {
         let data = try Data(contentsOf: appDirectory.appendingPathComponent("Resources/foundation.json"))
-        let configuration = try JSONDecoder().decode(EmulatorConfiguration.self, from: data)
+        let configuration = try JSONDecoder().decode(ApplicationConfiguration.self, from: data)
         try configuration.validate()
         #expect(configuration.schemaVersion == 1)
-        #expect(configuration.mode == .emulator)
-        #expect(!configuration.liveIntegrationsEnabled)
+        #expect(configuration.mode == .device)
+        #expect(configuration.deviceIntegrationEnabled)
     }
 
     @Test("Unknown schemas fail before a configuration can be used", arguments: [-1, 0, 2, 999])
     func unsupportedSchemaIsRejected(schemaVersion: Int) throws {
         let configuration = try decode(ConfigurationInput(schemaVersion: schemaVersion))
-        #expect(throws: EmulatorConfiguration.ValidationError.unsupportedSchema) {
+        #expect(throws: ApplicationConfiguration.ValidationError.unsupportedSchema) {
             try configuration.validate()
         }
     }
 
-    @Test("Enabling live integrations is rejected even when the mode says emulator")
-    func liveIntegrationsAreForbidden() throws {
-        let configuration = try decode(ConfigurationInput(liveIntegrationsEnabled: true))
-        #expect(throws: EmulatorConfiguration.ValidationError.liveIntegrationsForbidden) {
+    @Test("Disabling device integration is rejected")
+    func deviceIntegrationIsRequired() throws {
+        let configuration = try decode(ConfigurationInput(deviceIntegrationEnabled: false))
+        #expect(throws: ApplicationConfiguration.ValidationError.deviceIntegrationRequired) {
             try configuration.validate()
         }
     }
 
-    @Test("A live or unknown assembly cannot be decoded", arguments: ["live", "production", ""])
+    @Test("An emulator or unknown assembly cannot be decoded", arguments: ["emulator", "production", ""])
     func unsupportedModeIsRejected(mode: String) throws {
         #expect(throws: DecodingError.self) {
             try decode(ConfigurationInput(mode: mode))
@@ -59,27 +59,27 @@ struct FoundationTests {
     @Test(
         "Missing or mistyped safety fields are not given permissive defaults",
         arguments: [
-            #"{"mode":"emulator","liveIntegrationsEnabled":false}"#,
-            #"{"schemaVersion":1,"mode":"emulator"}"#,
-            #"{"schemaVersion":1,"liveIntegrationsEnabled":false}"#,
-            #"{"schemaVersion":1,"mode":"emulator","liveIntegrationsEnabled":"false"}"#,
-            #"{"schemaVersion":"1","mode":"emulator","liveIntegrationsEnabled":false}"#,
+            #"{"mode":"device","deviceIntegrationEnabled":true}"#,
+            #"{"schemaVersion":1,"mode":"device"}"#,
+            #"{"schemaVersion":1,"deviceIntegrationEnabled":true}"#,
+            #"{"schemaVersion":1,"mode":"device","deviceIntegrationEnabled":"true"}"#,
+            #"{"schemaVersion":"1","mode":"device","deviceIntegrationEnabled":true}"#,
         ])
     func malformedConfigurationIsRejected(json: String) throws {
         #expect(throws: DecodingError.self) {
-            try JSONDecoder().decode(EmulatorConfiguration.self, from: Data(json.utf8))
+            try JSONDecoder().decode(ApplicationConfiguration.self, from: Data(json.utf8))
         }
     }
 
-    private func decode(_ input: ConfigurationInput) throws -> EmulatorConfiguration {
-        try JSONDecoder().decode(EmulatorConfiguration.self, from: JSONEncoder().encode(input))
+    private func decode(_ input: ConfigurationInput) throws -> ApplicationConfiguration {
+        try JSONDecoder().decode(ApplicationConfiguration.self, from: JSONEncoder().encode(input))
     }
 }
 
 private struct ConfigurationInput: Encodable {
     var schemaVersion = 1
-    var mode = "emulator"
-    var liveIntegrationsEnabled = false
+    var mode = "device"
+    var deviceIntegrationEnabled = true
 }
 
 private struct AppMetadata: Decodable {
