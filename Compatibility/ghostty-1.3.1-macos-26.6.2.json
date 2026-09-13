@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-09-13",
-  "outcome": "exact-surface-focus-qualified-with-association-gap",
+  "outcome": "exact-surface-focus-and-app-created-association-token-qualified",
   "source": "deterministic adapter tests plus operator-authorized live AppleScript probes",
   "macOS": {
     "productVersion": "26.6.2",
@@ -42,6 +42,17 @@
     "temporaryWindowClosedByStableID": true,
     "cleanupVerified": true
   },
+  "liveAssociationEnvironment": {
+    "existingSurfaceSetPreserved": true,
+    "temporaryWindowsCreated": 1,
+    "temporaryCommand": "CopilotMicroGhosttyProbe child mode",
+    "surfaceAssociationTokenFormat": "64 lowercase hexadecimal characters",
+    "environmentKey": "COPILOT_MICRO_SURFACE_TOKEN",
+    "exactTokenInheritedByChild": true,
+    "privateResultRemoved": true,
+    "temporaryWindowClosedByStableID": true,
+    "cleanupVerified": true
+  },
   "adapterSafety": {
     "shellInvoked": false,
     "scriptSourceStatic": true,
@@ -62,13 +73,15 @@
     "identify the front window, selected tab and focused terminal",
     "activate an exact window, select an exact tab and focus an exact terminal",
     "create a new window with an argument-separated working directory and command",
+    "pass a one-time app-created surface association token into the launched child process",
+    "match surface creation and bridge registration in either order without allowing token reassignment",
     "close only a temporary qualification window identified by its returned stable ID"
   ],
   "remainingGaps": [
     "Ghostty 1.3.1 exposes no terminal child PID or TTY, so an already-running Copilot CLI instance cannot be safely associated with a surface from title or working directory",
-    "the production bridge does not yet return an app-created surface association token",
+    "the packaged app does not yet start the authenticated bridge, launch Copilot through the adapter or claim a real extension registration",
     "the packaged app Automation permission and revocation recovery flow remain an onboarding task",
-    "actual Copilot CLI launch through the app was not exercised in this qualification",
+    "actual Copilot CLI registration through the app-created association path was not exercised in this qualification",
     "Ghostty does not expose Copilot CLI composer, picker, permission or question context through its scripting dictionary"
   ]
 }

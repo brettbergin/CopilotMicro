@@ -9,12 +9,15 @@ import {
   BOOTSTRAP_TOKEN_FILENAME,
   BRIDGE_DIRECTORY_ENVIRONMENT_KEY,
   BRIDGE_SOCKET_FILENAME,
+  SURFACE_ASSOCIATION_ENVIRONMENT_KEY,
   createHostBinding,
   loadBridgeRuntimeConfiguration,
+  loadSurfaceAssociationToken,
   runHostExtension,
 } from "../src/extension-runtime.mjs";
 
 const token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const surfaceToken = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
 async function withRuntimeDirectory(body) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "copilot-micro-runtime-"));
@@ -71,6 +74,22 @@ test("host identity remains separate from session and generation", () => {
   assert.equal(first.instanceId, replacement.instanceId);
   assert.notEqual(first.sessionId, replacement.sessionId);
   assert.notEqual(first.generation, replacement.generation);
+});
+
+test("surface association token is optional but strictly validated", () => {
+  assert.equal(loadSurfaceAssociationToken({ environment: {} }), null);
+  assert.equal(
+    loadSurfaceAssociationToken({
+      environment: { [SURFACE_ASSOCIATION_ENVIRONMENT_KEY]: surfaceToken },
+    }),
+    surfaceToken,
+  );
+  assert.throws(
+    () => loadSurfaceAssociationToken({
+      environment: { [SURFACE_ASSOCIATION_ENVIRONMENT_KEY]: "unsafe token" },
+    }),
+    /invalidSurfaceAssociationToken/u,
+  );
 });
 
 test("host runtime registers no tools or hooks and rejects received actions", async () => {
@@ -145,6 +164,7 @@ test("host runtime registers no tools or hooks and rejects received actions", as
   assert.equal(Object.hasOwn(joinOptions, "permissionHandler"), false);
   assert.equal(registration.instanceId, "cli-host-321");
   assert.equal(registration.sessionId, "session-1");
+  assert.equal(Object.hasOwn(registration, "surfaceAssociationToken"), false);
   assert.match(registration.generation, /^generation-/u);
   const result = sent.find((payload) => payload.messageType === "actionResult");
   assert.equal(result.outcome, "rejected");
@@ -193,6 +213,7 @@ test("bounded reconnects preserve the host and session but rotate generation", a
       socketPath: "/tmp/copilot-micro-runtime-test.sock",
       bootstrapToken: token,
     },
+    surfaceAssociationToken: surfaceToken,
     parentProcessID: 321,
     maximumReconnectAttempts: 1,
     signal: controller.signal,
@@ -206,6 +227,10 @@ test("bounded reconnects preserve the host and session but rotate generation", a
   assert.equal(registrations.length, 2);
   assert.equal(registrations[0].instanceId, registrations[1].instanceId);
   assert.equal(registrations[0].sessionId, registrations[1].sessionId);
+  assert.equal(
+    registrations[0].surfaceAssociationToken,
+    registrations[1].surfaceAssociationToken,
+  );
   assert.notEqual(registrations[0].generation, registrations[1].generation);
   assert.deepEqual(delays, [250]);
 });

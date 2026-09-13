@@ -11,6 +11,7 @@ import {
 
 export const BRIDGE_VERSION = "0.1.0";
 export const BRIDGE_DIRECTORY_ENVIRONMENT_KEY = "COPILOT_MICRO_BRIDGE_DIRECTORY";
+export const SURFACE_ASSOCIATION_ENVIRONMENT_KEY = "COPILOT_MICRO_SURFACE_TOKEN";
 export const BRIDGE_SOCKET_FILENAME = "bridge.sock";
 export const BOOTSTRAP_TOKEN_FILENAME = "bootstrap-token";
 export const DEFAULT_HEARTBEAT_MILLISECONDS = 5_000;
@@ -91,10 +92,22 @@ export function createHostBinding({
   };
 }
 
+export function loadSurfaceAssociationToken({
+  environment = process.env,
+} = {}) {
+  const token = environment[SURFACE_ASSOCIATION_ENVIRONMENT_KEY];
+  if (token === undefined) return null;
+  if (!/^[a-f0-9]{64}$/u.test(token)) {
+    throw new Error("invalidSurfaceAssociationToken");
+  }
+  return token;
+}
+
 export async function runHostExtension({
   joinSession,
   connect = connectAuthenticated,
   runtimeConfiguration = loadBridgeRuntimeConfiguration(),
+  surfaceAssociationToken = loadSurfaceAssociationToken(),
   parentProcessID = process.ppid,
   heartbeatMilliseconds = DEFAULT_HEARTBEAT_MILLISECONDS,
   maximumReconnectAttempts = DEFAULT_MAXIMUM_RECONNECT_ATTEMPTS,
@@ -142,6 +155,7 @@ export async function runHostExtension({
           role: "cliBridge",
           bootstrapToken: runtimeConfiguration.bootstrapToken,
           ...binding,
+          ...(surfaceAssociationToken === null ? {} : { surfaceAssociationToken }),
           bridgeVersion: BRIDGE_VERSION,
           cliVersion: "unknown",
           sdkVersion: "host-provided",

@@ -67,6 +67,9 @@ struct TerminalContractsTests {
 
     @Test("Launch plans preserve argument boundaries without shell encoding")
     func preservesArgumentVector() throws {
+        let associationToken = try SurfaceAssociationToken(
+            rawValue: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        )
         let plan = try TerminalLaunchPlan(
             launchExecutableURL: URL(fileURLWithPath: "/Applications/Ghostty.app/Contents/MacOS/ghostty"),
             arguments: [
@@ -76,11 +79,13 @@ struct TerminalContractsTests {
                 "text; still one argument",
             ],
             workingDirectoryURL: URL(fileURLWithPath: "/Users/example/Project With Spaces"),
-            surfaceDisposition: .newWindow
+            surfaceDisposition: .newWindow,
+            surfaceAssociationToken: associationToken
         )
         #expect(plan.arguments.count == 4)
         #expect(plan.arguments.last == "text; still one argument")
         #expect(plan.surfaceDisposition == .newWindow)
+        #expect(plan.surfaceAssociationToken == associationToken)
 
         #expect(throws: TerminalContractError.invalidArguments) {
             _ = try TerminalLaunchPlan(

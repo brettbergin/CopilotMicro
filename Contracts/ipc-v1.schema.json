@@ -31,6 +31,10 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
+    "surfaceAssociationToken": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "registration": {
       "type": "object",
       "additionalProperties": false,
@@ -67,6 +71,16 @@
         },
         "generation": {
           "$ref": "#/$defs/identifier"
+        },
+        "surfaceAssociationToken": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/surfaceAssociationToken"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "bridgeVersion": {
           "$ref": "#/$defs/identifier"

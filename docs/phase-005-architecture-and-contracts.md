@@ -278,11 +278,22 @@ identities.
 Ghostty exposes no terminal child PID or TTY. Consequently, title or working
 directory similarity is not acceptable association evidence for an existing
 Copilot CLI process. The adapter accepts only an explicit
-`CLIInstanceID`-to-surface binding. App-created surfaces return their stable
-IDs, but production registration still needs a separate exact association
-token before those surfaces can be bound automatically. Until then, Ghostty
-focus capability is qualified at the surface layer but disabled for arbitrary
-existing CLI sessions.
+`CLIInstanceID`-to-surface binding. For app-created surfaces, it reserves a
+one-time 64-character lowercase hexadecimal token before launch, passes it as
+`COPILOT_MICRO_SURFACE_TOKEN`, and binds the returned stable IDs only to a
+bridge registration carrying the exact token. Surface creation and bridge
+registration may arrive in either order; reservations expire, failed launches
+cancel them, and a claimed token cannot move to another CLI instance.
+
+The IPC version 1 registration keeps this field optional for backward
+compatibility. A missing token produces an observed but unassociated CLI
+instance; it never falls back to title, working directory or process
+heuristics. The token is correlation evidence, not authentication: the private
+bootstrap token and same-user peer validation remain authoritative. Live
+qualification proved that Ghostty passes the exact token into the launched
+child process and that the temporary surface/result are cleaned up. Packaged
+app bridge startup, actual Copilot launch and a real extension registration
+claim remain to be integrated before hardware actions can target the surface.
 
 ## Deterministic state and observability
 

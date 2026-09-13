@@ -72,7 +72,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "CopilotMicroGhosttyProbe",
-            dependencies: ["CopilotMicroTerminal"]
+            dependencies: [
+                "CopilotMicroCore",
+                "CopilotMicroTerminal",
+            ]
         ),
         .testTarget(
             name: "CopilotMicroCoreTests",

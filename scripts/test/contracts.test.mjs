@@ -27,7 +27,7 @@ test("shared contract catalogs and fixtures pass", () => {
     cliCompatibilityReportCount: 1,
     hardwareCapabilityEvidenceSchemaCount: 1,
     hardwareCompatibilityReportCount: 1,
-    ipcFixtureCount: 20,
+    ipcFixtureCount: 23,
   });
 });
 

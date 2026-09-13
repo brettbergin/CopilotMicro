@@ -85,6 +85,7 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
     public let instanceID: CLIInstanceID
     public let sessionID: SessionID
     public let generation: ConnectionGeneration
+    public let surfaceAssociationToken: SurfaceAssociationToken?
     public let bridgeVersion: String
     public let cliVersion: String
     public let sdkVersion: String
@@ -93,6 +94,7 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
         role: IPCPeerRole = .cliBridge,
         bootstrapToken: IPCBootstrapToken,
         binding: LiveBinding,
+        surfaceAssociationToken: SurfaceAssociationToken? = nil,
         bridgeVersion: String,
         cliVersion: String,
         sdkVersion: String
@@ -107,6 +109,7 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
         instanceID = binding.instanceID
         sessionID = binding.sessionID
         generation = binding.generation
+        self.surfaceAssociationToken = surfaceAssociationToken
         self.bridgeVersion = bridgeVersion
         self.cliVersion = cliVersion
         self.sdkVersion = sdkVersion
@@ -120,6 +123,7 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
         case instanceID = "instanceId"
         case sessionID = "sessionId"
         case generation
+        case surfaceAssociationToken
         case bridgeVersion
         case cliVersion
         case sdkVersion
@@ -141,6 +145,10 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
                 sessionID: container.decode(SessionID.self, forKey: .sessionID),
                 generation: container.decode(ConnectionGeneration.self, forKey: .generation)
             ),
+            surfaceAssociationToken: container.decodeIfPresent(
+                SurfaceAssociationToken.self,
+                forKey: .surfaceAssociationToken
+            ),
             bridgeVersion: container.decode(String.self, forKey: .bridgeVersion),
             cliVersion: container.decode(String.self, forKey: .cliVersion),
             sdkVersion: container.decode(String.self, forKey: .sdkVersion)
@@ -149,7 +157,7 @@ public struct IPCRegistration: Codable, Equatable, Sendable {
 }
 
 public enum IPCRegistrationCodec {
-    private static let keys: Set<String> = [
+    private static let requiredKeys: Set<String> = [
         "protocolVersion",
         "messageType",
         "role",
@@ -161,13 +169,20 @@ public enum IPCRegistrationCodec {
         "cliVersion",
         "sdkVersion",
     ]
+    private static let allowedKeys = requiredKeys.union([
+        "surfaceAssociationToken"
+    ])
 
     public static func encode(_ registration: IPCRegistration) throws -> Data {
         try ipcEncoder().encode(registration)
     }
 
     public static func decode(_ data: Data) throws -> IPCRegistration {
-        let object = try strictObject(data, expectedKeys: keys)
+        let object = try strictObject(
+            data,
+            requiredKeys: requiredKeys,
+            allowedKeys: allowedKeys
+        )
         guard object["protocolVersion"] as? Int == IPCRegistration.protocolVersion else {
             throw IPCWireDecodeError.unsupportedProtocol
         }
@@ -180,6 +195,8 @@ public enum IPCRegistrationCodec {
         } catch let error as IPCWireDecodeError {
             throw error
         } catch is IPCBootstrapToken.ValidationError {
+            throw IPCWireDecodeError.malformed
+        } catch is SurfaceAssociationToken.ValidationError {
             throw IPCWireDecodeError.malformed
         } catch is IdentifierValidationError {
             throw IPCWireDecodeError.malformed
@@ -981,15 +998,23 @@ private func ipcEncoder() -> JSONEncoder {
 }
 
 private func strictObject(_ data: Data, expectedKeys: Set<String>) throws -> [String: Any] {
+    try strictObject(data, requiredKeys: expectedKeys, allowedKeys: expectedKeys)
+}
+
+private func strictObject(
+    _ data: Data,
+    requiredKeys: Set<String>,
+    allowedKeys: Set<String>
+) throws -> [String: Any] {
     guard data.count <= LengthPrefixedFraming.maximumPayloadBytes else {
         throw IPCWireDecodeError.messageTooLarge
     }
     let object = try strictJSONObject(data)
     let keys = Set(object.keys)
-    guard expectedKeys.isSubset(of: keys) else {
+    guard requiredKeys.isSubset(of: keys) else {
         throw IPCWireDecodeError.malformed
     }
-    guard keys.isSubset(of: expectedKeys) else {
+    guard keys.isSubset(of: allowedKeys) else {
         throw IPCWireDecodeError.unexpectedField
     }
     return object

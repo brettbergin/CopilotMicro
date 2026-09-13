@@ -132,12 +132,14 @@ public struct TerminalLaunchPlan: Equatable, Sendable {
     public let arguments: [String]
     public let workingDirectoryURL: URL
     public let surfaceDisposition: TerminalLaunchSurface
+    public let surfaceAssociationToken: SurfaceAssociationToken?
 
     public init(
         launchExecutableURL: URL,
         arguments: [String],
         workingDirectoryURL: URL,
-        surfaceDisposition: TerminalLaunchSurface
+        surfaceDisposition: TerminalLaunchSurface,
+        surfaceAssociationToken: SurfaceAssociationToken? = nil
     ) throws {
         guard
             launchExecutableURL.isFileURL,
@@ -159,6 +161,7 @@ public struct TerminalLaunchPlan: Equatable, Sendable {
         self.arguments = arguments
         self.workingDirectoryURL = workingDirectoryURL.standardizedFileURL
         self.surfaceDisposition = surfaceDisposition
+        self.surfaceAssociationToken = surfaceAssociationToken
     }
 }
 
@@ -170,7 +173,6 @@ public enum TerminalLaunchSurface: String, Codable, Sendable {
 public protocol TerminalAdapter: Sendable {
     var terminal: SupportedTerminal { get }
 
-    func makeOpenCopilotPlan(for request: OpenCopilotRequest) throws -> TerminalLaunchPlan
     func discoverTargets(for instanceID: CLIInstanceID) async throws -> [TerminalSurfaceTarget]
     func observeContext(for target: TerminalSurfaceTarget) async throws -> TerminalContextEvidence
     func focus(_ target: TerminalSurfaceTarget) async throws -> TerminalFocusOutcome

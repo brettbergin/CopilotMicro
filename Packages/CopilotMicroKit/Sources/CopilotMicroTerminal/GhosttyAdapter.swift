@@ -343,41 +343,25 @@ public struct GhosttyQualificationResult: Codable, Equatable, Sendable {
     }
 }
 
-public actor GhosttyTargetBindingStore {
-    private var bindings: [CLIInstanceID: GhosttyTargetBinding] = [:]
-
-    public init() {}
-
-    public func bind(_ instanceID: CLIInstanceID, to binding: GhosttyTargetBinding) {
-        bindings[instanceID] = binding
-    }
-
-    public func binding(for instanceID: CLIInstanceID) -> GhosttyTargetBinding? {
-        bindings[instanceID]
-    }
-
-    public func remove(_ instanceID: CLIInstanceID) {
-        bindings.removeValue(forKey: instanceID)
-    }
-
-    public func removeAll() {
-        bindings.removeAll()
-    }
-}
-
 public struct GhosttyAdapter: TerminalAdapter, Sendable {
+    public static let associationTimeoutMilliseconds: UInt64 = 60_000
+
     public let terminal = SupportedTerminal.ghostty
 
     private let installation: TerminalApplicationDescriptor
     private let runner: any GhosttyScriptRunning
     private let processLocator: any GhosttyProcessLocating
     private let bindings: GhosttyTargetBindingStore
+    private let associationTokenGenerator: @Sendable () throws -> SurfaceAssociationToken
 
     public init(
         installation: TerminalApplicationDescriptor,
         runner: any GhosttyScriptRunning = OSAScriptRunner(),
         processLocator: any GhosttyProcessLocating = WorkspaceGhosttyProcessLocator(),
-        bindings: GhosttyTargetBindingStore = GhosttyTargetBindingStore()
+        bindings: GhosttyTargetBindingStore,
+        associationTokenGenerator: @escaping @Sendable () throws -> SurfaceAssociationToken = {
+            try SurfaceAssociationToken.generate()
+        }
     ) throws {
         guard installation.terminal == .ghostty else {
             throw GhosttyAdapterError.wrongTerminal
@@ -386,10 +370,12 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
         self.runner = runner
         self.processLocator = processLocator
         self.bindings = bindings
+        self.associationTokenGenerator = associationTokenGenerator
     }
 
-    public func makeOpenCopilotPlan(
-        for request: OpenCopilotRequest
+    private func makeOpenCopilotPlan(
+        for request: OpenCopilotRequest,
+        associationToken: SurfaceAssociationToken
     ) throws -> TerminalLaunchPlan {
         guard
             request.terminal.terminal == .ghostty,
@@ -411,16 +397,22 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
                 installation.applicationURL.path,
                 request.projectDirectoryURL.path,
                 cliPath,
+                associationToken.rawValue,
             ],
             workingDirectoryURL: request.projectDirectoryURL,
-            surfaceDisposition: .newWindow
+            surfaceDisposition: .newWindow,
+            surfaceAssociationToken: associationToken
         )
     }
 
     public func openCopilot(
         _ request: OpenCopilotRequest
-    ) async throws -> GhosttyTargetBinding {
-        _ = try makeOpenCopilotPlan(for: request)
+    ) async throws -> GhosttyOpenedSurface {
+        let associationToken = try associationTokenGenerator()
+        let plan = try makeOpenCopilotPlan(
+            for: request,
+            associationToken: associationToken
+        )
         let initialApplications = await processLocator.runningApplications()
         guard initialApplications.count <= 1 else {
             throw GhosttyAdapterError.multipleInstances
@@ -428,37 +420,63 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
         if let initialApplication = initialApplications.first {
             try validateRunningApplication(initialApplication)
         }
-        let output = try await runScript(
-            GhosttyScripts.newWindow,
-            arguments: [
-                installation.applicationURL.path,
-                request.projectDirectoryURL.path,
-                request.cliExecutable.candidateURL.path,
-            ]
+        let nowMilliseconds = Self.uptimeMilliseconds()
+        try await bindings.reserve(
+            associationToken,
+            expiresAtMilliseconds: nowMilliseconds + Self.associationTimeoutMilliseconds,
+            nowMilliseconds: nowMilliseconds
         )
-        let processIdentifier = try await soleProcessIdentifier()
-        if let initialProcessIdentifier = initialApplications.first?.processIdentifier,
-            processIdentifier != initialProcessIdentifier
-        {
-            throw GhosttyAdapterError.multipleInstances
+        do {
+            let output = try await runScript(
+                GhosttyScripts.newWindow,
+                arguments: Array(plan.arguments.suffix(4))
+            )
+            let processIdentifier = try await soleProcessIdentifier()
+            if let initialProcessIdentifier = initialApplications.first?.processIdentifier,
+                processIdentifier != initialProcessIdentifier
+            {
+                throw GhosttyAdapterError.multipleInstances
+            }
+            let binding = try GhosttyTargetBinding(
+                processIdentifier: processIdentifier,
+                surface: Self.parseCreatedSurface(output)
+            )
+            let claimedInstanceID = try await bindings.attach(
+                binding,
+                to: associationToken,
+                nowMilliseconds: Self.uptimeMilliseconds()
+            )
+            return GhosttyOpenedSurface(
+                associationToken: associationToken,
+                binding: binding,
+                claimedInstanceID: claimedInstanceID
+            )
+        } catch {
+            await bindings.cancel(associationToken)
+            throw error
         }
-        return try GhosttyTargetBinding(
-            processIdentifier: processIdentifier,
-            surface: Self.parseCreatedSurface(output)
+    }
+
+    public func claim(
+        _ associationToken: SurfaceAssociationToken,
+        for instanceID: CLIInstanceID
+    ) async -> GhosttyAssociationClaimOutcome {
+        await claim(
+            associationToken,
+            for: instanceID,
+            nowMilliseconds: Self.uptimeMilliseconds()
         )
     }
 
-    public func bind(
-        _ instanceID: CLIInstanceID,
-        to reference: GhosttySurfaceReference
-    ) async throws {
-        let processIdentifier = try await soleProcessIdentifier()
-        await bindings.bind(
-            instanceID,
-            to: try GhosttyTargetBinding(
-                processIdentifier: processIdentifier,
-                surface: reference
-            )
+    public func claim(
+        _ associationToken: SurfaceAssociationToken,
+        for instanceID: CLIInstanceID,
+        nowMilliseconds: UInt64
+    ) async -> GhosttyAssociationClaimOutcome {
+        await bindings.claim(
+            associationToken,
+            for: instanceID,
+            nowMilliseconds: nowMilliseconds
         )
     }
 
@@ -559,12 +577,14 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
     ) async throws -> GhosttyQualificationResult {
         let processIdentifier = try await soleProcessIdentifier()
         let initialReferences = Set(try await snapshot().surfaces.map(\.reference))
+        let qualificationToken = try associationTokenGenerator()
         let createdOutput = try await runScript(
             GhosttyScripts.createQualificationSurfaces,
             arguments: [
                 installation.applicationURL.path,
                 workingDirectoryURL.path,
                 "/usr/bin/true",
+                qualificationToken.rawValue,
             ]
         )
         let created = try Self.parseQualificationSurfaces(createdOutput)
@@ -640,6 +660,76 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
             )
         } catch {
             try? await closeQualificationWindow(created.windowIdentifier)
+            throw error
+        }
+    }
+
+    public func qualifyAssociationEnvironment(
+        probeExecutableURL: URL,
+        resultURL: URL
+    ) async throws -> Bool {
+        let standardizedProbeExecutableURL = probeExecutableURL.standardizedFileURL
+        let standardizedResultURL = resultURL.standardizedFileURL
+        guard Self.isSafeGhosttyCommandPath(standardizedProbeExecutableURL.path),
+            standardizedResultURL.isFileURL,
+            standardizedResultURL.path.hasPrefix(
+                FileManager.default.temporaryDirectory.standardizedFileURL.path + "/"
+            ),
+            !FileManager.default.fileExists(atPath: standardizedResultURL.path)
+        else {
+            throw GhosttyAdapterError.unsafeCLIExecutablePath
+        }
+        let processIdentifier = try await soleProcessIdentifier()
+        let initialReferences = Set(try await snapshot().surfaces.map(\.reference))
+        let associationToken = try associationTokenGenerator()
+        let createdOutput = try await runScript(
+            GhosttyScripts.newAssociationProbeWindow,
+            arguments: [
+                installation.applicationURL.path,
+                FileManager.default.temporaryDirectory.path,
+                standardizedProbeExecutableURL.path,
+                associationToken.rawValue,
+                standardizedResultURL.path,
+            ]
+        )
+        let created = try Self.parseCreatedSurface(createdOutput)
+        do {
+            guard try await soleProcessIdentifier() == processIdentifier else {
+                throw GhosttyAdapterError.multipleInstances
+            }
+            let deadline = Date().addingTimeInterval(5)
+            var probeResult: GhosttyAssociationProbeResult?
+            while probeResult == nil, Date() < deadline {
+                if FileManager.default.fileExists(atPath: standardizedResultURL.path) {
+                    let data = try Data(contentsOf: standardizedResultURL)
+                    probeResult = try JSONDecoder().decode(
+                        GhosttyAssociationProbeResult.self,
+                        from: data
+                    )
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            guard
+                probeResult?.schemaVersion == 1,
+                probeResult?.surfaceAssociationToken == associationToken
+            else {
+                throw GhosttyAdapterError.scriptFailed(
+                    "The Ghostty child process did not inherit the expected surface token."
+                )
+            }
+            try await closeQualificationWindow(created.windowIdentifier)
+            try? FileManager.default.removeItem(at: standardizedResultURL)
+            let finalReferences = Set(try await snapshot().surfaces.map(\.reference))
+            guard finalReferences == initialReferences else {
+                throw GhosttyAdapterError.scriptFailed(
+                    "The Ghostty association probe did not preserve existing surfaces."
+                )
+            }
+            return true
+        } catch {
+            try? await closeQualificationWindow(created.windowIdentifier)
+            try? FileManager.default.removeItem(at: standardizedResultURL)
             throw error
         }
     }
@@ -845,6 +935,10 @@ public struct GhosttyAdapter: TerminalAdapter, Sendable {
                     || [0x2F, 0x2E, 0x5F, 0x2D, 0x2B].contains(scalar.value)
             }
     }
+
+    private static func uptimeMilliseconds() -> UInt64 {
+        DispatchTime.now().uptimeNanoseconds / 1_000_000
+    }
 }
 
 enum GhosttyScripts {
@@ -924,6 +1018,7 @@ enum GhosttyScripts {
             set applicationPath to item 1 of argv
             set projectDirectory to item 2 of argv
             set copilotExecutable to item 3 of argv
+            set associationToken to item 4 of argv
             set textTab to ASCII character 9
             using terms from application "Ghostty"
                 tell application applicationPath
@@ -931,6 +1026,7 @@ enum GhosttyScripts {
                     set initial working directory of surfaceConfiguration to projectDirectory
                     set command of surfaceConfiguration to copilotExecutable
                     set wait after command of surfaceConfiguration to true
+                    set environment variables of surfaceConfiguration to {"COPILOT_MICRO_SURFACE_TOKEN=" & associationToken}
                     set createdWindow to new window with configuration surfaceConfiguration
                     set createdTab to selected tab of createdWindow
                     set createdTerminal to focused terminal of createdTab
@@ -945,6 +1041,7 @@ enum GhosttyScripts {
             set applicationPath to item 1 of argv
             set projectDirectory to item 2 of argv
             set qualificationCommand to item 3 of argv
+            set associationToken to item 4 of argv
             set textTab to ASCII character 9
             using terms from application "Ghostty"
                 tell application applicationPath
@@ -952,6 +1049,7 @@ enum GhosttyScripts {
                     set initial working directory of surfaceConfiguration to projectDirectory
                     set command of surfaceConfiguration to qualificationCommand
                     set wait after command of surfaceConfiguration to true
+                    set environment variables of surfaceConfiguration to {"COPILOT_MICRO_SURFACE_TOKEN=" & associationToken}
                     set createdWindow to new window with configuration surfaceConfiguration
                     try
                         set firstTab to selected tab of createdWindow
@@ -966,6 +1064,30 @@ enum GhosttyScripts {
                         end try
                         error messageText number errorNumber
                     end try
+                end tell
+            end using terms from
+        end run
+        """#
+
+    static let newAssociationProbeWindow = #"""
+        on run argv
+            set applicationPath to item 1 of argv
+            set projectDirectory to item 2 of argv
+            set probeExecutable to item 3 of argv
+            set associationToken to item 4 of argv
+            set resultPath to item 5 of argv
+            set textTab to ASCII character 9
+            using terms from application "Ghostty"
+                tell application applicationPath
+                    set surfaceConfiguration to new surface configuration
+                    set initial working directory of surfaceConfiguration to projectDirectory
+                    set command of surfaceConfiguration to probeExecutable
+                    set wait after command of surfaceConfiguration to true
+                    set environment variables of surfaceConfiguration to {"COPILOT_MICRO_SURFACE_TOKEN=" & associationToken, "COPILOT_MICRO_ASSOCIATION_RESULT_PATH=" & resultPath}
+                    set createdWindow to new window with configuration surfaceConfiguration
+                    set createdTab to selected tab of createdWindow
+                    set createdTerminal to focused terminal of createdTab
+                    return "created" & textTab & (id of createdWindow as text) & textTab & (id of createdTab as text) & textTab & (id of createdTerminal as text)
                 end tell
             end using terms from
         end run

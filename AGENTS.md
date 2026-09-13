@@ -13,9 +13,13 @@ Louder Input must remain closed. The managed keymap backup/restore tools remain
 separate and guarded. The app does not start the CLI socket or install the
 production extension; every stateful Copilot CLI action remains rejected until
 I-15. The terminal module validates supported installations, exact saved
-preferences, CLI paths and typed process/window/tab/pane evidence, but no
-terminal-specific focus adapter is qualified yet. Do not reintroduce simulated
-device state or widen CLI authority.
+preferences, CLI paths and typed process/window/tab/pane evidence. Its Ghostty
+1.3.1 adapter is qualified for exact stable-surface observation and focus.
+App-created Ghostty surfaces now receive a one-time association token that the
+bridge registration can return to a race-safe native registry; exact child
+environment inheritance is live-qualified. The packaged app has not yet
+started the bridge or connected a real registration to that registry. Do not
+reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -59,6 +63,11 @@ the repository could load it into a real session.
   Ghostty window containing two tabs and one split, run only `/usr/bin/true`,
   verify exact focus through the production adapter, and close the created
   window by its stable ID.
+- `make qualify-ghostty-association
+  CONSENT=I-authorize-ghostty-environment-test`: create one temporary Ghostty
+  window running the local probe, prove exact surface-token inheritance by the
+  child process, remove its private result, and close the created window by its
+  stable ID.
 - `make qualify-hardware CONSENT=I-own-this-device-read`: explicitly discover,
   open non-exclusively and read bounded identity/status/keymap metadata from
   one Creator Micro 2 candidate. It performs no configuration or lighting

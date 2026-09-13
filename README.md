@@ -20,8 +20,14 @@ Validated terminal and CLI discovery plus the shared exact-target contract are
 implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
 are qualified through its documented AppleScript API, including focus from
 another foreground app and cleanup of a temporary multi-tab/split test window.
-Automatic association of an already-running Copilot CLI instance remains
-disabled because Ghostty exposes neither the terminal child PID nor TTY.
+App-created Ghostty surfaces now carry a one-time association token into their
+child process. The bridge registration can carry that token, and a race-safe
+native registry resolves either launch/registration ordering without allowing
+token reassignment. Live qualification proved exact child environment
+inheritance and cleanup. Automatic association of an already running Copilot
+CLI instance remains disabled because Ghostty exposes neither the terminal
+child PID nor TTY. The packaged app does not yet start the bridge or launch
+and claim a real Copilot CLI registration.
 
 ## Developer setup
 
@@ -216,12 +222,25 @@ make qualify-ghostty-roundtrip \
   CONSENT=I-authorize-temporary-ghostty-window-test
 ```
 
+The association qualifier creates one temporary window running only the local
+probe executable. It verifies that Ghostty passes an exact one-time
+`COPILOT_MICRO_SURFACE_TOKEN` into the child process, removes the private
+result and closes the exact created window:
+
+```sh
+make qualify-ghostty-association \
+  CONSENT=I-authorize-ghostty-environment-test
+```
+
 The live macOS `26.6.2` result is recorded in
 [`Compatibility/ghostty-1.3.1-macos-26.6.2.json`](Compatibility/ghostty-1.3.1-macos-26.6.2.json).
 Ghostty's scripting dictionary has no terminal child PID or TTY, so existing
-manually launched CLI sessions cannot yet be bound safely. Composer, picker,
-permission and question context also remain unavailable rather than being
-approximated with terminal text or global keystrokes.
+manually launched CLI sessions cannot be bound safely. App-created surface
+token transport is implemented and live-qualified, but the packaged app has
+not yet started the authenticated bridge, launched Copilot through this path
+or claimed a real extension registration. Composer, picker, permission and
+question context also remain unavailable rather than being approximated with
+terminal text or global keystrokes.
 
 ## Live hardware app and qualification
 
