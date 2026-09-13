@@ -264,7 +264,35 @@ struct DeviceConfigurationWriteTests {
         #expect(receipt.observedResultSHA256 == plan.resultSHA256)
         #expect(receipt.activeProfileID == plan.activeProfileID)
         #expect(receipt.activeLayerIndex == plan.activeLayerIndex)
+        #expect(receipt.writeAcknowledged)
         #expect(!receipt.competingTrafficObservedAfterWrite)
+    }
+
+    @Test("A missing write acknowledgement can be reconciled by complete read-back")
+    func writeTimeoutCanBeReconciled() throws {
+        let preview = try keymapDocument(valuePrefix: "preview")
+        let plan = try DeviceConfigurationWritePlan(
+            managedMapping: preview.planForCopilotMicro()
+        )
+        let readBack = try DeviceKeymapDocument(
+            data: plan.resultData,
+            activeLayerIndex: plan.activeLayerIndex
+        )
+
+        let receipt = try DeviceWriteReceipt.reconciledAfterWriteTimeout(
+            plan: plan,
+            readBack: readBack
+        )
+        #expect(receipt.readBackVerified)
+        #expect(!receipt.writeAcknowledged)
+        #expect(receipt.observedResultSHA256 == plan.resultSHA256)
+
+        #expect(throws: DeviceConfigurationWriteError.readBackMismatch) {
+            _ = try DeviceWriteReceipt.reconciledAfterWriteTimeout(
+                plan: plan,
+                readBack: preview
+            )
+        }
     }
 
     private func keymapDocument(valuePrefix: String) throws -> DeviceKeymapDocument {

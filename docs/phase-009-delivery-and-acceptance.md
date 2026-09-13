@@ -9,11 +9,13 @@ part of stage 3 also has native/Node mock evidence for private authenticated
 IPC, bounded frames, roles, generations, sequences and rejection cases. The app
 does not start it. A separate source-only probe joined owned disposable Copilot
 CLI `1.0.84-5` sessions and produced a conservative compatibility report.
-USB HID discovery/read and the original-backup/mapping-preview path now have
-real-device evidence. No device mapping write has been performed. This does
-not qualify the production bridge, terminal, physical input, lighting,
-Bluetooth or updater, and it does not convert simulated acceptance journeys
-into hardware evidence.
+USB HID discovery/read, durable original backup, one guarded managed mapping
+write, exact independent read-back and an original-map restore preview now
+have real-device evidence. Firmware omitted the write acknowledgement, so the
+transport path reconciles that timeout through a fresh read-only connection.
+This does not qualify the production bridge, terminal, physical input,
+lighting, a real restore, Bluetooth or updater, and it does not convert
+simulated acceptance journeys into hardware evidence.
 
 ## Delivery strategy
 
@@ -59,7 +61,7 @@ contract was not.
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
 | U-08 | Model and effort capabilities | Partial | Current model/choices read; interactive/plan restored; same effort written/read; no different model or next-turn semantics | Available values/read-back and next-turn semantics verified |
-| U-09 | Current Pro firmware and both transports | Partial | USB read-only transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; the original keymap is durably backed up and a 19-change map is previewed, but Bluetooth, exact Pro behavior, input, lighting, a real write and restore remain unproven | Visible LED/input behavior and reversible map on exact hardware |
+| U-09 | Current Pro firmware and both transports | Partial | USB transport qualified PID `0x8298`, firmware `0.6.2`, active layer `2` and key rows `[2,4,4,3]`; the original keymap is durably backed up, the 19-change map was written and independently read back at its exact target hash, and restore was previewed; exact Pro behavior, physical input, lighting, Bluetooth qualification and a real restore remain unproven | Visible LED/input behavior and reversible map on exact hardware |
 | U-10 | Safe internal built-in updater | Unproven | No updater probe in this work package | Configured source/auth, trusted integrity and recoverable replacement, or disabled updater with gap |
 
 Qualification probes must not authorize production tools, alter real work, flash
@@ -154,10 +156,12 @@ contract/integration tests with owned disposable CLI sessions for bridge and
 terminal behavior. Use real-device qualification for physical geometry,
 lighting, transport and restore.
 
-The read-only hardware probe provides partial U-09 evidence and validates
-byte-fragment reassembly, request bounds, active profile identity and a
-non-first active layer. It does not count as A-22, A-24, A-30 or A-33 because
-no mapping, physical input, light output, reconnect or restore was exercised.
+The hardware probe and guarded setup path provide partial U-09 evidence and
+validate byte-fragment reassembly, request bounds, active profile identity, a
+non-first active layer, durable backup, one exact USB map write/read-back and
+a restore preview. They do not fully satisfy A-22, A-24, A-30 or A-33 because
+physical input, light output, transport recovery and an actual restore remain
+unexercised.
 
 Emulator tests do not qualify hardware. Mock request responses do not qualify
 the real CLI. HID acknowledgements do not prove visible LEDs. A successful

@@ -97,6 +97,7 @@ private struct SetupReport: Encodable {
     let changes: [SetupChange]
     let requiredConsent: String?
     let readBackVerified: Bool
+    let writeAcknowledged: Bool?
     let competingTrafficObserved: Bool
     let mutatingOperationsPerformed: Bool
 }
@@ -231,16 +232,14 @@ private struct CopilotMicroDeviceSetup {
             consent: consent
         )
         try await saveFreshPreChange(context: context, store: store, plan: plan)
-        let receipt = try context.connection.apply(
-            plan,
-            authorization: authorization,
-            beforeWrite: rejectKnownConfigurators
+        let receipt = try await applyWithReconciliation(
+            context: context,
+            plan: plan,
+            authorization: authorization
         )
         emit(
             report(
-                outcome: receipt.competingTrafficObservedAfterWrite
-                    ? "applied-with-contention-warning"
-                    : "applied",
+                outcome: mutationOutcome("applied", receipt: receipt),
                 context: context,
                 targetSHA256: plan.resultSHA256,
                 transactionSHA256: authorization.transactionSHA256,
@@ -252,6 +251,7 @@ private struct CopilotMicroDeviceSetup {
                 activeProfileID: receipt.activeProfileID,
                 activeLayerIndex: receipt.activeLayerIndex,
                 readBackVerified: receipt.readBackVerified,
+                writeAcknowledged: receipt.writeAcknowledged,
                 competingTrafficObserved: receipt.competingTrafficObservedAfterWrite,
                 mutated: true
             )
@@ -316,16 +316,14 @@ private struct CopilotMicroDeviceSetup {
             consent: consent
         )
         try await saveFreshPreChange(context: context, store: store, plan: plan)
-        let receipt = try context.connection.apply(
-            plan,
-            authorization: authorization,
-            beforeWrite: rejectKnownConfigurators
+        let receipt = try await applyWithReconciliation(
+            context: context,
+            plan: plan,
+            authorization: authorization
         )
         emit(
             report(
-                outcome: receipt.competingTrafficObservedAfterWrite
-                    ? "restored-with-contention-warning"
-                    : "restored",
+                outcome: mutationOutcome("restored", receipt: receipt),
                 context: context,
                 targetSHA256: plan.resultSHA256,
                 transactionSHA256: authorization.transactionSHA256,
@@ -343,6 +341,7 @@ private struct CopilotMicroDeviceSetup {
                 activeProfileID: receipt.activeProfileID,
                 activeLayerIndex: receipt.activeLayerIndex,
                 readBackVerified: receipt.readBackVerified,
+                writeAcknowledged: receipt.writeAcknowledged,
                 competingTrafficObserved: receipt.competingTrafficObservedAfterWrite,
                 mutated: true
             )
@@ -449,6 +448,54 @@ private struct CopilotMicroDeviceSetup {
         )
     }
 
+    private static func applyWithReconciliation(
+        context: DeviceContext,
+        plan: DeviceConfigurationWritePlan,
+        authorization: DeviceWriteAuthorization
+    ) async throws -> DeviceWriteReceipt {
+        do {
+            return try context.connection.apply(
+                plan,
+                authorization: authorization,
+                beforeWrite: rejectKnownConfigurators
+            )
+        } catch HIDConnectionError.timeout(let method) where method == "fs.write" {
+            var lastError: Error = DeviceConfigurationWriteError.readBackMismatch
+            for attempt in 0..<3 {
+                if attempt > 0 {
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                do {
+                    let verification = try openDevice(accessMode: .sharedReadOnly)
+                    defer { verification.connection.close() }
+                    guard verification.associationID == context.associationID else {
+                        throw DeviceConfigurationWriteError.authorizationMismatch
+                    }
+                    return try DeviceWriteReceipt.reconciledAfterWriteTimeout(
+                        plan: plan,
+                        readBack: verification.keymap
+                    )
+                } catch {
+                    lastError = error
+                }
+            }
+            throw lastError
+        }
+    }
+
+    private static func mutationOutcome(
+        _ completed: String,
+        receipt: DeviceWriteReceipt
+    ) -> String {
+        if !receipt.writeAcknowledged {
+            return "\(completed)-after-timeout-reconciliation"
+        }
+        if receipt.competingTrafficObservedAfterWrite {
+            return "\(completed)-with-contention-warning"
+        }
+        return completed
+    }
+
     private static func rejectKnownConfigurators() throws {
         let currentProcessID = ProcessInfo.processInfo.processIdentifier
         let running = NSWorkspace.shared.runningApplications.filter {
@@ -489,6 +536,7 @@ private struct CopilotMicroDeviceSetup {
         activeProfileID: Int? = nil,
         activeLayerIndex: Int? = nil,
         readBackVerified: Bool,
+        writeAcknowledged: Bool? = nil,
         competingTrafficObserved: Bool = false,
         mutated: Bool
     ) -> SetupReport {
@@ -523,6 +571,7 @@ private struct CopilotMicroDeviceSetup {
             changes: keyChangeReports + peripheralChangeReports,
             requiredConsent: requiredConsent,
             readBackVerified: readBackVerified,
+            writeAcknowledged: writeAcknowledged,
             competingTrafficObserved: competingTrafficObserved,
             mutatingOperationsPerformed: mutated
         )

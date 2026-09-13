@@ -248,7 +248,31 @@ public struct DeviceWriteReceipt: Codable, Equatable, Sendable {
     public let activeProfileID: Int
     public let activeLayerIndex: Int
     public let readBackVerified: Bool
+    public let writeAcknowledged: Bool
     public let competingTrafficObservedAfterWrite: Bool
+
+    public static func reconciledAfterWriteTimeout(
+        plan: DeviceConfigurationWritePlan,
+        readBack: DeviceKeymapDocument
+    ) throws -> DeviceWriteReceipt {
+        guard
+            readBack.sha256 == plan.resultSHA256
+                || readBack.isSemanticallyEqual(to: plan.resultData)
+        else {
+            throw DeviceConfigurationWriteError.readBackMismatch
+        }
+        return DeviceWriteReceipt(
+            operation: plan.operation,
+            sourceSHA256: plan.sourceSHA256,
+            expectedResultSHA256: plan.resultSHA256,
+            observedResultSHA256: readBack.sha256,
+            activeProfileID: readBack.activeProfileID,
+            activeLayerIndex: readBack.activeLayerIndex,
+            readBackVerified: true,
+            writeAcknowledged: false,
+            competingTrafficObservedAfterWrite: false
+        )
+    }
 
     func recordingCompetingTrafficAfterWrite(_ observed: Bool) -> DeviceWriteReceipt {
         DeviceWriteReceipt(
@@ -259,6 +283,7 @@ public struct DeviceWriteReceipt: Codable, Equatable, Sendable {
             activeProfileID: activeProfileID,
             activeLayerIndex: activeLayerIndex,
             readBackVerified: readBackVerified,
+            writeAcknowledged: writeAcknowledged,
             competingTrafficObservedAfterWrite: observed
         )
     }
@@ -318,6 +343,7 @@ enum DeviceConfigurationExecutor {
             activeProfileID: readBack.activeProfileID,
             activeLayerIndex: readBack.activeLayerIndex,
             readBackVerified: true,
+            writeAcknowledged: true,
             competingTrafficObservedAfterWrite: false
         )
     }

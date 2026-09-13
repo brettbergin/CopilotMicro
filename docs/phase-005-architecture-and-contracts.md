@@ -11,9 +11,10 @@ production CLI-hosted session bridge and live-session components remain
 unimplemented. The device boundary now has read-only IOKit discovery, bounded
 HID JSON-RPC framing and one qualified USB tuple. The guarded developer setup
 path now implements device-associated original backup, exact mapping preview,
-guarded one-write authorization and complete read-back verification. No
-mapping write has been authorized or performed, and no app-owned device
-service, physical input or lighting is enabled.
+guarded one-write authorization and complete read-back verification. The first
+managed USB write reached the exact reviewed target despite a missing firmware
+acknowledgement, and the original-map restore is previewable. No app-owned
+device service, physical input or lighting is enabled.
 
 ## Component boundaries
 

@@ -19,8 +19,9 @@ integrity-checked original backup and requires a closed-configurator
 declaration, known-configurator rejection, a
 device/source/target/backup/change-bound transaction digest, fresh pre-change
 snapshot, competing-response detection, exact consent and complete read-back
-before reporting a write as successful. No real mapping write has been
-performed yet.
+before reporting a write as successful. The first managed USB write was
+independently read back at the exact reviewed target after firmware omitted
+its acknowledgement; the verified original backup remains available.
 
 ## Trust boundaries
 

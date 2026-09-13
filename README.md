@@ -224,8 +224,14 @@ during preflight; traffic first observed afterward preserves the verified
 receipt and emits an explicit contention warning. These commands are
 intentionally not part of `make check`.
 
-No device mapping has been applied yet. Physical input and lighting remain
-unqualified until the reviewed mapping is explicitly approved and exercised.
+Firmware `0.6.2` applied the first USB `fs.write` without returning its
+acknowledgement.
+The setup tool treats that timeout as ambiguous, reconnects read-only and
+reports success only if the complete keymap matches the reviewed target.
+
+The first managed USB mapping was independently read back at the exact target
+SHA-256, and a restore transaction back to the verified original backup was
+previewed. Physical input, lighting and an actual restore remain unqualified.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;

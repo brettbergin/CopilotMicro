@@ -9,9 +9,11 @@ discovery, bounded HID framing/reassembly and an explicit read-only hardware
 probe are implemented. The guarded setup tool now implements durable original
 backup, bounded recovery history, exact mapping/restore previews, guarded
 one-write authorization and complete read-back verification. The original USB
-keymap has been backed up and a managed mapping preview generated; no mapping
-write has been authorized or performed. Physical input, lighting, Bluetooth
-and a real restore remain unqualified.
+keymap has been backed up, the managed mapping was written over USB and
+independently read back at its exact target hash, and an original-map restore
+was previewed. The firmware omitted the `fs.write` response, so timeout
+reconciliation is now part of the guarded path. Physical input, lighting and a
+real restore remain unqualified.
 
 ## Supported hardware boundary
 
@@ -129,6 +131,8 @@ Before the first managed write for a device:
 A JSON-RPC acknowledgement alone is not success. A failed or ambiguous write
 must leave a recoverable state and show Restore/retry guidance. Do not
 automatically overwrite the original backup with the managed mapping.
+If firmware applies `fs.write` but omits its response, reconnect read-only and
+report success only after the complete keymap matches the reviewed target.
 
 Before later configuration writes, keep a bounded pre-change recovery
 snapshot. Detect external changes made by Input or another configurator;
