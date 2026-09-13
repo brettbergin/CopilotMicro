@@ -266,6 +266,24 @@ UI-context and argument-vector launch contracts. The contract does not claim
 that an adapter has established exact focus: `.applicationOnly`, wrong-surface,
 unavailable and unknown evidence remain distinct from `.exact`.
 
+The Ghostty `1.3.1` adapter implements that boundary with the application's
+documented AppleScript dictionary. A bounded `/usr/bin/osascript` transport
+uses static script source, separate arguments, a minimal environment, private
+temporary output files, a deadline and output-size limits. It reads stable
+window/tab/terminal IDs but no titles, working directories, commands or
+terminal text. Focus succeeds only after activating the bound window,
+selecting the bound tab, focusing the bound terminal and re-reading all three
+identities.
+
+Ghostty exposes no terminal child PID or TTY. Consequently, title or working
+directory similarity is not acceptable association evidence for an existing
+Copilot CLI process. The adapter accepts only an explicit
+`CLIInstanceID`-to-surface binding. App-created surfaces return their stable
+IDs, but production registration still needs a separate exact association
+token before those surfaces can be bound automatically. Until then, Ghostty
+focus capability is qualified at the surface layer but disabled for arbitrary
+existing CLI sessions.
+
 ## Deterministic state and observability
 
 Implement LED projection and action preconditions as testable deterministic

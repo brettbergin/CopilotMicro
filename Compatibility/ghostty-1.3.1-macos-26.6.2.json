@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-13",
+  "outcome": "exact-surface-focus-qualified-with-association-gap",
+  "source": "deterministic adapter tests plus operator-authorized live AppleScript probes",
+  "macOS": {
+    "productVersion": "26.6.2",
+    "buildVersion": "25G83"
+  },
+  "terminal": {
+    "name": "Ghostty",
+    "version": "1.3.1",
+    "bundleIdentifier": "com.mitchellh.ghostty",
+    "applicationPath": "/Applications/Ghostty.app"
+  },
+  "scriptingDictionary": {
+    "repository": "ghostty-org/ghostty",
+    "tag": "v1.3.1",
+    "path": "macos/Ghostty.sdef",
+    "blobSHA": "bdfc501fb518368a9762c5f07248d90a3142d258"
+  },
+  "liveReadOnlySnapshot": {
+    "runningApplicationProcesses": 1,
+    "windows": 1,
+    "tabs": 2,
+    "terminalSurfaces": 2,
+    "frontmostSurfaceResolvedByStableIDs": true,
+    "terminalTextRead": false,
+    "terminalCommandsRead": false,
+    "workingDirectoriesRead": false
+  },
+  "liveRoundTrip": {
+    "existingWindowPreserved": true,
+    "temporaryWindowsCreated": 1,
+    "temporaryTabsCreated": 2,
+    "temporarySplitsCreated": 1,
+    "temporaryCommand": "/usr/bin/true",
+    "foregroundDisplacementVerified": true,
+    "firstTerminalExactFocusVerified": true,
+    "splitTerminalExactFocusVerified": true,
+    "postFocusSnapshotRevalidation": true,
+    "temporaryWindowClosedByStableID": true,
+    "cleanupVerified": true
+  },
+  "adapterSafety": {
+    "shellInvoked": false,
+    "scriptSourceStatic": true,
+    "argumentsPassedSeparately": true,
+    "selectedApplicationPathRevalidated": true,
+    "multipleRunningGhosttyProcessesRejected": true,
+    "boundedTimeout": true,
+    "boundedOutput": true,
+    "malformedOutputRejected": true,
+    "nonzeroExitRejected": true,
+    "automationDenialReported": true,
+    "accessibilityPermissionRequired": false,
+    "inputTextUsed": false,
+    "sendKeyUsed": false
+  },
+  "qualifiedCapabilities": [
+    "read stable window, tab and terminal IDs",
+    "identify the front window, selected tab and focused terminal",
+    "activate an exact window, select an exact tab and focus an exact terminal",
+    "create a new window with an argument-separated working directory and command",
+    "close only a temporary qualification window identified by its returned stable ID"
+  ],
+  "remainingGaps": [
+    "Ghostty 1.3.1 exposes no terminal child PID or TTY, so an already-running Copilot CLI instance cannot be safely associated with a surface from title or working directory",
+    "the production bridge does not yet return an app-created surface association token",
+    "the packaged app Automation permission and revocation recovery flow remain an onboarding task",
+    "actual Copilot CLI launch through the app was not exercised in this qualification",
+    "Ghostty does not expose Copilot CLI composer, picker, permission or question context through its scripting dictionary"
+  ]
+}

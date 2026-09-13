@@ -51,6 +51,14 @@ the repository could load it into a real session.
 - `make qualify-terminals`: read supported terminal bundle metadata and
   approved Copilot CLI paths without launching a terminal, CLI, or shell
   startup file.
+- `make qualify-ghostty CONSENT=I-authorize-read-only-ghostty-automation`:
+  query stable Ghostty window, tab and terminal IDs after explicit Automation
+  consent. It does not send input or launch a command.
+- `make qualify-ghostty-roundtrip
+  CONSENT=I-authorize-temporary-ghostty-window-test`: create a temporary
+  Ghostty window containing two tabs and one split, run only `/usr/bin/true`,
+  verify exact focus through the production adapter, and close the created
+  window by its stable ID.
 - `make qualify-hardware CONSENT=I-own-this-device-read`: explicitly discover,
   open non-exclusively and read bounded identity/status/keymap metadata from
   one Creator Micro 2 candidate. It performs no configuration or lighting

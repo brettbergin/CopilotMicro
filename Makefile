@@ -5,7 +5,7 @@ SMOKE_OUTPUT ?= build/smoke-$(shell /usr/bin/uuidgen)
 SMOKE_OUTPUT := $(SMOKE_OUTPUT)
 SWIFT_SOURCES := Package.swift App/Sources Packages/CopilotMicroKit/Package.swift Packages/CopilotMicroKit/Sources Packages/CopilotMicroKit/Tests
 
-.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-terminals qualify-hardware observe-device-input qualify-device-lighting preview-device-mapping apply-device-mapping preview-device-restore restore-device-mapping lint format check
+.PHONY: help doctor doctor-xcode build package smoke-test test-doctor test-packager test-contracts test-bridge test-cli-probe test-core qualify-cli qualify-terminals qualify-ghostty qualify-ghostty-roundtrip qualify-hardware observe-device-input qualify-device-lighting preview-device-mapping apply-device-mapping preview-device-restore restore-device-mapping lint format check
 
 help:
 	@printf '%s\n' \
@@ -22,6 +22,8 @@ help:
 		'test-core     Run the Core package Swift Testing suite without XCTest' \
 		'qualify-cli   Explicitly launch an owned disposable CLI capability probe' \
 		'qualify-terminals Read supported terminal and Copilot CLI installation metadata' \
+		'qualify-ghostty Read exact Ghostty window, tab and terminal IDs with consent' \
+		'qualify-ghostty-roundtrip Create, focus and close temporary Ghostty surfaces' \
 		'qualify-hardware Run the read-only Creator Micro 2 hardware probe with exact consent' \
 		'observe-device-input Print normalized physical input for a bounded interval' \
 		'qualify-device-lighting Run a bounded all-key color sequence without changing underglow or flash' \
@@ -78,6 +80,14 @@ qualify-cli:
 
 qualify-terminals:
 	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroTerminalProbe
+
+qualify-ghostty:
+	@if [ "$(CONSENT)" != "I-authorize-read-only-ghostty-automation" ]; then printf '%s\n' 'CONSENT must be I-authorize-read-only-ghostty-automation' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroGhosttyProbe --consent="$(CONSENT)"
+
+qualify-ghostty-roundtrip:
+	@if [ "$(CONSENT)" != "I-authorize-temporary-ghostty-window-test" ]; then printf '%s\n' 'CONSENT must be I-authorize-temporary-ghostty-window-test' >&2; exit 2; fi
+	./scripts/swiftpm run --package-path Packages/CopilotMicroKit --scratch-path Packages/CopilotMicroKit/.build CopilotMicroGhosttyProbe --round-trip --consent="$(CONSENT)"
 
 qualify-hardware:
 	@if [ "$(CONSENT)" != "I-own-this-device-read" ]; then printf '%s\n' 'CONSENT must be I-own-this-device-read' >&2; exit 2; fi

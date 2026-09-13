@@ -1,0 +1,543 @@
+import CopilotMicroCore
+import Foundation
+import Testing
+
+@testable import CopilotMicroTerminal
+
+@Suite("Ghostty adapter")
+struct GhosttyAdapterTests {
+    @Test("Snapshot parser preserves exact window, tab, and terminal IDs")
+    func parsesSnapshot() throws {
+        let snapshot = try GhosttyAdapter.parseSnapshot(
+            """
+            snapshot\ttrue\twindow-1
+            surface\twindow-1\ttab-1\tterminal-1\ttrue\ttrue
+            surface\twindow-1\ttab-1\tterminal-2\ttrue\tfalse
+            """
+        )
+        #expect(snapshot.applicationFrontmost)
+        #expect(snapshot.frontWindowIdentifier == "window-1")
+        #expect(snapshot.surfaces.count == 2)
+        #expect(snapshot.surfaces.first?.terminalFocused == true)
+    }
+
+    @Test("Snapshot parser rejects malformed and oversized responses")
+    func rejectsInvalidSnapshots() {
+        #expect(throws: GhosttyAdapterError.malformedResponse) {
+            _ = try GhosttyAdapter.parseSnapshot("not-a-snapshot")
+        }
+        let rows = (0...256).map {
+            "surface\twindow-\($0)\ttab-\($0)\tterminal-\($0)\tfalse\tfalse"
+        }
+        #expect(throws: GhosttyAdapterError.malformedResponse) {
+            _ = try GhosttyAdapter.parseSnapshot(
+                (["snapshot\tfalse\t"] + rows).joined(separator: "\n")
+            )
+        }
+    }
+
+    @Test("Bound Ghostty surfaces are revalidated before becoming targets")
+    func discoversOnlyBoundExistingSurface() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            outputs: [
+                """
+                snapshot\ttrue\twindow-1
+                surface\twindow-1\ttab-1\tterminal-1\ttrue\ttrue
+                """
+            ]
+        )
+        let bindings = GhosttyTargetBindingStore()
+        let instanceID = try CLIInstanceID(rawValue: "cli-host-42")
+        let reference = try GhosttySurfaceReference(
+            windowIdentifier: "window-1",
+            tabIdentifier: "tab-1",
+            terminalIdentifier: "terminal-1"
+        )
+        await bindings.bind(
+            instanceID,
+            to: try GhosttyTargetBinding(processIdentifier: 42, surface: reference)
+        )
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)]),
+            bindings: bindings
+        )
+
+        let targets = try await adapter.discoverTargets(for: instanceID)
+
+        #expect(targets.count == 1)
+        #expect(targets.first?.instanceID == instanceID)
+        #expect(targets.first?.processIdentifier == 42)
+        #expect(targets.first?.paneIdentifier == "terminal-1")
+    }
+
+    @Test("Unbound CLI instances never inherit another Ghostty surface")
+    func rejectsUnboundInstance() async throws {
+        let runner = FakeGhosttyScriptRunner(outputs: [])
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)])
+        )
+
+        let targets = try await adapter.discoverTargets(
+            for: CLIInstanceID(rawValue: "cli-host-42")
+        )
+
+        #expect(targets.isEmpty)
+        #expect(await runner.invocationCount == 0)
+    }
+
+    @Test("Stale binding fails when the exact terminal disappears")
+    func rejectsStaleBinding() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            outputs: [
+                """
+                snapshot\ttrue\twindow-other
+                surface\twindow-other\ttab-other\tterminal-other\ttrue\ttrue
+                """
+            ]
+        )
+        let bindings = GhosttyTargetBindingStore()
+        let instanceID = try CLIInstanceID(rawValue: "cli-host-42")
+        await bindings.bind(
+            instanceID,
+            to: try GhosttyTargetBinding(
+                processIdentifier: 42,
+                surface: GhosttySurfaceReference(
+                    windowIdentifier: "window-1",
+                    tabIdentifier: "tab-1",
+                    terminalIdentifier: "terminal-1"
+                )
+            )
+        )
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)]),
+            bindings: bindings
+        )
+
+        await #expect(throws: GhosttyAdapterError.surfaceMissing) {
+            _ = try await adapter.discoverTargets(for: instanceID)
+        }
+    }
+
+    @Test("Restarted Ghostty process never matches a stale target")
+    func rejectsRestartedProcess() async throws {
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: FakeGhosttyScriptRunner(outputs: []),
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(99)])
+        )
+
+        let evidence = try await adapter.observeContext(for: target())
+
+        #expect(evidence.match == .unknown)
+    }
+
+    @Test("Focus uses exact IDs and requires post-focus revalidation")
+    func focusesAndRevalidates() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            outputs: [
+                """
+                snapshot\ttrue\twindow-2
+                surface\twindow-1\ttab-1\tterminal-1\ttrue\ttrue
+                """,
+                "focused",
+                """
+                snapshot\ttrue\twindow-1
+                surface\twindow-1\ttab-1\tterminal-1\ttrue\ttrue
+                """,
+            ]
+        )
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)])
+        )
+        let target = try target()
+
+        #expect(try await adapter.focus(target) == .focused)
+        let invocations = await runner.invocations
+        #expect(invocations.count == 3)
+        #expect(
+            invocations[1].arguments == [
+                "/Applications/Ghostty.app",
+                "window-1",
+                "tab-1",
+                "terminal-1",
+            ])
+    }
+
+    @Test("Permission denial fails explicitly")
+    func reportsAutomationDenial() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            errors: [.scriptFailed(1, "Not authorized to send Apple events. (-1743)")]
+        )
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)])
+        )
+
+        await #expect(throws: GhosttyAdapterError.automationDenied) {
+            _ = try await adapter.snapshot()
+        }
+    }
+
+    @Test("Snapshot never launches Ghostty as a read-only side effect")
+    func snapshotRequiresRunningApplication() async throws {
+        let runner = FakeGhosttyScriptRunner(outputs: [])
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([])
+        )
+
+        await #expect(throws: GhosttyAdapterError.notRunning) {
+            _ = try await adapter.snapshot()
+        }
+        #expect(await runner.invocationCount == 0)
+    }
+
+    @Test("Open Copilot plan uses osascript argv and rejects command metacharacters")
+    func plansSafeNewWindow() throws {
+        let installation = ghosttyInstallation()
+        let adapter = try GhosttyAdapter(installation: installation)
+        let request = try openRequest()
+
+        let plan = try adapter.makeOpenCopilotPlan(for: request)
+
+        #expect(plan.launchExecutableURL.path == "/usr/bin/osascript")
+        #expect(plan.surfaceDisposition == .newWindow)
+        #expect(
+            plan.arguments.suffix(3) == [
+                "/Applications/Ghostty.app",
+                "/Users/example/Project With Spaces",
+                "/opt/homebrew/bin/copilot",
+            ])
+
+        let unsafeCLI = CLIExecutableDescriptor(
+            candidateURL: URL(fileURLWithPath: "/tmp/copilot;unsafe"),
+            resolvedExecutableURL: URL(fileURLWithPath: "/tmp/copilot;unsafe"),
+            source: .userSelected
+        )
+        let unsafeRequest = try OpenCopilotRequest(
+            terminal: installation,
+            cliExecutable: unsafeCLI,
+            projectDirectoryURL: URL(fileURLWithPath: "/tmp")
+        )
+        #expect(throws: GhosttyAdapterError.unsafeCLIExecutablePath) {
+            _ = try adapter.makeOpenCopilotPlan(for: unsafeRequest)
+        }
+    }
+
+    @Test("Open Copilot returns the created surface bound to the Ghostty process")
+    func opensNewWindow() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            outputs: ["created\twindow-1\ttab-1\tterminal-1"]
+        )
+        let locator = SequencedGhosttyProcessLocator([
+            [],
+            [runningGhostty(42)],
+        ])
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: locator
+        )
+
+        let binding = try await adapter.openCopilot(openRequest())
+
+        #expect(binding.processIdentifier == 42)
+        #expect(binding.surface.terminalIdentifier == "terminal-1")
+        let invocation = try #require(await runner.invocations.first)
+        #expect(
+            invocation.arguments == [
+                "/Applications/Ghostty.app",
+                "/Users/example/Project With Spaces",
+                "/opt/homebrew/bin/copilot",
+            ])
+    }
+
+    @Test("Multiple Ghostty processes block Open Copilot before scripting")
+    func rejectsAmbiguousRunningApplications() async throws {
+        let runner = FakeGhosttyScriptRunner(outputs: [])
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([
+                runningGhostty(42),
+                runningGhostty(43),
+            ])
+        )
+
+        await #expect(throws: GhosttyAdapterError.multipleInstances) {
+            _ = try await adapter.openCopilot(openRequest())
+        }
+        #expect(await runner.invocationCount == 0)
+    }
+
+    @Test("Production scripts never read text or send terminal input")
+    func scriptsAvoidTerminalContentAndInput() {
+        let scripts = [
+            GhosttyScripts.snapshot,
+            GhosttyScripts.focus,
+            GhosttyScripts.newWindow,
+        ]
+        for script in scripts {
+            #expect(!script.contains("input text"))
+            #expect(!script.contains("send key"))
+            #expect(!script.contains("working directory of currentTerminal"))
+            #expect(!script.contains("name of currentTerminal"))
+        }
+    }
+
+    @Test("Qualification exercises two tabs and a split then verifies cleanup")
+    func qualifiesFocusAndCleanup() async throws {
+        let runner = FakeGhosttyScriptRunner(
+            outputs: [
+                """
+                snapshot\ttrue\twindow-original
+                surface\twindow-original\ttab-original\tterminal-original\ttrue\ttrue
+                """,
+                "created\twindow-q\ttab-1\tterminal-1\ttab-2\tterminal-2\tterminal-3",
+                """
+                snapshot\ttrue\twindow-q
+                surface\twindow-q\ttab-1\tterminal-1\tfalse\tfalse
+                surface\twindow-q\ttab-2\tterminal-2\ttrue\tfalse
+                surface\twindow-q\ttab-2\tterminal-3\ttrue\ttrue
+                """,
+                "focused",
+                """
+                snapshot\ttrue\twindow-q
+                surface\twindow-q\ttab-1\tterminal-1\ttrue\ttrue
+                surface\twindow-q\ttab-2\tterminal-2\tfalse\tfalse
+                surface\twindow-q\ttab-2\tterminal-3\tfalse\tfalse
+                """,
+                """
+                snapshot\ttrue\twindow-q
+                surface\twindow-q\ttab-1\tterminal-1\ttrue\ttrue
+                surface\twindow-q\ttab-2\tterminal-2\tfalse\tfalse
+                surface\twindow-q\ttab-2\tterminal-3\tfalse\tfalse
+                """,
+                "focused",
+                """
+                snapshot\ttrue\twindow-q
+                surface\twindow-q\ttab-1\tterminal-1\tfalse\tfalse
+                surface\twindow-q\ttab-2\tterminal-2\ttrue\tfalse
+                surface\twindow-q\ttab-2\tterminal-3\ttrue\ttrue
+                """,
+                "closed",
+                """
+                snapshot\ttrue\twindow-original
+                surface\twindow-original\ttab-original\tterminal-original\ttrue\ttrue
+                """,
+            ]
+        )
+        let adapter = try GhosttyAdapter(
+            installation: ghosttyInstallation(),
+            runner: runner,
+            processLocator: StaticGhosttyProcessLocator([runningGhostty(42)])
+        )
+
+        let result = try await adapter.qualifySurfaceRoundTrip(
+            workingDirectoryURL: URL(fileURLWithPath: "/tmp")
+        )
+
+        #expect(result.firstFocusOutcome == .focused)
+        #expect(result.splitFocusOutcome == .focused)
+        #expect(!result.foregroundDisplacementVerified)
+        #expect(result.cleanupVerified)
+        let invocations = await runner.invocations
+        #expect(
+            invocations[1].arguments == [
+                "/Applications/Ghostty.app",
+                "/tmp",
+                "/usr/bin/true",
+            ])
+        #expect(
+            invocations[8].arguments == [
+                "/Applications/Ghostty.app",
+                "window-q",
+            ])
+    }
+
+    private func ghosttyInstallation() -> TerminalApplicationDescriptor {
+        TerminalApplicationDescriptor(
+            terminal: .ghostty,
+            bundleIdentifier: SupportedTerminal.ghostty.bundleIdentifier,
+            applicationURL: URL(fileURLWithPath: "/Applications/Ghostty.app"),
+            executableURL: URL(
+                fileURLWithPath: "/Applications/Ghostty.app/Contents/MacOS/ghostty"
+            ),
+            version: "1.3.1",
+            source: .commonLocation
+        )
+    }
+
+    private func target() throws -> TerminalSurfaceTarget {
+        try TerminalSurfaceTarget(
+            terminal: TerminalPreference(ghosttyInstallation()),
+            instanceID: CLIInstanceID(rawValue: "cli-host-42"),
+            processIdentifier: 42,
+            windowIdentifier: "window-1",
+            tabIdentifier: "tab-1",
+            paneIdentifier: "terminal-1"
+        )
+    }
+
+    private func openRequest() throws -> OpenCopilotRequest {
+        let cli = CLIExecutableDescriptor(
+            candidateURL: URL(fileURLWithPath: "/opt/homebrew/bin/copilot"),
+            resolvedExecutableURL: URL(fileURLWithPath: "/opt/homebrew/bin/copilot"),
+            source: .commonLocation
+        )
+        return try OpenCopilotRequest(
+            terminal: ghosttyInstallation(),
+            cliExecutable: cli,
+            projectDirectoryURL: URL(fileURLWithPath: "/Users/example/Project With Spaces")
+        )
+    }
+
+    private func runningGhostty(_ processIdentifier: Int32) -> GhosttyRunningApplication {
+        GhosttyRunningApplication(
+            processIdentifier: processIdentifier,
+            applicationURL: URL(fileURLWithPath: "/Applications/Ghostty.app")
+        )
+    }
+}
+
+@Suite("AppleScript runner")
+struct OSAScriptRunnerTests {
+    @Test("Runner bounds execution time")
+    func boundsExecutionTime() async throws {
+        let helper = try makeHelperScript("sleep 5")
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent()) }
+        let runner = OSAScriptRunner(executableURL: helper, timeoutSeconds: 0.05)
+
+        await #expect(throws: OSAScriptRunnerError.timedOut) {
+            _ = try await runner.run(script: "ignored", arguments: [])
+        }
+    }
+
+    @Test("Runner rejects oversized output")
+    func rejectsOversizedOutput() async throws {
+        let helper = try makeHelperScript(
+            "i=0; while [ \"$i\" -lt 70000 ]; do printf x; i=$((i + 1)); done"
+        )
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent()) }
+        let runner = OSAScriptRunner(executableURL: helper, timeoutSeconds: 5)
+
+        await #expect(throws: OSAScriptRunnerError.outputTooLarge) {
+            _ = try await runner.run(script: "ignored", arguments: [])
+        }
+    }
+
+    @Test("Runner preserves bounded nonzero failures")
+    func reportsNonzeroExit() async throws {
+        let helper = try makeHelperScript("printf 'bounded failure' >&2; exit 7")
+        defer { try? FileManager.default.removeItem(at: helper.deletingLastPathComponent()) }
+        let runner = OSAScriptRunner(executableURL: helper, timeoutSeconds: 1)
+
+        await #expect(
+            throws: OSAScriptRunnerError.scriptFailed(7, "bounded failure")
+        ) {
+            _ = try await runner.run(script: "ignored", arguments: [])
+        }
+    }
+
+    @Test("Runner rejects oversized arguments before launching")
+    func rejectsOversizedArgument() async throws {
+        let runner = OSAScriptRunner(executableURL: URL(fileURLWithPath: "/usr/bin/false"))
+
+        await #expect(throws: OSAScriptRunnerError.invalidArguments) {
+            _ = try await runner.run(
+                script: "ignored",
+                arguments: [String(repeating: "x", count: 4_097)]
+            )
+        }
+    }
+
+    private func makeHelperScript(_ body: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "CopilotMicroGhosttyTests.\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: false
+        )
+        let script = directory.appendingPathComponent("helper.sh")
+        try Data("#!/bin/sh\n\(body)\n".utf8).write(to: script)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: script.path
+        )
+        return script
+    }
+}
+
+private actor FakeGhosttyScriptRunner: GhosttyScriptRunning {
+    struct Invocation: Sendable {
+        let script: String
+        let arguments: [String]
+    }
+
+    private var outputs: [String]
+    private var errors: [OSAScriptRunnerError]
+    private(set) var invocations: [Invocation] = []
+
+    init(
+        outputs: [String] = [],
+        errors: [OSAScriptRunnerError] = []
+    ) {
+        self.outputs = outputs
+        self.errors = errors
+    }
+
+    var invocationCount: Int {
+        invocations.count
+    }
+
+    func run(script: String, arguments: [String]) throws -> String {
+        invocations.append(Invocation(script: script, arguments: arguments))
+        if !errors.isEmpty {
+            throw errors.removeFirst()
+        }
+        guard !outputs.isEmpty else {
+            throw OSAScriptRunnerError.scriptFailed(1, "No fake output.")
+        }
+        return outputs.removeFirst()
+    }
+}
+
+private struct StaticGhosttyProcessLocator: GhosttyProcessLocating {
+    let applications: [GhosttyRunningApplication]
+
+    init(_ applications: [GhosttyRunningApplication]) {
+        self.applications = applications
+    }
+
+    func runningApplications() async -> [GhosttyRunningApplication] {
+        applications
+    }
+}
+
+private actor SequencedGhosttyProcessLocator: GhosttyProcessLocating {
+    private var results: [[GhosttyRunningApplication]]
+
+    init(_ results: [[GhosttyRunningApplication]]) {
+        self.results = results
+    }
+
+    func runningApplications() -> [GhosttyRunningApplication] {
+        guard results.count > 1 else {
+            return results.first ?? []
+        }
+        return results.removeFirst()
+    }
+}

@@ -17,8 +17,11 @@ uninstalled read-only extension entry point and native session reconciler
 implement the qualified Copilot CLI `1.0.84-5` observation subset, but the app
 does not start that bridge and all stateful CLI actions remain disabled.
 Validated terminal and CLI discovery plus the shared exact-target contract are
-implemented; terminal-specific focus and window/tab/pane adapters are not yet
-qualified.
+implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
+are qualified through its documented AppleScript API, including focus from
+another foreground app and cleanup of a temporary multi-tab/split test window.
+Automatic association of an already-running Copilot CLI instance remains
+disabled because Ghostty exposes neither the terminal child PID nor TTY.
 
 ## Developer setup
 
@@ -191,9 +194,34 @@ See
 [`Compatibility/terminal-discovery-macos-26.6.2.json`](Compatibility/terminal-discovery-macos-26.6.2.json).
 
 `CopilotMicroTerminal` also defines the shared process/window/tab/pane target,
-UI-context evidence and argument-array Open Copilot launch contracts. These
-types do not establish that any terminal-specific adapter can yet focus an
-exact surface or execute a launch plan.
+UI-context evidence and argument-array Open Copilot launch contracts. Its
+Ghostty adapter reads only stable surface IDs, requires an explicit
+CLI-instance binding, rejects multiple running Ghostty processes or a
+different selected installation, and re-reads the hierarchy after focus before
+reporting success. It never infers identity from terminal title or working
+directory.
+
+Run the read-only Ghostty probe only after approving macOS Automation access:
+
+```sh
+make qualify-ghostty CONSENT=I-authorize-read-only-ghostty-automation
+```
+
+The separately gated round-trip creates one temporary window containing two
+tabs and one split, runs only `/usr/bin/true`, verifies exact focus from
+another foreground app and closes only the created window:
+
+```sh
+make qualify-ghostty-roundtrip \
+  CONSENT=I-authorize-temporary-ghostty-window-test
+```
+
+The live macOS `26.6.2` result is recorded in
+[`Compatibility/ghostty-1.3.1-macos-26.6.2.json`](Compatibility/ghostty-1.3.1-macos-26.6.2.json).
+Ghostty's scripting dictionary has no terminal child PID or TTY, so existing
+manually launched CLI sessions cannot yet be bound safely. Composer, picker,
+permission and question context also remain unavailable rather than being
+approximated with terminal text or global keystrokes.
 
 ## Live hardware app and qualification
 

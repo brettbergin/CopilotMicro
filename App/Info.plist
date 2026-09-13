@@ -26,6 +26,8 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Copilot Micro uses approved terminal automation to open and focus the exact Copilot CLI surface you selected.</string>
     <key>NSInputMonitoringUsageDescription</key>
     <string>Copilot Micro reads input from your Creator Micro 2 control surface.</string>
     <key>NSPrincipalClass</key>
