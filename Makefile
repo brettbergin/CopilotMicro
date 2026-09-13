@@ -62,7 +62,7 @@ test-contracts:
 	node --test scripts/test/contracts.test.mjs
 
 test-bridge:
-	node --test Bridge/test/client.test.mjs Bridge/test/protocol.test.mjs
+	node --test Bridge/test/client.test.mjs Bridge/test/extension-runtime.test.mjs Bridge/test/protocol.test.mjs Bridge/test/session-observer.test.mjs
 
 test-cli-probe:
 	node --test Bridge/test/probe.test.mjs scripts/test/qualify-cli.test.mjs
@@ -118,10 +118,15 @@ lint:
 	node --check scripts/test/qualify-cli.test.mjs
 	node --check Bridge/src/protocol.mjs
 	node --check Bridge/src/client.mjs
+	node --check Bridge/src/session-observer.mjs
+	node --check Bridge/src/extension-runtime.mjs
+	node --check Bridge/src/extension.mjs
 	node --check Bridge/probe/probe-core.mjs
 	node --check Bridge/probe/extension.mjs
 	node --check Bridge/test/protocol.test.mjs
 	node --check Bridge/test/client.test.mjs
+	node --check Bridge/test/session-observer.test.mjs
+	node --check Bridge/test/extension-runtime.test.mjs
 	node --check Bridge/test/probe.test.mjs
 	/bin/bash -n scripts/swiftpm
 	/bin/bash -n scripts/test-core

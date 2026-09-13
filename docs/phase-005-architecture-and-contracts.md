@@ -4,20 +4,16 @@ Status: target architecture supporting the agreed product. The native
 menu bar/manager scaffold, packaging, version-1 schema, action/control
 catalogs, shared fixtures, deterministic Core state model and isolated
 configuration/diagnostics module exist. The authenticated local socket,
-source-only Node client, shared negative IPC fixtures and disposable CLI
-capability probe now exist. The app does not start the socket and no production
-extension is installed. The probe has joined owned CLI sessions, but the
-production CLI-hosted session bridge and live-session components remain
-unimplemented. The device boundary now has read-only IOKit discovery, bounded
-HID JSON-RPC framing and one qualified USB tuple. The guarded developer setup
-path now implements device-associated original backup, exact mapping preview,
-guarded one-write authorization and complete read-back verification. The
-incorrect inactive-layer target was restored to the verified original, then a
-reduced 15-change active-layer target was applied and read back. Developer
-tools now normalize `v.oai.hid` keys/dial input and native `kb.radial`
-joystick input, and physically qualified steady all-key color output through
-`v.oai.thstatus` without changing ambient underglow or flash. No app-owned
-device service or physical input routing to Copilot CLI is enabled.
+source-only Node client, shared negative IPC fixtures, disposable CLI
+capability probe, uninstalled production observer source and native session
+reconciler now exist. The app does not start the socket and no production
+extension is installed. I-07 implements only the qualified read-only session
+subset and rejects stateful actions. The device boundary now includes bounded
+IOKit HID transport, guarded original backup/restore, a reduced 15-change
+active-layer map, normalized `v.oai.hid` keys/dial and native `kb.radial`
+joystick input, plus physically qualified steady all-key color output through
+`v.oai.thstatus`. No app-owned device service, terminal targeting or physical
+input routing to Copilot CLI is enabled.
 
 ## Component boundaries
 
@@ -140,16 +136,27 @@ The channel must provide:
 - Liveness/heartbeat information and bounded reconnect behavior.
 - Correlation and replay protection, without forwarding arbitrary SDK RPC.
 
-Implementation status: `CopilotMicroBridge` and `Bridge/src/` implement the
-transport-only portion of this contract with a 64 KiB big-endian length prefix,
+Implementation status: `CopilotMicroBridge` and `Bridge/src/` implement this
+contract through authenticated registration, bounded snapshots, event-driven
+reconciliation, heartbeats, replacement/liveness invalidation and explicit
+action rejection. The transport retains its 64 KiB big-endian length prefix,
 mode `0700` runtime directories, mode `0600` socket/bootstrap files, macOS peer
-UID checks, a private 256-bit bootstrap token, strict peer roles, connection
-generations, monotonic sequences and a 64-request in-flight bound. Swift and
-Node consume the same `Contracts/fixtures/ipc-v1/manifest.json` negative cases.
-This remains mock transport evidence only: the native app does not start the
-server and production source is not installed under `.github/extensions/`.
-The separate disposable probe has joined real owned sessions, but it does not
-use or qualify the production IPC bridge.
+UID checks, private 256-bit bootstrap token, strict peer roles, connection
+generations, monotonic sequences and 64-request in-flight bound. Swift and Node
+consume the same `Contracts/fixtures/ipc-v1/manifest.json` negative cases.
+
+The production observer registers `tools: []` and no hooks or permission
+handler. It never launches a CLI, requests tokens, forwards raw SDK calls or
+executes arbitrary commands. Event payloads are reduced to bounded reason
+categories; full state is reconciled through the qualified read-only RPC set.
+Pending permission snapshots carry counts only, not request IDs. Capability
+snapshots advertise no supported stateful action, and the native reconciler
+rejects any production snapshot that does.
+
+This remains isolated source/mock evidence: the native app does not start the
+server, production source is not installed under `.github/extensions/`, and no
+live CLI qualification was rerun for I-07. The disposable probe's existing
+`1.0.84-5` evidence is the compatibility ceiling.
 
 ### Registration
 
@@ -182,6 +189,13 @@ from qualified host/UI evidence. It is not an existing SDK field assumed from
 A new connection starts unknown. Establish initial snapshots and subscribe
 without a missed-event window. Reconcile gaps/out-of-order events rather than
 replaying an obsolete state. No snapshot should contain the full transcript.
+
+I-07 subscribes immediately after `joinSession()`, before opening the local IPC
+connection. Events seen during attachment are folded into the first
+reconciliation. Later qualified events reserve a newer context revision and
+invalidate native derived state until the matching snapshot arrives. Native
+liveness expiry, replacement and generation mismatch clear capabilities,
+model state and action context.
 
 ### Action request
 

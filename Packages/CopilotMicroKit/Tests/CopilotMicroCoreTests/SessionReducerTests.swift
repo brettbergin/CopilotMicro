@@ -202,6 +202,36 @@ struct SessionReducerTests {
         #expect(state.contextRevision == 3)
     }
 
+    @Test("Unidentified attention counts remain observable without permission authority")
+    func unidentifiedAttentionIsSafe() throws {
+        let binding = try makeBinding()
+        var state = SessionRuntimeState()
+        #expect(SessionReducer.reduce(&state, .connected(binding)) == .applied)
+        #expect(
+            SessionReducer.reduce(
+                &state,
+                .snapshot(
+                    context(binding, 1),
+                    SessionSnapshot(
+                        mode: .known(.standard),
+                        work: .idle,
+                        attention: try AttentionState(permissionCount: 1, otherCount: 0)
+                    )
+                )
+            ) == .applied
+        )
+        #expect(state.pendingAttention.isEmpty)
+        #expect(state.attention.permissionCount == 1)
+        #expect(LightingProjector.project(state).semanticState == .attention)
+
+        #expect(
+            SessionReducer.reduce(&state, .reconciliationRequired(binding)) == .applied
+        )
+        #expect(state.connection == .synchronizing)
+        #expect(state.attention == .unknown)
+        #expect(LightingProjector.project(state).semanticState == .unknown)
+    }
+
     @Test("Pause survives late snapshots, disconnect and reconnect until explicit resume")
     func pauseIsSticky() throws {
         let binding = try makeBinding()

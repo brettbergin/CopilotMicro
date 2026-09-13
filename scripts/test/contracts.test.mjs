@@ -27,7 +27,7 @@ test("shared contract catalogs and fixtures pass", () => {
     cliCompatibilityReportCount: 1,
     hardwareCapabilityEvidenceSchemaCount: 1,
     hardwareCompatibilityReportCount: 1,
-    ipcFixtureCount: 18,
+    ipcFixtureCount: 20,
   });
 });
 
@@ -139,4 +139,33 @@ test("committed hardware evidence is read-only and schema-valid", () => {
   assert.deepEqual(report.keymap.activeLayerKeyRowLengths, [2, 4, 4, 3]);
   assert.equal(report.status.activeLayerIndex, 1);
   assert.equal(Object.hasOwn(report, "serialNumber"), false);
+});
+
+test("production extension source remains passive and uninstalled", () => {
+  const sourceFiles = [
+    "Bridge/src/extension.mjs",
+    "Bridge/src/extension-runtime.mjs",
+    "Bridge/src/session-observer.mjs",
+  ];
+  const source = sourceFiles
+    .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+    .join("\n");
+  for (const forbidden of [
+    /child_process/u,
+    /permissionHandler/u,
+    /permissions\.setRequired/u,
+    /session\.abort/u,
+    /session\.send/u,
+    /\.mode\.set/u,
+    /\.model\.set/u,
+    /GITHUB_TOKEN/u,
+    /COPILOT_SDK_TOKEN/u,
+  ]) {
+    assert.doesNotMatch(source, forbidden);
+  }
+  assert.match(source, /joinSession\(\{ tools: \[\] \}\)/u);
+  assert.equal(
+    fs.existsSync(path.join(root, ".github", "extensions", "copilot-micro")),
+    false,
+  );
 });

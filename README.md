@@ -13,16 +13,14 @@ slice. The menu panel, seven-area manager,
 original pad editor, session/control simulator, lighting preview, app packaging,
 versioned contracts, deterministic reducers, atomic local settings, previewed
 portable import/export and bounded redacted diagnostics exist. Live product
-hardware/CLI control remains unavailable and clearly disabled. Developer tools
-can discover an explicitly owned Creator Micro 2, preserve and restore its
+hardware/CLI control remains unavailable and clearly disabled. The
+owner-restricted IPC package, uninstalled read-only extension entry point and
+native session reconciler implement the qualified Copilot CLI `1.0.84-5`
+observation subset while rejecting every stateful action. Developer tools can
+discover an explicitly owned Creator Micro 2, preserve and restore its
 original keymap, apply the reduced managed map, observe normalized physical
-input and run a bounded key-lighting sequence. An
-owner-restricted Unix-domain IPC package and isolated Node client now share
-bounded authentication, framing, role, generation and sequence contracts, but
-the app does not start that listener and no production CLI extension is
-installed. A source-only disposable probe has joined owned Copilot CLI
-`1.0.84-5` sessions and recorded a conservative compatibility report; it is
-not production session control.
+input and run a bounded key-lighting sequence. The app starts neither live
+service, and no production extension is installed.
 
 ## Developer setup
 
@@ -110,17 +108,26 @@ recovery material. Packaging smoke disables local storage entirely.
 
 `CopilotMicroBridge` implements a 64 KiB length-prefixed Unix-domain protocol,
 same-user peer checks, a private bootstrap token, strict native/bridge roles,
-connection generations, monotonic per-direction sequences and bounded
-in-flight request tracking. Runtime directories are mode `0700`; token and
-socket files are mode `0600`. Unknown existing socket paths and symlinked
+connection generations, monotonic per-direction sequences, liveness and
+bounded in-flight request tracking. Runtime directories are mode `0700`; token
+and socket files are mode `0600`. Unknown existing socket paths and symlinked
 private directories fail closed.
 
-The source-only Node client uses the same registration and frame contract.
-`make test-bridge` exercises it against isolated temporary sockets; nothing
-under `Bridge/` is placed in `.github/extensions/` or loaded into a real
-Copilot CLI session. Production listener startup, bridge installation and
-session behavior remain intentionally blocked until disposable capability
-probes qualify the actual installed CLI.
+`Bridge/src/extension.mjs` is a thin host-provided-SDK entry point. It registers
+no tools, hooks or permission handler, launches no CLI process, forwards no raw
+SDK method and reads no GitHub/Copilot token. It joins only its host foreground
+session, authenticates to the app-owned local socket, starts each extension
+lifetime unknown, reconciles bounded snapshots after qualified events, sends
+heartbeats and rejects all 16 production actions with compatibility-aware
+reasons. Pending permission counts never become request authority.
+
+The source-only Node client and native reconciler use the same registration and
+frame contract. Replacement keeps host, session and generation identities
+separate; stale generations, out-of-order state and liveness expiry invalidate
+the binding. `make test-bridge` and `make test-core` exercise these paths using
+isolated mocks. Nothing under `Bridge/` is placed in `.github/extensions/` or
+loaded into a real Copilot CLI session. The emulator app assembly still starts
+no production listener or live service.
 
 ## Disposable CLI qualification
 
@@ -273,6 +280,13 @@ underglow, matching the product requirement to preserve that user setting.
 Host-driven blink/pulse timing, Bluetooth, sleep/wake and app-owned live
 device-service wiring remain unqualified. Sanitized evidence is recorded in
 [`Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json`](Compatibility/live-creator-micro-2-0x8298-firmware-0.6.2-usb.json).
+
+## Production session observation source
+
+The production observer source is not a qualification launcher and is not
+installed by any repository command. I-07 promotes only behavior already
+qualified by the disposable probe; installation, live app activation and every
+stateful control remain future work.
 
 Swift Testing 6.2.4 can emit a known compile-time macro shutdown diagnostic
 with this toolchain. Do not suppress it or skip rebuilding changed tests;

@@ -7,10 +7,11 @@ Implementation status: local configuration and diagnostics now use user-only
 paths, bounded schemas, atomic replacement, recovery copies, deterministic
 diagnostic rotation and explicit redacted export. The isolated local IPC layer
 now enforces private filesystem modes, same-user peer checks, bootstrap
-authentication, strict roles, bounded frames, generations and ordered
-sequences. It is not started by the app and has not joined a CLI session.
-A separate passive probe has joined owned disposable CLI sessions without
-using the production IPC path. Live production extension authority and updater boundaries remain design
+authentication, strict roles, bounded frames, generations, ordered sequences
+and liveness. I-07 adds an uninstalled passive production observer and native
+reconciler, but the app does not start them. A separate passive probe has joined
+owned disposable CLI sessions without using the production IPC path. Stateful
+production extension authority and updater boundaries remain design
 requirements. The read-only
 hardware qualifier now opens one exact candidate non-exclusively and allowlists
 only version, status and keymap reads. Its evidence excludes the serial number
@@ -69,6 +70,11 @@ A skipped feature may not violate these invariants as a convenience fallback.
 
 Start with a passive extension observer. The default bridge must not install
 an approve-all handler or answer requests merely because it received an event.
+
+The I-07 entry point registers an explicit empty tool list and no hooks or
+permission handler. It exposes no generic SDK forwarding path and rejects every
+stateful action through I-15. A compatibility mismatch changes action reasons
+to unknown rather than attempting an unqualified call.
 
 On Copilot CLI `1.0.84-5`, registering hooks triggered an explicit elevated
 permission prompt, so the passive probe registers no hooks. Ordinary event
@@ -130,6 +136,13 @@ Do not request sensitive environment variables such as GitHub tokens for
 routine device/session control. The CLI retains its authentication. Store
 bridge bootstrap material separately from portable configuration and exclude
 it from logs/exports.
+
+The uninstalled extension reads only the owner-restricted bridge directory,
+socket and bootstrap file. It does not accept a token value from environment,
+read GitHub/Copilot credentials or log paths, identifiers or raw SDK errors.
+Host events cross IPC only as allowlisted categories followed by bounded state
+reconciliation. Pending permission counts are retained without request IDs,
+tool details or command text.
 
 Show the extension's installed path and ownership. Project/user/plugin
 extension name collisions or unexpected shadowing are errors to diagnose,

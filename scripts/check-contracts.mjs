@@ -297,6 +297,28 @@ export function loadContractCatalogs(root) {
     schema.$defs.sessionSnapshot.properties.capabilities.propertyNames.$ref,
     "#/$defs/actionType",
   );
+  assert.deepEqual(
+    schema.oneOf.map((entry) => entry.$ref),
+    [
+      "#/$defs/actionRequest",
+      "#/$defs/actionResult",
+      "#/$defs/heartbeat",
+      "#/$defs/sessionEvent",
+      "#/$defs/sessionSnapshot",
+    ],
+  );
+  for (const field of [
+    "attention",
+    "capabilities",
+    "compatibility",
+    "hostCapabilities",
+    "model",
+  ]) {
+    assert.ok(
+      schema.$defs.sessionSnapshot.required.includes(field),
+      `session snapshot must require ${field}`,
+    );
+  }
 
   const contacts = [];
   const controlIDs = new Set();

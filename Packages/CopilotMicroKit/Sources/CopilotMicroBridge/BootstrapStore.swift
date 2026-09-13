@@ -6,8 +6,14 @@ public enum IPCBootstrapStoreError: Error, Equatable, Sendable {
     case fileSystem
 }
 
+public enum IPCBridgeRuntime {
+    public static let directoryName = "bridge"
+    public static let socketFilename = "bridge.sock"
+    public static let bootstrapTokenFilename = "bootstrap-token"
+}
+
 public actor IPCBootstrapStore {
-    public static let filename = "bootstrap-token"
+    public static let filename = IPCBridgeRuntime.bootstrapTokenFilename
 
     public let rootURL: URL
     public let directoryURL: URL
@@ -17,8 +23,11 @@ public actor IPCBootstrapStore {
 
     public init(rootURL: URL, fileManager: FileManager = .default) {
         self.rootURL = rootURL.standardizedFileURL
-        directoryURL = self.rootURL.appendingPathComponent("bridge", isDirectory: true)
-        tokenURL = directoryURL.appendingPathComponent(Self.filename)
+        directoryURL = self.rootURL.appendingPathComponent(
+            IPCBridgeRuntime.directoryName,
+            isDirectory: true
+        )
+        tokenURL = directoryURL.appendingPathComponent(IPCBridgeRuntime.bootstrapTokenFilename)
         self.fileManager = fileManager
     }
 

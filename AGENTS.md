@@ -10,18 +10,15 @@ deterministic controls/session/lighting contract layer exist. Versioned local
 settings, portable import/export and bounded redacted diagnostics are
 implemented. The authenticated local IPC package and isolated Node client now
 exist, but the app does not start a socket and no production CLI extension is
-installed. A passive source-only probe has qualified bounded surfaces in owned
-disposable Copilot CLI `1.0.84-5` sessions. Its evidence does not enable live
-app control. Native read-only Creator Micro 2 discovery and bounded HID
-JSON-RPC qualification now exist as explicit developer tools. A separate
-guarded setup tool can create and verify the durable original backup, preview
-the exact managed map, and perform one guarded shared-transport write only
-when its device-bound transaction digest, closed-configurator declaration and
-exact consent are supplied. USB input observation now normalizes all keys,
-dial detents and native radial joystick notifications, and a bounded lighting
-probe drives the key LEDs without changing flash or ambient underglow. The app
-still does not open HID or route physical actions to Copilot CLI. Preserve the
-emulator/live boundary while promoting only qualified behavior.
+installed. A passive source-only probe qualified bounded surfaces in owned
+disposable Copilot CLI `1.0.84-5` sessions. The production source tree contains
+an uninstalled read-only extension entry point and native session reconciler
+for that qualified observation subset; every stateful action remains rejected
+until I-15. Native Creator Micro 2 developer tools now provide guarded backup,
+restore and reduced mapping, normalized keys/dial/native radial joystick input,
+and bounded key lighting without changing flash or ambient underglow. The app
+still starts no live service or routes physical actions to Copilot CLI.
+Preserve the emulator/live boundary and do not widen qualified authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -40,7 +37,8 @@ the repository could load it into a real session.
 - `make test-contracts`: shared schema, action, control and negative-fixture
   checks used by both the native model and JavaScript bridge.
 - `make test-bridge`: isolated Node framing, authentication, role and client
-  tests. It does not load an extension into Copilot CLI.
+  tests, including the uninstalled production observer/rejection runtime. It
+  does not load an extension into Copilot CLI.
 - `make test-cli-probe`: isolated disposable workspace, privacy, evidence and
   capability-classification tests. It does not launch Copilot CLI.
 - `make test-core`: pinned Swift Testing unit suite, with XCTest disabled.
