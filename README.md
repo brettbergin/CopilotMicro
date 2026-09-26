@@ -13,12 +13,27 @@ lighting. The packaged app opens the Creator Micro 2 vendor HID interface,
 validates the managed keymap, shows real key, dial and radial joystick events,
 and applies matching runtime color/brightness to the 13 key LEDs and ambient
 underglow. It does not write device flash. The owner-restricted IPC package,
-uninstalled read-only extension entry point and native session reconciler
-implement the qualified Copilot CLI `1.0.84-5` observation subset, but the app
-does not start that bridge and all stateful CLI actions remain disabled.
+read-only extension entry point and native session reconciler
+implement the qualified Copilot CLI `1.0.84-5` observation subset. Normal app
+launches now start the private authenticated listener and display its state,
+and the signed app bundles the observer as an inert resource. An explicit
+confirmation flow can install that exact observer into the user extension
+directory with a versioned hash receipt; collisions and externally modified
+files are preserved and blocked. After installation, the user can choose a
+project and explicitly open a new token-bearing Copilot window in the one
+qualified Ghostty installation. All stateful CLI actions remain disabled.
 Validated terminal and CLI discovery plus the shared exact-target contract are
-implemented; terminal-specific focus and window/tab/pane adapters are not yet
-qualified.
+implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
+are qualified through its documented AppleScript API, including focus from
+another foreground app and cleanup of a temporary multi-tab/split test window.
+App-created Ghostty surfaces now carry a one-time association token into their
+child process. The bridge registration can carry that token, and a race-safe
+native registry resolves either launch/registration ordering without allowing
+token reassignment. Live qualification proved exact child environment
+inheritance and cleanup. Automatic association of an already running Copilot
+CLI instance remains disabled because Ghostty exposes neither the terminal
+child PID nor TTY. The packaged installation and launch flow has not yet been
+used to claim a real Copilot CLI registration.
 
 ## Developer setup
 
@@ -61,10 +76,11 @@ make package
 `make check` runs source checks, shared contract fixtures, isolated Node IPC
 tests, Swift package unit tests, hidden AppKit/SwiftUI and resource smoke, and a
 bounded accessory startup smoke through the production app-delegate, main-menu
-and status-item wiring. It does not display a window, open the production IPC
-listener, load a CLI extension, request permissions or touch a device, and the
-accessory process exits immediately. Hardware access is explicitly suppressed
-only for smoke validation. Its generated smoke
+and status-item wiring. It validates the inert bundled observer resource but
+does not display a window, open the production IPC listener, inspect or change
+the user extension directory, load a CLI extension, request permissions or
+touch a device, and the accessory process exits immediately. Hardware access
+is explicitly suppressed only for smoke validation. Its generated smoke
 package directory is removed by an exact-path safety check. Swift tests use the
 pinned official Swift Testing dependency; first resolution downloads public
 packages.
@@ -74,8 +90,10 @@ uses a fresh `build/package-*` directory. Open that `.app` to see the `CM` menu
 bar item and choose Open Manager. A normal launch immediately attempts the
 qualified non-exclusive HID connection. Close Work Louder Input and grant the
 app Input Monitoring when macOS requests it. The manager then shows live
-physical input and controls both key lighting and ambient underglow. To choose
-an output location explicitly:
+physical input and controls both key lighting and ambient underglow. The
+Diagnostics view shows the exact user extension destination before offering
+installation; installation and Open Copilot both require separate explicit
+user actions. To choose an output location explicitly:
 
 ```sh
 make package PACKAGE_OUTPUT=build/my-preview
@@ -115,10 +133,23 @@ reasons. Pending permission counts never become request authority.
 The source-only Node client and native reconciler use the same registration and
 frame contract. Replacement keeps host, session and generation identities
 separate; stale generations, out-of-order state and liveness expiry invalidate
-the binding. `make test-bridge` and `make test-core` exercise these paths using
-isolated mocks. Nothing under `Bridge/` is placed in `.github/extensions/` or
-loaded into a real Copilot CLI session. The direct-device app still starts no
-production CLI listener or session service.
+the binding. Normal packaged-app launches create or load the owner-only
+bootstrap material, start the Unix socket listener, reconcile authenticated
+registrations and connect surface tokens to the shared Ghostty association
+registry. The menu and Diagnostics view report listener/connection state.
+Smoke mode suppresses all bridge filesystem and socket access.
+
+`make test-bridge` and `make test-core` exercise these paths using isolated
+mocks and temporary real sockets. Packaging copies only the five reviewed
+`Bridge/src/` modules into the signed app resources. The app never installs
+them automatically: after confirmation it writes the exact files to
+`~/.copilot/extensions/copilot-micro-session-bridge`, records their version
+and SHA-256 hashes under application support, blocks unrelated or modified
+destinations, retains an app-owned prior version on update, and refuses a
+project that shadows the same extension name. Explicit Open Copilot creates a
+new Ghostty surface instead of typing into an existing shell. Plugin-origin
+name-collision preflight, uninstall, terminal selection UI and a real
+app-to-CLI registration remain pending.
 
 ## Disposable CLI qualification
 
@@ -191,9 +222,47 @@ See
 [`Compatibility/terminal-discovery-macos-26.6.2.json`](Compatibility/terminal-discovery-macos-26.6.2.json).
 
 `CopilotMicroTerminal` also defines the shared process/window/tab/pane target,
-UI-context evidence and argument-array Open Copilot launch contracts. These
-types do not establish that any terminal-specific adapter can yet focus an
-exact surface or execute a launch plan.
+UI-context evidence and argument-array Open Copilot launch contracts. Its
+Ghostty adapter reads only stable surface IDs, requires an explicit
+CLI-instance binding, rejects multiple running Ghostty processes or a
+different selected installation, and re-reads the hierarchy after focus before
+reporting success. It never infers identity from terminal title or working
+directory.
+
+Run the read-only Ghostty probe only after approving macOS Automation access:
+
+```sh
+make qualify-ghostty CONSENT=I-authorize-read-only-ghostty-automation
+```
+
+The separately gated round-trip creates one temporary window containing two
+tabs and one split, runs only `/usr/bin/true`, verifies exact focus from
+another foreground app and closes only the created window:
+
+```sh
+make qualify-ghostty-roundtrip \
+  CONSENT=I-authorize-temporary-ghostty-window-test
+```
+
+The association qualifier creates one temporary window running only the local
+probe executable. It verifies that Ghostty passes an exact one-time
+`COPILOT_MICRO_SURFACE_TOKEN` into the child process, removes the private
+result and closes the exact created window:
+
+```sh
+make qualify-ghostty-association \
+  CONSENT=I-authorize-ghostty-environment-test
+```
+
+The live macOS `26.6.2` result is recorded in
+[`Compatibility/ghostty-1.3.1-macos-26.6.2.json`](Compatibility/ghostty-1.3.1-macos-26.6.2.json).
+Ghostty's scripting dictionary has no terminal child PID or TTY, so existing
+manually launched CLI sessions cannot be bound safely. App-created surface
+token transport is implemented and live-qualified. The packaged app now starts
+the authenticated bridge and exposes an explicit install-and-launch path, but
+that path has not yet claimed a real extension registration. Composer, picker,
+permission and question context also remain unavailable rather than being
+approximated with terminal text or global keystrokes.
 
 ## Live hardware app and qualification
 

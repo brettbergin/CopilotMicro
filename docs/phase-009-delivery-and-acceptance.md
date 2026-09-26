@@ -8,7 +8,8 @@ configuration/diagnostic foundation are implemented. I-07 adds
 native/Node mock evidence for an uninstalled read-only stage-3 observer:
 private authenticated IPC, host/session/generation separation, unknown-first
 snapshots, event reconciliation, capability changes, liveness/replacement and
-explicit rejection of all stateful actions. The app does not start it. A
+explicit rejection of all stateful actions. Normal app launches now start the
+private listener and display bounded bridge state, while smoke suppresses it. A
 separate source-only probe joined owned disposable Copilot CLI `1.0.84-5`
 sessions and produced the compatibility ceiling used by I-07.
 USB HID discovery/read, durable original backup, guarded restore, reduced
@@ -60,7 +61,7 @@ contract was not.
 | U-01 | Foreground-session extension lifecycle | Partial | `joinSession()` and `/clear` replacement/reload worked under one host; arbitrary existing-session selection was not tested | Join/replacement/selection synchronization demonstrated |
 | U-02 | Authoritative initial state and acknowledgement | Partial | Mode/task/queue/pending snapshots and activity boundaries were observable; verified user acknowledgement was not | Mode, activity, pending requests and user acknowledgement qualified; unsupported signals disclosed |
 | U-03 | Native list/switch/new/archive operations | Unavailable | No callable extension surface demonstrated these host UI operations | Real host behavior, not fabricated commands or private-file edits |
-| U-04 | Exact terminal window/tab/pane targeting | Contract only | Validated installation/CLI discovery, exact preference revalidation and typed process/window/tab/pane evidence are implemented; no terminal adapter is qualified | Separate evidence for each terminal |
+| U-04 | Exact terminal window/tab/pane targeting | Partial | Ghostty 1.3.1 stable window/tab/terminal observation and exact focus are qualified on macOS 26.6.2, including another foreground app and a temporary multi-tab/split window. App-created surfaces use an exact one-time token carried through the child environment and bridge registration; child inheritance is live-qualified and registry races/replay are tested. Ghostty exposes no child PID or TTY, so arbitrary existing CLI instances remain unassociated | Wire packaged-app bridge startup, launch a real Copilot instance through the adapter and claim its registration; qualify iTerm2 and Terminal.app separately |
 | U-05 | Existing composer focus/submit | Unavailable | Completion trigger metadata was readable; no actual draft focus/submit API was demonstrated | Preserve and submit the actual draft once; no `session.send()` substitute |
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
@@ -192,10 +193,15 @@ extension in a private owned disposable repository, strips GitHub/Copilot token
 environment variables and cleans only marker-verified paths. The default probe
 registers no tools, hooks or permission handler.
 
-No I-07 command installs or loads `Bridge/src/extension.mjs`, and `make check`
-does not launch Copilot CLI or open HID. The shipped app resource enables the
-direct device service during normal launches but starts no production CLI
-listener or session service.
+No default check installs or loads `Bridge/src/extension.mjs`, launches Copilot
+CLI or opens HID. Packaging seals the reviewed observer modules into the app,
+and smoke validates that inert resource while suppressing bridge and hardware
+access. During a normal launch, separate user actions are required to confirm
+installation at the displayed user-extension path and to choose a project
+before opening a new Ghostty Copilot window. Collision, modified-file and
+project-shadow checks fail closed. No real packaged-path registration has been
+qualified, plugin-origin collision preflight remains pending, and all stateful
+CLI actions remain unavailable.
 
 Measure Q-07's host-event-to-HID-write targets under defined connected
 conditions and separately observe physical output. Track regression evidence

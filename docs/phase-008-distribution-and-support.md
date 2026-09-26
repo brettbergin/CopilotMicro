@@ -48,6 +48,20 @@ An unknown CLI/OS/terminal build gets a compatibility explanation, not a blind
 attempt at sensitive actions. Do not downgrade/update the user's CLI silently.
 New macOS major versions require separate qualification.
 
+Ghostty `1.3.1` exact surface enumeration and focus are qualified on macOS
+`26.6.2` through its documented AppleScript API. The live test preserved an
+existing window, created a temporary window with two tabs and one split,
+focused two exact terminal IDs from another foreground app, and verified
+cleanup. This requires Automation permission but not Accessibility permission.
+The app bundle declares why it controls the selected terminal. Ad-hoc rebuilds
+may still cause grant churn.
+
+This does not qualify association with an arbitrary existing Copilot CLI
+process. Ghostty does not expose a child PID or TTY for a terminal surface, and
+Copilot Micro will not infer identity from a title or working directory. That
+dependent capability remains disabled until the app-created surface and
+bridge registration share an exact association token.
+
 The initial hardware tuple is read-only USB evidence for macOS-reported
 `Creator Micro 2`, VID/PID `0x303A/0x8298`, firmware `0.6.2`, 64-byte reports
 and vendor usage `0xFF00`/`1`. Bluetooth, input, lighting, managed mapping and
@@ -124,6 +138,15 @@ installation receipt with version and file hashes outside portable exports.
 Never overwrite a pre-existing unrelated or user-modified extension. Surface
 project/user/plugin name collisions and require resolution. Install and update
 atomically, retaining a recoverable app-owned prior version.
+
+Implementation status: packaging includes only the five reviewed observer
+modules under an inert app resource. The app shows
+`~/.copilot/extensions/copilot-micro-session-bridge` before installation,
+requires confirmation, records a versioned SHA-256 receipt outside portable
+configuration, blocks unowned or modified destinations, rejects a matching
+project extension before launch, swaps owned updates atomically and retains a
+private prior copy. Plugin-origin collision preflight and verified uninstall
+remain pending.
 
 Negotiate application/bridge protocol compatibility independently of app
 version. If a changed bridge cannot activate safely in the current CLI,

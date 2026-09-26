@@ -21,6 +21,62 @@
       "authentication": "accepted"
     },
     {
+      "name": "valid-registration-with-surface-association",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "surfaceAssociationToken": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "accepted"
+    },
+    {
+      "name": "valid-registration-with-null-surface-association",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "surfaceAssociationToken": null,
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "valid",
+      "authentication": "accepted"
+    },
+    {
+      "name": "invalid-surface-association-token",
+      "kind": "registration",
+      "message": {
+        "protocolVersion": 1,
+        "messageType": "registration",
+        "role": "cliBridge",
+        "bootstrapToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "instanceId": "cli-instance-1",
+        "sessionId": "session-1",
+        "generation": "generation-1",
+        "surfaceAssociationToken": "not-a-valid-token",
+        "bridgeVersion": "0.1.0",
+        "cliVersion": "1.0.84-5",
+        "sdkVersion": "host-provided"
+      },
+      "decode": "malformed"
+    },
+    {
       "name": "wrong-registration-role",
       "kind": "registration",
       "message": {

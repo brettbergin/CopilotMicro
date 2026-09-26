@@ -76,6 +76,43 @@ public struct ConnectionGeneration: Codable, Hashable, Sendable {
     }
 }
 
+public struct SurfaceAssociationToken: Codable, Hashable, Sendable {
+    public enum ValidationError: Error, Equatable, Sendable {
+        case invalid
+    }
+
+    public let rawValue: String
+
+    public init(rawValue: String) throws {
+        guard
+            rawValue.utf8.count == 64,
+            rawValue.unicodeScalars.allSatisfy({
+                (0x30...0x39).contains($0.value) || (0x61...0x66).contains($0.value)
+            })
+        else {
+            throw ValidationError.invalid
+        }
+        self.rawValue = rawValue
+    }
+
+    public static func generate() throws -> SurfaceAssociationToken {
+        var generator = SystemRandomNumberGenerator()
+        let token = (0..<32).map { _ in
+            String(format: "%02x", UInt8.random(in: .min ... .max, using: &generator))
+        }.joined()
+        return try SurfaceAssociationToken(rawValue: token)
+    }
+
+    public init(from decoder: Decoder) throws {
+        try self.init(rawValue: decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
 public struct RequestID: Codable, Hashable, Sendable {
     public let rawValue: String
 

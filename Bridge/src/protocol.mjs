@@ -48,9 +48,10 @@ export const RESULT_CODES = [
 
 const IDENTIFIER = /^[!-~]{1,128}$/u;
 const BOOTSTRAP_TOKEN = /^[a-f0-9]{64}$/u;
+const SURFACE_ASSOCIATION_TOKEN = /^[a-f0-9]{64}$/u;
 const ACTION_TYPE_SET = new Set(ACTION_TYPES);
 const RESULT_CODE_SET = new Set(RESULT_CODES);
-const REGISTRATION_KEYS = new Set([
+const REGISTRATION_REQUIRED_KEYS = new Set([
   "protocolVersion",
   "messageType",
   "role",
@@ -61,6 +62,10 @@ const REGISTRATION_KEYS = new Set([
   "bridgeVersion",
   "cliVersion",
   "sdkVersion",
+]);
+const REGISTRATION_ALLOWED_KEYS = new Set([
+  ...REGISTRATION_REQUIRED_KEYS,
+  "surfaceAssociationToken",
 ]);
 const FRAME_KEYS = new Set([
   "protocolVersion",
@@ -468,14 +473,26 @@ export function validateRegistration(data) {
   if (parsed.error) return parsed;
   const value = parsed.value;
   if (!isPlainObject(value)) return { error: "malformed" };
-  if (Object.keys(value).some((key) => !REGISTRATION_KEYS.has(key))) {
+  if (Object.keys(value).some((key) => !REGISTRATION_ALLOWED_KEYS.has(key))) {
     return { error: "unexpectedField" };
   }
-  if (!exactKeys(value, REGISTRATION_KEYS)) return { error: "malformed" };
+  if (![...REGISTRATION_REQUIRED_KEYS].every((key) => Object.hasOwn(value, key))) {
+    return { error: "malformed" };
+  }
   if (value.protocolVersion !== IPC_PROTOCOL_VERSION) return { error: "unsupportedProtocol" };
   if (value.messageType !== "registration") return { error: "invalidMessageType" };
   if (!["nativeApp", "cliBridge"].includes(value.role)) return { error: "invalidRole" };
   if (!BOOTSTRAP_TOKEN.test(value.bootstrapToken)) return { error: "malformed" };
+  if (
+    value.surfaceAssociationToken !== undefined
+    && value.surfaceAssociationToken !== null
+    && (
+      typeof value.surfaceAssociationToken !== "string"
+      || !SURFACE_ASSOCIATION_TOKEN.test(value.surfaceAssociationToken)
+    )
+  ) {
+    return { error: "malformed" };
+  }
   if (
     !validIdentifier(value.instanceId)
     || !validIdentifier(value.sessionId)

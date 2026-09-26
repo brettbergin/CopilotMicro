@@ -184,6 +184,7 @@ public final class UnixSocketListener: @unchecked Sendable {
     private let lock = NSLock()
     private let fileManager: FileManager
     private var descriptor: Int32 = -1
+    private var leaseDescriptor: Int32 = -1
     private var socketIdentity: FileIdentity?
 
     public init(socketURL: URL, fileManager: FileManager = .default) throws {
@@ -209,12 +210,27 @@ public final class UnixSocketListener: @unchecked Sendable {
         }
         let directory = socketURL.deletingLastPathComponent()
         try preparePrivateDirectory(directory, fileManager: fileManager)
-        guard try fileIdentity(at: socketURL) == nil else {
-            throw IPCTransportError.addressInUse
+        let newLeaseDescriptor = try acquireListenerLease(
+            at: directory.appendingPathComponent(IPCBridgeRuntime.listenerLockFilename)
+        )
+        do {
+            if let existingIdentity = try fileIdentity(at: socketURL) {
+                guard existingIdentity.isSocket else {
+                    throw IPCTransportError.addressInUse
+                }
+                try validateOwnedPrivateSocket(at: socketURL)
+                guard unlink(socketURL.path) == 0 || errno == ENOENT else {
+                    throw IPCTransportError.ioFailure
+                }
+            }
+        } catch {
+            releaseListenerLease(newLeaseDescriptor)
+            throw error
         }
 
         let newDescriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard newDescriptor >= 0 else {
+            releaseListenerLease(newLeaseDescriptor)
             throw IPCTransportError.ioFailure
         }
         var createdIdentity: FileIdentity?
@@ -241,6 +257,7 @@ public final class UnixSocketListener: @unchecked Sendable {
                 throw IPCTransportError.ioFailure
             }
             descriptor = newDescriptor
+            leaseDescriptor = newLeaseDescriptor
             socketIdentity = createdIdentity
         } catch {
             Darwin.close(newDescriptor)
@@ -250,6 +267,7 @@ public final class UnixSocketListener: @unchecked Sendable {
             {
                 _ = unlink(socketURL.path)
             }
+            releaseListenerLease(newLeaseDescriptor)
             throw error
         }
     }
@@ -278,6 +296,8 @@ public final class UnixSocketListener: @unchecked Sendable {
         lock.lock()
         let activeDescriptor = descriptor
         descriptor = -1
+        let activeLeaseDescriptor = leaseDescriptor
+        leaseDescriptor = -1
         let ownedIdentity = socketIdentity
         socketIdentity = nil
         lock.unlock()
@@ -289,9 +309,11 @@ public final class UnixSocketListener: @unchecked Sendable {
             let currentIdentity = try? fileIdentity(at: socketURL),
             currentIdentity == ownedIdentity
         else {
+            releaseListenerLease(activeLeaseDescriptor)
             return
         }
         _ = unlink(socketURL.path)
+        releaseListenerLease(activeLeaseDescriptor)
     }
 
     private func withDescriptor<T>(_ body: (Int32) throws -> T) throws -> T {
@@ -583,6 +605,10 @@ extension mode_t {
     fileprivate var isSocket: Bool {
         self & S_IFMT == S_IFSOCK
     }
+
+    fileprivate var isRegularFile: Bool {
+        self & S_IFMT == S_IFREG
+    }
 }
 
 private func fileIdentity(at url: URL) throws -> FileIdentity? {
@@ -609,6 +635,59 @@ private func preparePrivateDirectory(_ url: URL, fileManager: FileManager) throw
         try fileManager.createDirectory(at: url, withIntermediateDirectories: false)
     }
     try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+}
+
+private func acquireListenerLease(at url: URL) throws -> Int32 {
+    let descriptor = Darwin.open(
+        url.path,
+        O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+        mode_t(S_IRUSR | S_IWUSR)
+    )
+    guard descriptor >= 0 else {
+        throw IPCTransportError.permissionDenied
+    }
+    do {
+        var status = stat()
+        guard fstat(descriptor, &status) == 0,
+            status.st_mode.isRegularFile,
+            status.st_uid == geteuid(),
+            fchmod(descriptor, mode_t(S_IRUSR | S_IWUSR)) == 0
+        else {
+            throw IPCTransportError.permissionDenied
+        }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            throw errno == EWOULDBLOCK
+                ? IPCTransportError.addressInUse
+                : IPCTransportError.ioFailure
+        }
+        return descriptor
+    } catch {
+        Darwin.close(descriptor)
+        throw error
+    }
+}
+
+private func releaseListenerLease(_ descriptor: Int32) {
+    guard descriptor >= 0 else { return }
+    _ = flock(descriptor, LOCK_UN)
+    Darwin.close(descriptor)
+}
+
+private func validateOwnedPrivateSocket(at url: URL) throws {
+    var status = stat()
+    guard lstat(url.path, &status) == 0 else {
+        if errno == ENOENT {
+            return
+        }
+        throw IPCTransportError.ioFailure
+    }
+    guard
+        status.st_mode.isSocket,
+        status.st_uid == geteuid(),
+        status.st_mode & 0o777 == 0o600
+    else {
+        throw IPCTransportError.permissionDenied
+    }
 }
 
 private func configureSocket(_ descriptor: Int32) throws {

@@ -6,9 +6,12 @@ catalogs, shared fixtures, deterministic Core state model and isolated
 configuration/diagnostics module exist. The authenticated local socket,
 source-only Node client, shared negative IPC fixtures, disposable CLI
 capability probe, uninstalled production observer source and native session
-reconciler now exist. The app does not start the socket and no production
-extension is installed. I-07 implements only the qualified read-only session
-subset and rejects stateful actions. The device boundary now includes bounded
+reconciler now exist. The packaged app starts the private authenticated socket
+on normal launches, while smoke mode suppresses bridge filesystem/socket
+access. Packaging seals the five reviewed observer modules as inert resources;
+the app installs them only after explicit confirmation, with an app-owned hash
+receipt and collision checks. I-07 implements only the qualified read-only
+session subset and rejects stateful actions. The device boundary now includes bounded
 IOKit HID transport, guarded original backup/restore, a reduced 15-change
 active-layer map, normalized `v.oai.hid` keys/dial and native `kb.radial`
 joystick input, plus physically qualified steady all-key color output through
@@ -156,9 +159,16 @@ Pending permission snapshots carry counts only, not request IDs. Capability
 snapshots advertise no supported stateful action, and the native reconciler
 rejects any production snapshot that does.
 
-This remains isolated source/mock evidence: the native app does not start the
-server, production source is not installed under `.github/extensions/`, and no
-live CLI qualification was rerun for I-07. The disposable probe's existing
+The native app now owns this server lifecycle and exposes bounded
+listener/connection status. Production source is never installed under the
+development repository's `.github/extensions/`. The packaged app can install
+the reviewed files at
+`~/.copilot/extensions/copilot-micro-session-bridge` after confirmation, then
+open a chosen project in a new token-bearing Ghostty window. A receipt under
+application support records version and hashes; unowned, modified or
+project-shadowing paths block rather than overwrite or launch. No real CLI
+registration has connected through this packaged path, and no live CLI
+qualification was rerun for this integration. The disposable probe's existing
 `1.0.84-5` evidence is the compatibility ceiling.
 
 ### Registration
@@ -265,6 +275,35 @@ explicit exact-path preferences, and defines typed process/window/tab/pane,
 UI-context and argument-vector launch contracts. The contract does not claim
 that an adapter has established exact focus: `.applicationOnly`, wrong-surface,
 unavailable and unknown evidence remain distinct from `.exact`.
+
+The Ghostty `1.3.1` adapter implements that boundary with the application's
+documented AppleScript dictionary. A bounded `/usr/bin/osascript` transport
+uses static script source, separate arguments, a minimal environment, private
+temporary output files, a deadline and output-size limits. It reads stable
+window/tab/terminal IDs but no titles, working directories, commands or
+terminal text. Focus succeeds only after activating the bound window,
+selecting the bound tab, focusing the bound terminal and re-reading all three
+identities.
+
+Ghostty exposes no terminal child PID or TTY. Consequently, title or working
+directory similarity is not acceptable association evidence for an existing
+Copilot CLI process. The adapter accepts only an explicit
+`CLIInstanceID`-to-surface binding. For app-created surfaces, it reserves a
+one-time 64-character lowercase hexadecimal token before launch, passes it as
+`COPILOT_MICRO_SURFACE_TOKEN`, and binds the returned stable IDs only to a
+bridge registration carrying the exact token. Surface creation and bridge
+registration may arrive in either order; reservations expire, failed launches
+cancel them, and a claimed token cannot move to another CLI instance.
+
+The IPC version 1 registration keeps this field optional for backward
+compatibility. A missing token produces an observed but unassociated CLI
+instance; it never falls back to title, working directory or process
+heuristics. The token is correlation evidence, not authentication: the private
+bootstrap token and same-user peer validation remain authoritative. Live
+qualification proved that Ghostty passes the exact token into the launched
+child process and that the temporary surface/result are cleaned up. Packaged
+app bridge startup, actual Copilot launch and a real extension registration
+claim remain to be integrated before hardware actions can target the surface.
 
 ## Deterministic state and observability
 

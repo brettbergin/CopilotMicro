@@ -14,8 +14,10 @@ let package = Package(
         .executableTarget(
             name: "CopilotMicro",
             dependencies: [
+                .product(name: "CopilotMicroBridge", package: "CopilotMicroKit"),
                 .product(name: "CopilotMicroCore", package: "CopilotMicroKit"),
                 .product(name: "CopilotMicroDevice", package: "CopilotMicroKit"),
+                .product(name: "CopilotMicroTerminal", package: "CopilotMicroKit"),
             ],
             path: "App/Sources"
         )

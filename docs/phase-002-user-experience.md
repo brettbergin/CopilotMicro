@@ -42,6 +42,15 @@ Allow onboarding to resume after a denied permission or disconnected device.
 Do not treat cancellation as failure, discard a good original backup, or
 repeat already-confirmed destructive steps.
 
+Implementation status: the manager and menu now show the exact user extension
+destination and require a separate confirmation before installation. The
+packaged observer remains inert until that action. Installation records version
+and hashes, preserves collisions or modified files, and retains an app-owned
+prior version on update. After installation, Open Copilot requires a directory
+chosen through a native panel and creates a new Ghostty window; it never types
+into an existing shell. Persisted terminal selection, uninstall and a real
+registration walkthrough remain pending.
+
 ### Terminal discovery
 
 Inspect common locations, including `/Applications`, `~/Applications`,

@@ -35,6 +35,12 @@ struct IPCProtocolTests {
                 do {
                     let registration = try IPCRegistrationCodec.decode(data)
                     #expect(expectedDecode == "valid", "Unexpectedly decoded \(name)")
+                    if name == "valid-registration-with-surface-association" {
+                        #expect(
+                            registration.surfaceAssociationToken?.rawValue
+                                == "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+                        )
+                    }
                     let peerUserID: uid_t = fixture["peer"] as? String == "different" ? 502 : 501
                     let result = IPCAuthenticator(
                         expectedToken: expectedToken,
@@ -141,6 +147,17 @@ struct IPCProtocolTests {
         #expect(token.rawValue.allSatisfy { hexadecimal.contains($0) })
         #expect(throws: IPCBootstrapToken.ValidationError.invalid) {
             try IPCBootstrapToken(rawValue: "not-secret-enough")
+        }
+    }
+
+    @Test("Surface association material is fixed-size lowercase hexadecimal")
+    func surfaceAssociationTokenGeneration() throws {
+        let token = try SurfaceAssociationToken.generate()
+        let hexadecimal = Set("0123456789abcdef")
+        #expect(token.rawValue.utf8.count == 64)
+        #expect(token.rawValue.allSatisfy { hexadecimal.contains($0) })
+        #expect(throws: SurfaceAssociationToken.ValidationError.invalid) {
+            try SurfaceAssociationToken(rawValue: "not-a-surface-token")
         }
     }
 }

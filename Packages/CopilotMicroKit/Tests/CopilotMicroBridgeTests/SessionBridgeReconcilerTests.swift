@@ -125,7 +125,7 @@ struct SessionBridgeReconcilerTests {
         let expired = reconciler.expireIfNeeded(nowMilliseconds: 191)
         #expect(expired)
         #expect(reconciler.runtimeState.connection == .disconnected)
-        #expect(reconciler.registration == nil)
+        #expect(reconciler.registration != nil)
 
         _ = reconciler.activateAuthenticatedRegistration(
             try registration(),
@@ -140,6 +140,45 @@ struct SessionBridgeReconcilerTests {
                 == .reconciliationRequired(.lifecycle)
         )
         #expect(reconciler.runtimeState.connection == .synchronizing)
+    }
+
+    @Test("Transport suspension preserves identity for reconnect classification")
+    func transportSuspensionPreservesIdentity() throws {
+        var reconciler = SessionBridgeReconciler()
+        let first = try registration(generation: "generation-1")
+        _ = reconciler.activateAuthenticatedRegistration(first, nowMilliseconds: 10)
+
+        reconciler.suspendConnection()
+
+        #expect(reconciler.registration == first)
+        #expect(reconciler.runtimeState.connection == .disconnected)
+        #expect(reconciler.runtimeState.binding == nil)
+        #expect(
+            reconciler.activateAuthenticatedRegistration(
+                try registration(generation: "generation-2"),
+                nowMilliseconds: 20
+            ) == .reconnected
+        )
+    }
+
+    @Test("Same-generation reconnect restores a suspended binding")
+    func sameGenerationReconnectRestoresBinding() throws {
+        var reconciler = SessionBridgeReconciler()
+        let registration = try registration()
+        _ = reconciler.activateAuthenticatedRegistration(
+            registration,
+            nowMilliseconds: 10
+        )
+        reconciler.suspendConnection()
+
+        #expect(
+            reconciler.activateAuthenticatedRegistration(
+                registration,
+                nowMilliseconds: 20
+            ) == .reconnected
+        )
+        #expect(reconciler.runtimeState.connection == .synchronizing)
+        #expect(reconciler.runtimeState.binding?.instanceID == registration.instanceID)
     }
 
     @Test("Production snapshots cannot advertise any supported stateful action")

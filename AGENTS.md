@@ -10,12 +10,22 @@ connection. Its GUI shows real connection, key, dial and radial joystick input,
 and applies matching runtime color/brightness to the key LEDs and ambient
 underglow without writing device flash. Input Monitoring is required and Work
 Louder Input must remain closed. The managed keymap backup/restore tools remain
-separate and guarded. The app does not start the CLI socket or install the
-production extension; every stateful Copilot CLI action remains rejected until
-I-15. The terminal module validates supported installations, exact saved
-preferences, CLI paths and typed process/window/tab/pane evidence, but no
-terminal-specific focus adapter is qualified yet. Do not reintroduce simulated
-device state or widen CLI authority.
+separate and guarded. The normal packaged app starts the owner-restricted
+authenticated CLI socket and reports bridge state; smoke mode suppresses bridge
+filesystem and socket access. The signed app bundles the passive observer but
+installs it only after an explicit confirmation that shows the resolved
+user-extension path. Hash receipts, collision checks and retained app-owned
+backups prevent unrelated or modified files from being overwritten. Every
+stateful Copilot CLI action remains rejected until I-15. The terminal module
+validates supported installations, exact saved
+preferences, CLI paths and typed process/window/tab/pane evidence. Its Ghostty
+1.3.1 adapter is qualified for exact stable-surface observation and focus.
+App-created Ghostty surfaces now receive a one-time association token that the
+bridge registration can return to a race-safe native registry; exact child
+environment inheritance is live-qualified. The app can explicitly open a new
+Ghostty Copilot window after a project is selected, but this packaged path has
+not yet received a real registration.
+Do not reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift
 package for native code. The local build uses Apple's installed Command Line
@@ -51,6 +61,19 @@ the repository could load it into a real session.
 - `make qualify-terminals`: read supported terminal bundle metadata and
   approved Copilot CLI paths without launching a terminal, CLI, or shell
   startup file.
+- `make qualify-ghostty CONSENT=I-authorize-read-only-ghostty-automation`:
+  query stable Ghostty window, tab and terminal IDs after explicit Automation
+  consent. It does not send input or launch a command.
+- `make qualify-ghostty-roundtrip
+  CONSENT=I-authorize-temporary-ghostty-window-test`: create a temporary
+  Ghostty window containing two tabs and one split, run only `/usr/bin/true`,
+  verify exact focus through the production adapter, and close the created
+  window by its stable ID.
+- `make qualify-ghostty-association
+  CONSENT=I-authorize-ghostty-environment-test`: create one temporary Ghostty
+  window running the local probe, prove exact surface-token inheritance by the
+  child process, remove its private result, and close the created window by its
+  stable ID.
 - `make qualify-hardware CONSENT=I-own-this-device-read`: explicitly discover,
   open non-exclusively and read bounded identity/status/keymap metadata from
   one Creator Micro 2 candidate. It performs no configuration or lighting
