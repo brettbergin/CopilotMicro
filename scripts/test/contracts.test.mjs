@@ -24,7 +24,7 @@ test("shared contract catalogs and fixtures pass", () => {
     resultFixtureCount: 5,
     configurationSchemaCount: 2,
     cliCapabilityEvidenceSchemaCount: 1,
-    cliCompatibilityReportCount: 1,
+    cliCompatibilityReportCount: 2,
     hardwareCapabilityEvidenceSchemaCount: 1,
     hardwareCompatibilityReportCount: 1,
     ipcFixtureCount: 23,
@@ -90,6 +90,20 @@ test("committed CLI evidence keeps unsafe capabilities disabled", () => {
   assert.equal(report.capabilities["U-01"].status, "partial");
   assert.equal(report.capabilities["U-07"].status, "unavailable");
   assert.equal(report.capabilities["U-08"].status, "partial");
+  assert.ok(fs.statSync(reportPath).size < 131_072);
+});
+
+test("current CLI probe records partial evidence without extending qualification", () => {
+  const reportPath = path.join(root, "Compatibility", "copilot-cli-1.0.89-4.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.environment.cliVersion, "1.0.89-4");
+  assert.equal(report.environment.sdkVersion, null);
+  assert.equal(report.lifecycle.joinedSessions, 1);
+  assert.equal(report.lifecycle.sameHostAcrossReplacement, false);
+  assert.equal(report.capabilities["U-02"].status, "partial");
+  assert.equal(report.capabilities["U-07"].status, "unavailable");
+  assert.equal(report.capabilities["U-08"].status, "unavailable");
   assert.ok(fs.statSync(reportPath).size < 131_072);
 });
 
