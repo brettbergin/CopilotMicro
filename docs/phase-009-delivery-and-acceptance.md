@@ -59,6 +59,14 @@ machine-readable evidence is
 Partial means useful behavior was demonstrated but the full required product
 contract was not.
 
+A separate passive run on installed CLI `1.0.89-4` produced
+[`Compatibility/copilot-cli-1.0.89-4.json`](../Compatibility/copilot-cli-1.0.89-4.json).
+One extension lifetime joined; bounded queue, background-task and
+pending-permission snapshots worked. Replacement was not demonstrated in
+that run, and the host SDK version was unavailable. The production observer
+still rejects that build for read-only display, so this probe does not change
+the compatibility ceiling or the packaged-registration gap.
+
 | ID | Area | Status | Current result | Required result or gap |
 |---|---|---|---|---|
 | U-01 | Foreground-session extension lifecycle | Partial | `joinSession()` and `/clear` replacement/reload worked under one host; arbitrary existing-session selection was not tested | Join/replacement/selection synchronization demonstrated |

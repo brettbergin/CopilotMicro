@@ -65,7 +65,16 @@ Disposable interactive qualification on 2026-09-12 used Copilot CLI
 Node `v24.20.0` on Darwin ARM64. The sanitized machine-readable result is
 [`Compatibility/copilot-cli-1.0.84-5.json`](../Compatibility/copilot-cli-1.0.84-5.json).
 
-`joinSession()` succeeded. Replacing the foreground session with `/clear`
+An additional disposable passive probe of CLI `1.0.89-4` on 2026-09-26
+recorded bounded queue, background-task and pending-permission snapshots and
+one joined extension lifetime. Its host-provided SDK version was not
+established, and foreground replacement did not yield a second joined
+lifetime in this run. See
+[`Compatibility/copilot-cli-1.0.89-4.json`](../Compatibility/copilot-cli-1.0.89-4.json).
+This evidence does not expand the exact production read-only compatibility
+tuple or qualify a real packaged bridge registration.
+
+In the `1.0.84-5` run, `joinSession()` succeeded. Replacing the foreground session with `/clear`
 started a second extension lifetime, joined a second session alias under the
 same host alias and terminated both lifetimes cleanly. Arbitrary selection
 among existing sessions was not exercised, so foreground binding remains
