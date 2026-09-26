@@ -17,6 +17,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let restartBridgeItem = NSMenuItem()
     private let installBridgeItem = NSMenuItem()
     private let openCopilotItem = NSMenuItem()
+    var onDidFinishLaunching: (@MainActor () -> Void)?
 
     init(
         hardwareEnabled: Bool,
@@ -85,6 +86,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         manager.store.start()
         manager.bridgeStore.start()
         refreshMenu()
+        onDidFinishLaunching?()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

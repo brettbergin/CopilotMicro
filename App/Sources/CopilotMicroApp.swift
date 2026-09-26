@@ -215,7 +215,7 @@ struct CopilotMicroApp {
         application: NSApplication
     ) throws {
         var failure: (any Error)?
-        DispatchQueue.main.async {
+        controller.onDidFinishLaunching = {
             do {
                 try smokeTest(
                     mode: .accessory,
