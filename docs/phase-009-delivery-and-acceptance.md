@@ -240,7 +240,11 @@ read-only observer/reconciler source are implemented. I-08 validated terminal
 and CLI installation discovery and the shared exact-target contract. Production
 USB hardware ownership, normalized input display and matching key/ambient
 runtime lighting are physically verified. Explicit terminal and CLI selection
-is persisted and fail-closed for the qualified Ghostty launch path. Stateful
+is persisted and fail-closed for the qualified Ghostty launch path. The
+manager now saves and restores bounded brightness, preserving other local
+preferences; new configurations default to the qualified 35% brightness.
+Brightness zero leaves textual status available, but persisted preferences
+and headless checks do not qualify session-driven physical LEDs. Stateful
 CLI control, packaged live registration, non-Ghostty targeting, Bluetooth,
 animated lighting, sleep/wake, latency,
 updater and their complete acceptance journeys remain future work.

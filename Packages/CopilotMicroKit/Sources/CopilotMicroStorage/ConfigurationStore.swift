@@ -122,6 +122,14 @@ public actor LocalConfigurationStore {
         return configuration
     }
 
+    public func setBrightness(_ value: Double) throws -> StoredConfiguration {
+        let brightness = try Brightness(clamping: value)
+        var configuration = try load()
+        configuration.lighting.brightness = brightness.value
+        try save(configuration)
+        return configuration
+    }
+
     public func resolveSelectedGhosttyLaunch() throws -> (
         TerminalApplicationDescriptor, CLIExecutableDescriptor
     ) {

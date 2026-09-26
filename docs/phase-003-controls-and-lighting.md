@@ -150,6 +150,15 @@ Brightness is user-adjustable. Clamp to the qualified device range. Setting
 brightness to zero does not disable textual status. Avoid maximum brightness
 as an unexplained default.
 
+New configurations start at the physically qualified 35% brightness. The
+manager loads the saved brightness before enabling lighting controls and lets
+users save a brightness choice without a device connection. Applying lighting
+also saves the chosen brightness after the runtime write succeeds. An existing
+stored value, including the earlier 65% configuration default, is honored but
+never sent to the device automatically at launch. Malformed configuration
+blocks lighting changes and stays untouched; device input observation can
+continue. These preferences do not enable CLI-state-driven physical lighting.
+
 The ambient underglow is part of the selected-session status display and must
 match the key LEDs in color, brightness and effect. The app owns both runtime
 lighting zones while connected, discloses that behavior in the manager and

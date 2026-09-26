@@ -1,5 +1,6 @@
 import AppKit
 import CopilotMicroCore
+import CopilotMicroStorage
 import SwiftUI
 
 @MainActor
@@ -67,10 +68,16 @@ final class ManagerWindow {
         bridgeEnabled: Bool,
         bridgeExtensionPackageURL: URL
     ) {
-        store = LiveDeviceStore(hardwareEnabled: hardwareEnabled)
+        let configurationStore = (try? LocalConfigurationStore.defaultRootURL())
+            .map { LocalConfigurationStore(rootURL: $0) }
+        store = LiveDeviceStore(
+            hardwareEnabled: hardwareEnabled,
+            configurationStore: configurationStore
+        )
         bridgeStore = LiveBridgeStore(
             bridgeEnabled: bridgeEnabled,
-            bridgeExtensionPackageURL: bridgeExtensionPackageURL
+            bridgeExtensionPackageURL: bridgeExtensionPackageURL,
+            configurationStore: configurationStore
         )
         hostingView = NSHostingView(
             rootView: ManagerView(store: store, bridgeStore: bridgeStore)
@@ -326,7 +333,15 @@ private struct LightingView: View {
                             } maximumValueLabel: {
                                 Text("100")
                             }
+                            .disabled(!store.canSaveBrightness)
                             Text("Brightness \(Int(store.brightness * 100)) percent")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("Save brightness") {
+                                store.saveBrightness()
+                            }
+                            .disabled(!store.canSaveBrightness)
+                            Text(store.brightnessStatus)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button("Apply to device") {
