@@ -33,7 +33,7 @@ public struct Brightness: Equatable, Sendable {
         case nonFinite
     }
 
-    public static let defaultValue = Brightness(unchecked: 0.65)
+    public static let defaultValue = Brightness(unchecked: 0.35)
     public let value: Double
 
     public init(clamping value: Double) throws {

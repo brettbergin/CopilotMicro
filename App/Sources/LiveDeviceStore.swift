@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CopilotMicroCore
 import CopilotMicroDevice
+import CopilotMicroStorage
 import Foundation
 
 enum ManagerArea: String, CaseIterable, Identifiable {
@@ -124,9 +125,12 @@ final class LiveDeviceStore: ObservableObject {
     @Published private(set) var lightingColor: LightingColor = .white
     @Published private(set) var lightingApplied = false
     @Published private(set) var lightingStatus = "Key lighting has not been changed by the app."
+    @Published private(set) var brightnessStatus = "Loading saved brightness."
+    @Published private(set) var brightnessLoaded = false
+    @Published private(set) var brightnessSaveBusy = false
     @Published private(set) var isPaused = false
 
-    @Published var brightness = 0.35
+    @Published var brightness = Brightness.defaultValue.value
 
     var onPresentationChange: (@MainActor () -> Void)?
 
@@ -138,9 +142,11 @@ final class LiveDeviceStore: ObservableObject {
     private var dialGeneration: UInt64 = 0
     private var joystickGeneration: UInt64 = 0
     private var openedInputMonitoringSettings = false
+    private let configurationStore: LocalConfigurationStore?
 
-    init(hardwareEnabled: Bool) {
+    init(hardwareEnabled: Bool, configurationStore: LocalConfigurationStore? = nil) {
         self.hardwareEnabled = hardwareEnabled
+        self.configurationStore = configurationStore
         connectionState = hardwareEnabled ? .inactive : .suppressedForSmoke
     }
 
@@ -152,7 +158,11 @@ final class LiveDeviceStore: ObservableObject {
     }
 
     var canControlLighting: Bool {
-        connectionState.isConnected && !isPaused
+        connectionState.isConnected && !isPaused && canSaveBrightness
+    }
+
+    var canSaveBrightness: Bool {
+        brightnessLoaded && !brightnessSaveBusy
     }
 
     var statusSymbol: String {
@@ -173,6 +183,7 @@ final class LiveDeviceStore: ObservableObject {
     func start() {
         guard hardwareEnabled, !started else { return }
         started = true
+        loadBrightness()
         connect()
     }
 
@@ -239,9 +250,33 @@ final class LiveDeviceStore: ObservableObject {
         lightingColor = color
     }
 
+    func saveBrightness() {
+        guard canSaveBrightness, let configurationStore else { return }
+        let value = brightness
+        brightnessSaveBusy = true
+        brightnessStatus = "Saving brightness."
+        Task { [weak self] in
+            do {
+                let saved = try await configurationStore.setBrightness(value)
+                guard let self else { return }
+                brightnessStatus = "Saved brightness: \(Int(saved.lighting.brightness * 100)) percent."
+            } catch {
+                guard let self else { return }
+                brightnessStatus = "Brightness was not saved: \(configurationMessage(error))"
+            }
+            self?.brightnessSaveBusy = false
+            self?.presentationDidChange()
+        }
+    }
+
     func applyLighting() {
-        guard canControlLighting, let connection else {
+        guard connectionState.isConnected, !isPaused, let connection else {
             lightingStatus = "Connect the device before changing key lighting."
+            presentationDidChange()
+            return
+        }
+        guard canSaveBrightness else {
+            lightingStatus = "Load saved brightness before changing key lighting."
             presentationDidChange()
             return
         }
@@ -259,6 +294,7 @@ final class LiveDeviceStore: ObservableObject {
             lightingStatus =
                 "Device acknowledged matching key and ambient \(lightingColor.displayName.lowercased()) at \(Int(appliedBrightness * 100)) percent."
             appendEvent("Device lighting updated", lightingStatus)
+            saveBrightness()
         } catch {
             lightingStatus = localizedMessage(error)
             appendEvent("Key lighting failed", lightingStatus)
@@ -279,6 +315,27 @@ final class LiveDeviceStore: ObservableObject {
             && !store.canControlLighting
             && store.eventLog.isEmpty
             && ManagerArea.allCases.count == 4
+    }
+
+    private func loadBrightness() {
+        guard let configurationStore else {
+            brightnessStatus = "The local configuration directory is unavailable."
+            return
+        }
+        Task { [weak self] in
+            do {
+                let saved = try await configurationStore.load()
+                guard let self else { return }
+                brightness = saved.lighting.brightness
+                brightnessLoaded = true
+                brightnessStatus = "Brightness loaded from local preferences."
+            } catch {
+                guard let self else { return }
+                brightnessStatus =
+                    "Cannot load saved brightness; the configuration was not changed: \(configurationMessage(error))"
+            }
+            self?.presentationDidChange()
+        }
     }
 
     private func connect() {
@@ -554,6 +611,10 @@ final class LiveDeviceStore: ObservableObject {
     private func localizedMessage(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription
             ?? "The Creator Micro 2 operation failed."
+    }
+
+    private func configurationMessage(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 }
 

@@ -242,7 +242,8 @@ final class LiveBridgeStore: ObservableObject {
         runtime: SessionBridgeRuntime = SessionBridgeRuntime(),
         ghosttyAssociations: GhosttyTargetBindingStore = GhosttyTargetBindingStore(),
         copilotHomeURL: URL = BridgeExtensionInstaller.defaultCopilotHomeURL(),
-        applicationSupportRootURL: URL? = nil
+        applicationSupportRootURL: URL? = nil,
+        configurationStore: LocalConfigurationStore? = nil
     ) {
         self.bridgeEnabled = bridgeEnabled
         self.runtime = runtime
@@ -259,12 +260,14 @@ final class LiveBridgeStore: ObservableObject {
             copilotHomeURL: copilotHomeURL,
             applicationSupportRootURL: rootURL
         )
-        if let configurationRoot = applicationSupportRootURL
+        if let configurationStore {
+            self.configurationStore = configurationStore
+        } else if let configurationRoot = applicationSupportRootURL
             ?? (try? LocalConfigurationStore.defaultRootURL())
         {
-            configurationStore = LocalConfigurationStore(rootURL: configurationRoot)
+            self.configurationStore = LocalConfigurationStore(rootURL: configurationRoot)
         } else {
-            configurationStore = nil
+            self.configurationStore = nil
             terminalSelectionIssue = "The local configuration directory is unavailable."
         }
         connectionState = bridgeEnabled ? .inactive : .suppressedForSmoke

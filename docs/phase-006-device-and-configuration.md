@@ -239,6 +239,13 @@ do not silently reset a device or perform a default action.
 | Live PID/session generation/pending approval | Memory only; re-established after reconnect |
 | Credentials or transcripts | Not stored in configuration |
 
+The manager and bridge share one local configuration store so a brightness
+save loads and updates only that field while retaining terminal/CLI selections
+and other preferences. Saving brightness is available without hardware;
+ordinary lighting apply remains a separate runtime-only device operation.
+Existing saved brightness values remain unchanged, and a failed load or save
+does not repair or replace malformed configuration implicitly.
+
 Suggested engineering bounds are 20 recent directories, one protected
 original backup per device plus five pre-change snapshots, and bounded
 diagnostic retention defined in [phase 007](phase-007-security-privacy-and-safety.md).

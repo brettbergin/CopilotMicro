@@ -7,6 +7,63 @@ import Testing
 
 @Suite("Private local configuration")
 struct ConfigurationTests {
+    @Test("New configurations retain the qualified 35 percent initial brightness")
+    func initialBrightness() async throws {
+        try await withTemporaryDirectory { root in
+            let store = LocalConfigurationStore(rootURL: root)
+            let configuration = try await store.load()
+            #expect(configuration.lighting.brightness == 0.35)
+        }
+    }
+
+    @Test("Saving brightness preserves unrelated settings and clamps to the device range")
+    func saveBrightness() async throws {
+        try await withTemporaryDirectory { root in
+            let store = LocalConfigurationStore(rootURL: root)
+            var original = try await store.load()
+            original.terminal = StoredTerminalPreferences(
+                preferredBundleIdentifier: SupportedTerminal.ghostty.bundleIdentifier,
+                preferredApplicationPath: "/Applications/Ghostty.app",
+                cliExecutableHint: "/opt/homebrew/bin/copilot"
+            )
+            original.lighting.reducedMotion = true
+            try await store.save(original)
+
+            let saved = try await store.setBrightness(0.42)
+            #expect(saved.lighting.brightness == 0.42)
+            #expect(saved.terminal == original.terminal)
+            #expect(saved.lighting.reducedMotion)
+            let reopened = LocalConfigurationStore(rootURL: root)
+            let persisted = try await reopened.load()
+            #expect(persisted == saved)
+
+            let off = try await store.setBrightness(-2)
+            #expect(off.lighting.brightness == 0)
+            let maximum = try await store.setBrightness(2)
+            #expect(maximum.lighting.brightness == 1)
+            await #expect(throws: Brightness.ValidationError.nonFinite) {
+                _ = try await store.setBrightness(.nan)
+            }
+            let unchanged = try await store.load()
+            #expect(unchanged == maximum)
+        }
+    }
+
+    @Test("Malformed preferences remain untouched when saving brightness fails")
+    func saveBrightnessRejectsMalformedConfiguration() async throws {
+        try await withTemporaryDirectory { root in
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let url = root.appendingPathComponent(LocalConfigurationStore.configurationFilename)
+            let malformed = Data(#"{"schemaVersion":1,"private":"keep"}"#.utf8)
+            try malformed.write(to: url)
+            let store = LocalConfigurationStore(rootURL: root)
+            await #expect(throws: ConfigurationError.self) {
+                _ = try await store.setBrightness(0.4)
+            }
+            #expect(try Data(contentsOf: url) == malformed)
+        }
+    }
+
     @Test("Portable export is complete and excludes machine-specific state")
     func portableExportExcludesPrivateLocalFields() throws {
         var configuration = StoredConfiguration()
