@@ -13,6 +13,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let issueItem = NSMenuItem()
     private let pauseItem = NSMenuItem()
     private let reconnectItem = NSMenuItem()
+    var onDidFinishLaunching: (@MainActor () -> Void)?
 
     init(hardwareEnabled: Bool) {
         manager = ManagerWindow(hardwareEnabled: hardwareEnabled)
@@ -59,6 +60,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = item
         manager.store.start()
         refreshMenu()
+        onDidFinishLaunching?()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
