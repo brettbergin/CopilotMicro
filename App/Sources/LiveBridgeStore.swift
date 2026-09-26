@@ -1,5 +1,6 @@
 import Combine
 import CopilotMicroBridge
+import CopilotMicroStorage
 import CopilotMicroTerminal
 import Foundation
 
@@ -213,16 +214,24 @@ final class LiveBridgeStore: ObservableObject {
     @Published private(set) var connectionState: LiveBridgeConnectionState
     @Published private(set) var installationState: LiveBridgeInstallationState
     @Published private(set) var launchState = LiveCopilotLaunchState.inactive
+    @Published private(set) var terminalInstallations: [TerminalApplicationDescriptor] = []
+    @Published private(set) var cliInstallations: [CLIExecutableDescriptor] = []
+    @Published private(set) var selectedTerminal: TerminalPreference?
+    @Published private(set) var selectedCLI: CLIExecutablePreference?
+    @Published private(set) var terminalSelectionIssue: String?
+    @Published private(set) var terminalSelectionBusy = false
     var onPresentationChange: (@MainActor () -> Void)?
 
     private let runtime: SessionBridgeRuntime
     private let extensionInstaller: BridgeExtensionInstaller
+    private let configurationStore: LocalConfigurationStore?
     private var startupTask: Task<Void, Never>?
     private var started = false
     private var startIdentifier: UUID?
     private var installationOperationIdentifier: UUID?
     private var launchOperationIdentifier: UUID?
     private var launchTimeoutTask: Task<Void, Never>?
+    private var selectionOperationIdentifier: UUID?
 
     init(
         bridgeEnabled: Bool,
@@ -247,6 +256,14 @@ final class LiveBridgeStore: ObservableObject {
             copilotHomeURL: copilotHomeURL,
             applicationSupportRootURL: rootURL
         )
+        if let configurationRoot = applicationSupportRootURL
+            ?? (try? LocalConfigurationStore.defaultRootURL())
+        {
+            configurationStore = LocalConfigurationStore(rootURL: configurationRoot)
+        } else {
+            configurationStore = nil
+            terminalSelectionIssue = "The local configuration directory is unavailable."
+        }
         connectionState = bridgeEnabled ? .inactive : .suppressedForSmoke
         installationState = bridgeEnabled ? .checking : .suppressedForSmoke
     }
@@ -268,6 +285,7 @@ final class LiveBridgeStore: ObservableObject {
         connectionState = .starting
         presentationDidChange()
         refreshInstallationStatus()
+        refreshTerminalChoices()
         let runtime = runtime
         let associations = ghosttyAssociations
         let store = self
@@ -325,6 +343,8 @@ final class LiveBridgeStore: ObservableObject {
         launchOperationIdentifier = nil
         launchTimeoutTask?.cancel()
         launchTimeoutTask = nil
+        selectionOperationIdentifier = nil
+        terminalSelectionBusy = false
         runtime.stop()
         connectionState = .inactive
         launchState = .inactive
@@ -341,6 +361,13 @@ final class LiveBridgeStore: ObservableObject {
         guard bridgeEnabled, runtime.isStarted, installationState.isInstalled else {
             return false
         }
+        guard !terminalSelectionBusy, terminalSelectionIssue == nil,
+            case .available(let terminal) = terminalSelection,
+            terminal.terminal == .ghostty,
+            case .available = cliSelection
+        else {
+            return false
+        }
         switch launchState {
         case .inactive, .failed:
             break
@@ -353,6 +380,134 @@ final class LiveBridgeStore: ObservableObject {
         case .inactive, .suppressedForSmoke, .starting, .connected, .failed:
             return false
         }
+    }
+
+    var terminalSelection: TerminalPreferenceResolution {
+        TerminalPreferenceResolver.resolve(selectedTerminal, in: terminalInstallations)
+    }
+
+    var cliSelection: CLIExecutablePreferenceResolution {
+        TerminalPreferenceResolver.resolve(selectedCLI, in: cliInstallations)
+    }
+
+    func refreshTerminalChoices() {
+        guard bridgeEnabled, let configurationStore else { return }
+        let identifier = UUID()
+        selectionOperationIdentifier = identifier
+        terminalSelectionBusy = true
+        presentationDidChange()
+        let store = self
+        Task.detached {
+            do {
+                let configuration = try await configurationStore.load()
+                let terminal = configuration.terminal
+                let selectedTerminal: TerminalPreference?
+                if let bundleID = terminal.preferredBundleIdentifier,
+                    let path = terminal.preferredApplicationPath
+                {
+                    selectedTerminal = try TerminalPreference(
+                        bundleIdentifier: bundleID,
+                        applicationPath: path
+                    )
+                } else {
+                    selectedTerminal = nil
+                }
+                let selectedCLI = try terminal.cliExecutableHint.map {
+                    try CLIExecutablePreference(executablePath: $0)
+                }
+                let applications = TerminalApplicationDiscovery().discover(
+                    userSelectedApplicationURLs: selectedTerminal.map {
+                        [URL(fileURLWithPath: $0.applicationPath)]
+                    } ?? []
+                )
+                let executables = CLIExecutableDiscovery().discover(
+                    userSelectedExecutableURLs: selectedCLI.map {
+                        [URL(fileURLWithPath: $0.executablePath)]
+                    } ?? []
+                )
+                await store.receiveTerminalChoices(
+                    applications: applications.installations,
+                    executables: executables.executables,
+                    selectedTerminal: selectedTerminal,
+                    selectedCLI: selectedCLI,
+                    identifier: identifier
+                )
+            } catch {
+                await store.failTerminalSelection(error, identifier: identifier)
+            }
+        }
+    }
+
+    func selectTerminal(at applicationURL: URL) {
+        selectPath(applicationURL, isTerminal: true)
+    }
+
+    func selectCLI(at executableURL: URL) {
+        selectPath(executableURL, isTerminal: false)
+    }
+
+    private func selectPath(_ url: URL, isTerminal: Bool) {
+        guard bridgeEnabled, !terminalSelectionBusy, let configurationStore else { return }
+        let identifier = UUID()
+        selectionOperationIdentifier = identifier
+        terminalSelectionBusy = true
+        terminalSelectionIssue = nil
+        presentationDidChange()
+        let store = self
+        Task.detached {
+            do {
+                if isTerminal {
+                    _ = try await configurationStore.selectTerminal(at: url)
+                } else {
+                    _ = try await configurationStore.selectCLI(at: url)
+                }
+                await store.finishSelection(identifier: identifier)
+            } catch {
+                await store.failTerminalSelection(error, identifier: identifier)
+            }
+        }
+    }
+
+    private func finishSelection(identifier: UUID) {
+        guard selectionOperationIdentifier == identifier else { return }
+        refreshTerminalChoices()
+    }
+
+    private func receiveTerminalChoices(
+        applications: [TerminalApplicationDescriptor],
+        executables: [CLIExecutableDescriptor],
+        selectedTerminal: TerminalPreference?,
+        selectedCLI: CLIExecutablePreference?,
+        identifier: UUID
+    ) {
+        guard selectionOperationIdentifier == identifier else { return }
+        selectionOperationIdentifier = nil
+        terminalInstallations = applications
+        cliInstallations = executables
+        self.selectedTerminal = selectedTerminal
+        self.selectedCLI = selectedCLI
+        terminalSelectionIssue = nil
+        terminalSelectionBusy = false
+        presentationDidChange()
+    }
+
+    private func failTerminalSelection(_ error: Error, identifier: UUID) {
+        guard selectionOperationIdentifier == identifier else { return }
+        selectionOperationIdentifier = nil
+        terminalSelectionBusy = false
+        switch error {
+        case let error as ConfigurationError:
+            terminalSelectionIssue = error.userMessage
+        case let error as TerminalApplicationValidationError:
+            terminalSelectionIssue = error.localizedDescription
+        case let error as CLIExecutableValidationError:
+            terminalSelectionIssue = error.localizedDescription
+        case let error as TerminalPreferenceError:
+            terminalSelectionIssue = error.localizedDescription
+        default:
+            terminalSelectionIssue = "The terminal selection could not be saved safely."
+        }
+        presentationDidChange()
     }
 
     func installExtension() {
@@ -383,6 +538,9 @@ final class LiveBridgeStore: ObservableObject {
 
     func openCopilot(projectDirectoryURL: URL) {
         guard canOpenCopilot else { return }
+        guard case .available(let expectedTerminal) = terminalSelection,
+            case .available(let expectedCLI) = cliSelection
+        else { return }
         let operationIdentifier = UUID()
         launchOperationIdentifier = operationIdentifier
         launchTimeoutTask?.cancel()
@@ -390,29 +548,29 @@ final class LiveBridgeStore: ObservableObject {
         launchState = .opening
         presentationDidChange()
         let installer = extensionInstaller
+        let configurationStore = self.configurationStore
         let associations = ghosttyAssociations
         let store = self
         Task.detached {
             do {
                 try await installer.requireNoProjectShadow(in: projectDirectoryURL)
-                let terminalReport = TerminalApplicationDiscovery().discover()
-                let ghosttyInstallations = terminalReport.installations.filter {
-                    $0.terminal == .ghostty
+                guard let configurationStore else {
+                    throw TerminalSelectionError.terminalNotSelected
                 }
-                guard ghosttyInstallations.count == 1 else {
-                    throw LiveCopilotLaunchError.ghosttySelectionRequired
+                let (terminal, cli) = try await configurationStore.resolveSelectedGhosttyLaunch()
+                guard terminal == expectedTerminal else {
+                    throw TerminalSelectionError.terminalChanged
                 }
-                let cliExecutables = CLIExecutableDiscovery().discover().executables
-                guard cliExecutables.count == 1 else {
-                    throw LiveCopilotLaunchError.cliSelectionRequired
+                guard cli == expectedCLI else {
+                    throw TerminalSelectionError.cliChanged
                 }
                 let adapter = try GhosttyAdapter(
-                    installation: ghosttyInstallations[0],
+                    installation: terminal,
                     bindings: associations
                 )
                 let request = try OpenCopilotRequest(
-                    terminal: ghosttyInstallations[0],
-                    cliExecutable: cliExecutables[0],
+                    terminal: terminal,
+                    cliExecutable: cli,
                     projectDirectoryURL: projectDirectoryURL
                 )
                 let openedSurface = try await adapter.openCopilot(request)
@@ -602,9 +760,8 @@ final class LiveBridgeStore: ObservableObject {
     }
 
     private static func launchFailureMessage(_ error: Error) -> String {
-        if let error = error as? LiveCopilotLaunchError {
-            return error.errorDescription
-                ?? "Choose one validated terminal and Copilot CLI installation."
+        if let error = error as? TerminalSelectionError {
+            return error.localizedDescription
         }
         if let error = error as? BridgeExtensionInstallerError {
             return error.errorDescription
@@ -642,19 +799,5 @@ final class LiveBridgeStore: ObservableObject {
 
     private func presentationDidChange() {
         onPresentationChange?()
-    }
-}
-
-private enum LiveCopilotLaunchError: LocalizedError {
-    case cliSelectionRequired
-    case ghosttySelectionRequired
-
-    var errorDescription: String? {
-        switch self {
-        case .cliSelectionRequired:
-            "Choose one validated Copilot CLI installation before opening Copilot."
-        case .ghosttySelectionRequired:
-            "Choose one validated Ghostty installation before opening Copilot."
-        }
     }
 }

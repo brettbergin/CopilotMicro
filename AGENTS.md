@@ -22,9 +22,11 @@ preferences, CLI paths and typed process/window/tab/pane evidence. Its Ghostty
 1.3.1 adapter is qualified for exact stable-surface observation and focus.
 App-created Ghostty surfaces now receive a one-time association token that the
 bridge registration can return to a race-safe native registry; exact child
-environment inheritance is live-qualified. The app can explicitly open a new
-Ghostty Copilot window after a project is selected, but this packaged path has
-not yet received a real registration.
+environment inheritance is live-qualified. The manager requires an explicit
+persisted terminal and CLI executable selection, revalidated before launch;
+only Ghostty has a qualified Open Copilot adapter. The app can explicitly open
+a new Ghostty Copilot window after a project is selected, but this packaged
+path has not yet received a real registration.
 Do not reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift

@@ -16,6 +16,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let reconnectItem = NSMenuItem()
     private let restartBridgeItem = NSMenuItem()
     private let installBridgeItem = NSMenuItem()
+    private let selectTerminalItem = NSMenuItem()
     private let openCopilotItem = NSMenuItem()
     var onDidFinishLaunching: (@MainActor () -> Void)?
 
@@ -54,6 +55,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         installBridgeItem.target = self
         installBridgeItem.action = #selector(reviewBridgeInstallation)
         menu.addItem(installBridgeItem)
+        selectTerminalItem.title = "Choose Terminal and CLI..."
+        selectTerminalItem.target = self
+        selectTerminalItem.action = #selector(openTerminalSettings)
+        menu.addItem(selectTerminalItem)
         openCopilotItem.target = self
         openCopilotItem.action = #selector(openCopilot)
         menu.addItem(openCopilotItem)
@@ -127,6 +132,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             && installBridgeItem.action == #selector(reviewBridgeInstallation)
             && installBridgeItem.target === self
             && installBridgeItem.isEnabled == manager.bridgeStore.installationState.canInstall
+            && selectTerminalItem.action == #selector(openTerminalSettings)
+            && selectTerminalItem.target === self && selectTerminalItem.isEnabled
             && openCopilotItem.action == #selector(openCopilot)
             && openCopilotItem.target === self
             && openCopilotItem.isEnabled == manager.bridgeStore.canOpenCopilot
@@ -255,6 +262,10 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         manager.bridgeStore.openCopilot(projectDirectoryURL: projectDirectoryURL)
     }
 
+    @objc private func openTerminalSettings() {
+        manager.show(area: .diagnostics)
+    }
+
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
     }
@@ -294,7 +305,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? "Install CLI Bridge..."
             : "CLI Bridge: \(manager.bridgeStore.installationState.label)"
         installBridgeItem.isEnabled = manager.bridgeStore.installationState.canInstall
-        openCopilotItem.title = "Open Copilot in Ghostty..."
+        openCopilotItem.title = "Open Copilot in selected Ghostty..."
         openCopilotItem.isEnabled = manager.bridgeStore.canOpenCopilot
         pauseItem.isEnabled = store.hardwareEnabled
         statusItem?.button?.toolTip =

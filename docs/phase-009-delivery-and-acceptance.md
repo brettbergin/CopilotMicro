@@ -61,7 +61,7 @@ contract was not.
 | U-01 | Foreground-session extension lifecycle | Partial | `joinSession()` and `/clear` replacement/reload worked under one host; arbitrary existing-session selection was not tested | Join/replacement/selection synchronization demonstrated |
 | U-02 | Authoritative initial state and acknowledgement | Partial | Mode/task/queue/pending snapshots and activity boundaries were observable; verified user acknowledgement was not | Mode, activity, pending requests and user acknowledgement qualified; unsupported signals disclosed |
 | U-03 | Native list/switch/new/archive operations | Unavailable | No callable extension surface demonstrated these host UI operations | Real host behavior, not fabricated commands or private-file edits |
-| U-04 | Exact terminal window/tab/pane targeting | Partial | Ghostty 1.3.1 stable window/tab/terminal observation and exact focus are qualified on macOS 26.6.2, including another foreground app and a temporary multi-tab/split window. App-created surfaces use an exact one-time token carried through the child environment and bridge registration; child inheritance is live-qualified and registry races/replay are tested. Ghostty exposes no child PID or TTY, so arbitrary existing CLI instances remain unassociated | Wire packaged-app bridge startup, launch a real Copilot instance through the adapter and claim its registration; qualify iTerm2 and Terminal.app separately |
+| U-04 | Exact terminal window/tab/pane targeting | Partial | Ghostty 1.3.1 stable window/tab/terminal observation and exact focus are qualified on macOS 26.6.2, including another foreground app and a temporary multi-tab/split window. App-created surfaces use an exact one-time token carried through the child environment and bridge registration; child inheritance is live-qualified and registry races/replay are tested. The manager now persists explicit terminal and CLI choices and revalidates exact paths for launch. Ghostty exposes no child PID or TTY, so arbitrary existing CLI instances remain unassociated | Launch a real Copilot instance through the packaged adapter and claim its registration; qualify iTerm2 and Terminal.app separately |
 | U-05 | Existing composer focus/submit | Unavailable | Completion trigger metadata was readable; no actual draft focus/submit API was demonstrated | Preserve and submit the actual draft once; no `session.send()` substitute |
 | U-06 | CLI voice lifecycle/dependencies | Unavailable | No voice RPC or live voice command was demonstrated | Native voice start/stop/state and required grants verified |
 | U-07 | Visible request and permission authority | Unavailable | Pending counts were readable; event bridging returned success but delivered no permission event for a visible TUI prompt | Request-ID-specific one-shot decision, visibility and concurrent-response races verified |
@@ -236,8 +236,10 @@ diagnostics, authenticated IPC contract, disposable CLI qualification and I-07
 read-only observer/reconciler source are implemented. I-08 validated terminal
 and CLI installation discovery and the shared exact-target contract. Production
 USB hardware ownership, normalized input display and matching key/ambient
-runtime lighting are physically verified. Stateful CLI control,
-terminal-specific targeting, Bluetooth, animated lighting, sleep/wake, latency,
+runtime lighting are physically verified. Explicit terminal and CLI selection
+is persisted and fail-closed for the qualified Ghostty launch path. Stateful
+CLI control, packaged live registration, non-Ghostty targeting, Bluetooth,
+animated lighting, sleep/wake, latency,
 updater and their complete acceptance journeys remain future work.
 Compatibility evidence and mock I-07 checks are work-package results, not a
 claim that the CLI controller is complete.

@@ -20,8 +20,12 @@ and the signed app bundles the observer as an inert resource. An explicit
 confirmation flow can install that exact observer into the user extension
 directory with a versioned hash receipt; collisions and externally modified
 files are preserved and blocked. After installation, the user can choose a
-project and explicitly open a new token-bearing Copilot window in the one
-qualified Ghostty installation. All stateful CLI actions remain disabled.
+project and explicitly open a new token-bearing Copilot window in their
+selected, qualified Ghostty installation. The manager's Diagnostics view
+discovers supported terminals and Copilot CLI executables, accepts manual
+selections, persists exact paths locally and blocks launch when a selection
+is missing or changes. Terminal.app can be selected but has no qualified
+Open Copilot adapter yet. All stateful CLI actions remain disabled.
 Validated terminal and CLI discovery plus the shared exact-target contract are
 implemented. Ghostty `1.3.1` exact window/tab/terminal observation and focus
 are qualified through its documented AppleScript API, including focus from
@@ -93,7 +97,10 @@ app Input Monitoring when macOS requests it. The manager then shows live
 physical input and controls both key lighting and ambient underglow. The
 Diagnostics view shows the exact user extension destination before offering
 installation; installation and Open Copilot both require separate explicit
-user actions. To choose an output location explicitly:
+user actions. Use **Choose Terminal and CLI** in the menu bar (or Diagnostics)
+to explicitly select both installations first. Discovery alone never chooses
+one, and a moved selection requires reselection. To choose an output location
+explicitly:
 
 ```sh
 make package PACKAGE_OUTPUT=build/my-preview
