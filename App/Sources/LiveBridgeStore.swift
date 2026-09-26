@@ -1,5 +1,6 @@
 import Combine
 import CopilotMicroBridge
+import CopilotMicroCore
 import CopilotMicroStorage
 import CopilotMicroTerminal
 import Foundation
@@ -214,6 +215,8 @@ final class LiveBridgeStore: ObservableObject {
     @Published private(set) var connectionState: LiveBridgeConnectionState
     @Published private(set) var installationState: LiveBridgeInstallationState
     @Published private(set) var launchState = LiveCopilotLaunchState.inactive
+    @Published private(set) var sessionObservation: SessionBridgeObservedState?
+    @Published private(set) var sessionObservationIssue: String?
     @Published private(set) var terminalInstallations: [TerminalApplicationDescriptor] = []
     @Published private(set) var cliInstallations: [CLIExecutableDescriptor] = []
     @Published private(set) var selectedTerminal: TerminalPreference?
@@ -275,6 +278,18 @@ final class LiveBridgeStore: ObservableObject {
 
     var runtimeStarted: Bool {
         runtime.isStarted
+    }
+
+    var sessionStatus: String {
+        guard case .connected(let association) = connectionState,
+            association == .bound || association == .reconnected
+        else {
+            return "No associated CLI session"
+        }
+        guard let sessionObservation else {
+            return sessionObservationIssue ?? "State unknown"
+        }
+        return LightingProjector.project(sessionObservation.runtimeState).textualState
     }
 
     func start() {
@@ -348,6 +363,8 @@ final class LiveBridgeStore: ObservableObject {
         runtime.stop()
         connectionState = .inactive
         launchState = .inactive
+        sessionObservation = nil
+        sessionObservationIssue = nil
         presentationDidChange()
     }
 
@@ -660,6 +677,9 @@ final class LiveBridgeStore: ObservableObject {
         guard launchOperationIdentifier == operationIdentifier else { return }
         launchState = alreadyAssociated ? .associated : .waitingForRegistration
         if alreadyAssociated {
+            if case .connected(.pending) = connectionState {
+                connectionState = .connected(.bound)
+            }
             launchOperationIdentifier = nil
             launchTimeoutTask?.cancel()
             launchTimeoutTask = nil
@@ -695,6 +715,8 @@ final class LiveBridgeStore: ObservableObject {
         case .listening:
             connectionState = .listening
         case .registrationAccepted(_, let association):
+            sessionObservation = nil
+            sessionObservationIssue = nil
             connectionState = .connected(association)
             switch association {
             case .bound, .reconnected:
@@ -716,8 +738,19 @@ final class LiveBridgeStore: ObservableObject {
             }
         case .sessionUpdated:
             break
+        case .sessionObserved(let observation):
+            if case .connected(let association) = connectionState {
+                sessionObservation =
+                    observation.isDisplayable(for: association)
+                    ? observation : nil
+                sessionObservationIssue =
+                    observation.compatibility.isQualifiedReadOnly
+                    ? nil : "This Copilot CLI build is not qualified for read-only state."
+            }
         case .disconnected:
             connectionState = .disconnected
+            sessionObservation = nil
+            sessionObservationIssue = nil
             if launchState != .inactive {
                 launchOperationIdentifier = nil
                 launchTimeoutTask?.cancel()
@@ -726,16 +759,22 @@ final class LiveBridgeStore: ObservableObject {
             }
         case .connectionFailed:
             connectionState = .listening
+            sessionObservation = nil
+            sessionObservationIssue = nil
         case .stopped:
             started = false
             self.startIdentifier = nil
             startupTask = nil
             connectionState = .disconnected
+            sessionObservation = nil
+            sessionObservationIssue = nil
         case .failed(let failure):
             started = false
             self.startIdentifier = nil
             startupTask = nil
             connectionState = .failed(failure)
+            sessionObservation = nil
+            sessionObservationIssue = nil
         }
         presentationDidChange()
     }

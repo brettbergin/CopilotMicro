@@ -9,6 +9,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private(set) var didFinishLaunching = false
     private let deviceItem = NSMenuItem()
     private let bridgeItem = NSMenuItem()
+    private let sessionItem = NSMenuItem()
     private let inputItem = NSMenuItem()
     private let lightingItem = NSMenuItem()
     private let issueItem = NSMenuItem()
@@ -39,7 +40,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
-        for item in [deviceItem, bridgeItem, inputItem, lightingItem, issueItem] {
+        for item in [deviceItem, bridgeItem, sessionItem, inputItem, lightingItem, issueItem] {
             item.isEnabled = false
             menu.addItem(item)
         }
@@ -140,7 +141,8 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             && pauseItem.action == #selector(togglePause)
             && pauseItem.target === self
             && pauseItem.isEnabled == manager.store.hardwareEnabled
-            && !deviceItem.isEnabled && !bridgeItem.isEnabled && !inputItem.isEnabled
+            && !deviceItem.isEnabled && !bridgeItem.isEnabled && !sessionItem.isEnabled
+            && !inputItem.isEnabled
             && !lightingItem.isEnabled && !issueItem.isEnabled
             && quit.action == #selector(self.quit)
             && quit.target === self && quit.isEnabled
@@ -289,6 +291,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let store = manager.store
         deviceItem.title = "Device: \(store.connectionState.label)"
         bridgeItem.title = "CLI bridge: \(manager.bridgeStore.connectionState.label)"
+        sessionItem.title = "CLI session: \(manager.bridgeStore.sessionStatus)"
         inputItem.title = "Last input: \(store.lastInput)"
         lightingItem.title =
             "Key lighting: \(store.lightingApplied ? store.lightingColor.displayName : "Off")"

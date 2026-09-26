@@ -24,10 +24,42 @@ public enum SessionBridgeRuntimeEvent: Equatable, Sendable {
         association: SessionBridgeAssociationOutcome
     )
     case sessionUpdated(SessionBridgeUpdate)
+    case sessionObserved(SessionBridgeObservedState)
     case disconnected
     case connectionFailed
     case failed(SessionBridgeRuntimeFailure)
     case stopped
+}
+
+public struct SessionBridgeObservedState: Equatable, Sendable {
+    public let runtimeState: SessionRuntimeState
+    public let model: SessionModelState
+    public let compatibility: SessionObservationCompatibility
+
+    public init(
+        runtimeState: SessionRuntimeState,
+        model: SessionModelState,
+        compatibility: SessionObservationCompatibility
+    ) {
+        self.runtimeState = runtimeState
+        self.model = model
+        self.compatibility = compatibility
+    }
+
+    public func isDisplayable(for association: SessionBridgeAssociationOutcome) -> Bool {
+        guard
+            runtimeState.binding != nil,
+            compatibility.isQualifiedReadOnly
+        else {
+            return false
+        }
+        switch association {
+        case .bound, .reconnected:
+            return true
+        case .notRequested, .pending, .tokenClaimedByAnotherInstance, .unknownToken:
+            return false
+        }
+    }
 }
 
 public struct SessionBridgeRuntimeConfiguration: Equatable, Sendable {
@@ -233,18 +265,24 @@ public final class SessionBridgeRuntime: @unchecked Sendable {
                         nowMilliseconds: uptimeMilliseconds()
                     )
                     await eventHandler(.sessionUpdated(update))
+                    await eventHandler(.sessionObserved(Self.observation(from: reconciler)))
                 } catch IPCTransportError.timedOut {
                     if reconciler.expireIfNeeded(nowMilliseconds: uptimeMilliseconds()) {
                         connectionActive = false
+                        await eventHandler(
+                            .sessionObserved(Self.observation(from: reconciler))
+                        )
                         await eventHandler(.disconnected)
                     }
                 } catch IPCTransportError.disconnected {
                     connectionActive = false
                     reconciler.suspendConnection()
+                    await eventHandler(.sessionObserved(Self.observation(from: reconciler)))
                     await eventHandler(.disconnected)
                 } catch {
                     connectionActive = false
                     reconciler.suspendConnection()
+                    await eventHandler(.sessionObserved(Self.observation(from: reconciler)))
                     await eventHandler(.connectionFailed)
                 }
             }
@@ -273,5 +311,15 @@ public final class SessionBridgeRuntime: @unchecked Sendable {
 
     private static func uptimeMilliseconds() -> UInt64 {
         DispatchTime.now().uptimeNanoseconds / 1_000_000
+    }
+
+    private static func observation(
+        from reconciler: SessionBridgeReconciler
+    ) -> SessionBridgeObservedState {
+        SessionBridgeObservedState(
+            runtimeState: reconciler.runtimeState,
+            model: reconciler.model,
+            compatibility: reconciler.compatibility
+        )
     }
 }

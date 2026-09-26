@@ -19,7 +19,10 @@ timeout through a fresh read-only connection. All keys, both dial directions,
 native radial joystick cardinals and steady all-key colors are physically
 qualified. The production app now owns the USB device connection, shows real
 input in its GUI and physically drives matching key and ambient colors.
-Terminal targeting, live CLI actions, host-driven blink/pulse, Bluetooth,
+The manager/menu can display qualified read-only status for an associated
+CLI lifetime; this is headless bridge/UI wiring, not a live registration or
+physical CLI-state lighting qualification. Live CLI actions, host-driven
+blink/pulse, Bluetooth,
 sleep/wake, latency and updater remain unqualified.
 
 ## Delivery strategy

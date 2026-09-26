@@ -5,6 +5,72 @@ import Testing
 
 @Suite("Packaged app session bridge runtime")
 struct SessionBridgeRuntimeTests {
+    @Test("Authenticated snapshots surface known state and events invalidate it")
+    func forwardsReconciledReadOnlyState() async throws {
+        let rootURL = URL(fileURLWithPath: "/tmp/cm-observe-\(UUID().uuidString.prefix(8))", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let events = RuntimeEventRecorder()
+        let runtime = SessionBridgeRuntime()
+        let configuration = try await runtime.start(
+            rootURL: rootURL,
+            associationHandler: { _ in .bound },
+            eventHandler: { event in await events.record(event) }
+        )
+        defer { runtime.stop() }
+        let token = try await IPCBootstrapStore(rootURL: rootURL).loadOrCreate()
+        let selectedRegistration = try registration(bootstrapToken: token)
+        let client = try await Task.detached {
+            try AuthenticatedIPCClient.connect(
+                socketURL: configuration.socketURL,
+                registration: selectedRegistration
+            )
+        }.value
+        defer { client.close() }
+        let snapshot = try JSONSerialization.data(withJSONObject: readOnlySnapshot(revision: 1))
+        try client.send(payload: snapshot)
+        try await waitUntil {
+            await events.observationCount >= 1
+        }
+        let observation = await events.latestObservation
+        #expect(observation?.runtimeState.mode == .known(.plan))
+        #expect(observation?.runtimeState.work.isKnown == true)
+        #expect(observation?.runtimeState.binding?.sessionID.rawValue == "session-1")
+        #expect(observation?.compatibility.isQualifiedReadOnly == true)
+        #expect(observation?.isDisplayable(for: .bound) == true)
+        #expect(observation?.isDisplayable(for: .notRequested) == false)
+        #expect(observation?.isDisplayable(for: .pending) == false)
+
+        let event = try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": 1, "messageType": "sessionEvent",
+            "instanceId": "cli-host-42", "sessionId": "session-1",
+            "generation": "generation-1", "contextRevision": 2, "reason": "mode",
+        ])
+        try client.send(payload: event)
+        try await waitUntil {
+            await events.observationCount >= 2
+        }
+        #expect(await events.latestObservation?.runtimeState.mode == .unknown)
+        #expect(await events.latestObservation?.runtimeState.connection == .synchronizing)
+        #expect(await events.latestObservation?.isDisplayable(for: .bound) == true)
+        let incompatible = SessionBridgeObservedState(
+            runtimeState: try #require(await events.latestObservation).runtimeState,
+            model: .unknown,
+            compatibility: SessionObservationCompatibility(
+                status: .unqualified,
+                cliVersion: "unsupported",
+                sdkVersion: "host-provided",
+                reason: "Not qualified."
+            )
+        )
+        #expect(!incompatible.isDisplayable(for: .bound))
+        client.close()
+        try await waitUntil {
+            await events.observationCount >= 3
+        }
+        #expect(await events.latestObservation?.runtimeState.binding == nil)
+        #expect(await events.latestObservation?.runtimeState.connection == .disconnected)
+    }
+
     @Test("Runtime authenticates registrations and reports surface association")
     func authenticatesAndAssociates() async throws {
         let rootURL = URL(
@@ -178,6 +244,33 @@ struct SessionBridgeRuntimeTests {
         return try #require(attributes[.posixPermissions] as? Int)
     }
 
+    private func readOnlySnapshot(revision: UInt64) -> [String: Any] {
+        [
+            "protocolVersion": 1, "messageType": "sessionSnapshot",
+            "instanceId": "cli-host-42", "sessionId": "session-1",
+            "generation": "generation-1", "contextRevision": revision,
+            "connection": "ready", "paused": false, "mode": "plan",
+            "work": ["known": true, "foregroundActive": true, "backgroundCount": 0, "queuedCount": 0],
+            "pendingAttention": [],
+            "attention": ["known": true, "permissionCount": 0, "otherCount": 0],
+            "capabilities": Dictionary(
+                uniqueKeysWithValues: ActionID.allCases.map {
+                    ($0.rawValue, ["status": "unavailable", "reason": "Read-only observer", "gapReference": "I-15"])
+                }),
+            "hostCapabilities": ["elicitation": false, "canvases": false, "mcpApps": false],
+            "model": [
+                "known": false, "modelId": NSNull(), "reasoningEffort": NSNull(),
+                "contextTier": NSNull(), "availableModels": [],
+            ],
+            "compatibility": [
+                "status": "qualifiedReadOnly", "cliVersion": "1.0.84-5",
+                "sdkVersion": "host-provided", "reason": "Qualified read-only observer.",
+            ],
+            "visiblePermissionRequestId": NSNull(), "failure": NSNull(),
+            "completionId": NSNull(),
+        ]
+    }
+
     private func registration(
         bootstrapToken: IPCBootstrapToken
     ) throws -> IPCRegistration {
@@ -223,6 +316,23 @@ private actor RuntimeEventRecorder {
 
     var first: SessionBridgeRuntimeEvent? {
         events.first
+    }
+
+    var latestObservation: SessionBridgeObservedState? {
+        for event in events.reversed() {
+            if case .sessionObserved(let state) = event {
+                return state
+            }
+        }
+        return nil
+    }
+
+    var observationCount: Int {
+        events.reduce(into: 0) { count, event in
+            if case .sessionObserved = event {
+                count += 1
+            }
+        }
     }
 }
 

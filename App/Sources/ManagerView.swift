@@ -182,6 +182,14 @@ private struct OverviewView: View {
                     symbol: "point.3.connected.trianglepath.dotted"
                 )
                 StatusCard(
+                    title: "Selected CLI session",
+                    value: bridgeStore.sessionStatus,
+                    detail:
+                        bridgeStore.sessionObservation?.runtimeState.binding?.sessionID.rawValue
+                        ?? "No qualified, associated read-only state",
+                    symbol: "rectangle.stack"
+                )
+                StatusCard(
                     title: "Bridge extension",
                     value: bridgeStore.installationState.label,
                     detail: bridgeStore.installationState.detail,
@@ -386,6 +394,10 @@ private struct DiagnosticsView: View {
                     VStack(spacing: 12) {
                         LabeledContent("State", value: bridgeStore.connectionState.label)
                         LabeledContent("Detail", value: bridgeStore.connectionState.detail)
+                        LabeledContent("Selected session", value: bridgeStore.sessionStatus)
+                        if let binding = bridgeStore.sessionObservation?.runtimeState.binding {
+                            LabeledContent("Session ID", value: binding.sessionID.rawValue)
+                        }
                         LabeledContent(
                             "Extension",
                             value: bridgeStore.installationState.label
