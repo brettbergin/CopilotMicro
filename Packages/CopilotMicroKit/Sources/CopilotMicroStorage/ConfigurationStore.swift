@@ -1,6 +1,30 @@
 import CopilotMicroCore
+import CopilotMicroTerminal
 import Darwin
 import Foundation
+
+public enum TerminalSelectionError: Error, Equatable, LocalizedError, Sendable {
+    case terminalNotSelected
+    case cliNotSelected
+    case terminalNotQualified
+    case terminalChanged
+    case cliChanged
+
+    public var errorDescription: String? {
+        switch self {
+        case .terminalNotSelected:
+            "Choose a terminal before opening Copilot."
+        case .cliNotSelected:
+            "Choose a Copilot CLI executable before opening Copilot."
+        case .terminalNotQualified:
+            "The selected terminal does not have a qualified Open Copilot adapter."
+        case .terminalChanged:
+            "The chosen terminal moved or changed. Select it again."
+        case .cliChanged:
+            "The chosen Copilot CLI executable moved or changed. Select it again."
+        }
+    }
+}
 
 public actor LocalConfigurationStore {
     public static let configurationFilename = "config.json"
@@ -59,6 +83,7 @@ public actor LocalConfigurationStore {
                 )
                 return configuration
             }
+
             let data = try boundedData(from: configurationURL)
             let schemaVersion = try schemaVersion(in: data)
             if schemaVersion == StoredConfiguration.schemaVersion {
@@ -76,6 +101,67 @@ public actor LocalConfigurationStore {
         } catch {
             throw ConfigurationError.fileSystem
         }
+    }
+
+    public func selectTerminal(at applicationURL: URL) throws -> StoredConfiguration {
+        let selected = try TerminalApplicationDiscovery(searchRoots: [])
+            .validateApplication(at: applicationURL)
+        var configuration = try load()
+        configuration.terminal.preferredBundleIdentifier = selected.bundleIdentifier
+        configuration.terminal.preferredApplicationPath = selected.applicationURL.path
+        try save(configuration)
+        return configuration
+    }
+
+    public func selectCLI(at executableURL: URL) throws -> StoredConfiguration {
+        let selected = try CLIExecutableDiscovery(candidateURLs: [])
+            .validateExecutable(at: executableURL)
+        var configuration = try load()
+        configuration.terminal.cliExecutableHint = selected.candidateURL.path
+        try save(configuration)
+        return configuration
+    }
+
+    public func resolveSelectedGhosttyLaunch() throws -> (
+        TerminalApplicationDescriptor, CLIExecutableDescriptor
+    ) {
+        let preferences = try load().terminal
+        guard
+            let bundleID = preferences.preferredBundleIdentifier,
+            let applicationPath = preferences.preferredApplicationPath
+        else {
+            throw TerminalSelectionError.terminalNotSelected
+        }
+        guard bundleID == SupportedTerminal.ghostty.bundleIdentifier else {
+            throw TerminalSelectionError.terminalNotQualified
+        }
+        guard let executablePath = preferences.cliExecutableHint else {
+            throw TerminalSelectionError.cliNotSelected
+        }
+        let terminal: TerminalApplicationDescriptor
+        do {
+            terminal = try TerminalApplicationDiscovery(searchRoots: [])
+                .validateApplication(at: URL(fileURLWithPath: applicationPath))
+            guard
+                terminal.bundleIdentifier == bundleID,
+                terminal.applicationURL.path == applicationPath
+            else {
+                throw TerminalSelectionError.terminalChanged
+            }
+        } catch {
+            throw TerminalSelectionError.terminalChanged
+        }
+        let cli: CLIExecutableDescriptor
+        do {
+            cli = try CLIExecutableDiscovery(candidateURLs: [])
+                .validateExecutable(at: URL(fileURLWithPath: executablePath))
+            guard cli.candidateURL.path == executablePath else {
+                throw TerminalSelectionError.cliChanged
+            }
+        } catch {
+            throw TerminalSelectionError.cliChanged
+        }
+        return (terminal, cli)
     }
 
     func save(_ configuration: StoredConfiguration) throws {

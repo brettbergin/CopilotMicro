@@ -48,8 +48,11 @@ packaged observer remains inert until that action. Installation records version
 and hashes, preserves collisions or modified files, and retains an app-owned
 prior version on update. After installation, Open Copilot requires a directory
 chosen through a native panel and creates a new Ghostty window; it never types
-into an existing shell. Persisted terminal selection, uninstall and a real
-registration walkthrough remain pending.
+into an existing shell. The Diagnostics view now offers explicit supported
+terminal and Copilot CLI discovery, manual selection and durable exact-path
+preferences. A missing selection blocks launch rather than switching to an
+alternative. Only Ghostty has a qualified Open Copilot adapter. Complete
+onboarding, uninstall and a real registration walkthrough remain pending.
 
 ### Terminal discovery
 
@@ -74,8 +77,9 @@ paths, and represents a saved terminal as an exact bundle ID plus canonical
 application path. If that path disappears, resolution reports the missing
 selection and possible alternatives without selecting one. The live macOS
 26.6.2 probe found Ghostty and Terminal.app; iTerm2 was not installed. The
-onboarding selection UI and terminal-specific focus behavior remain later
-work.
+Diagnostics selection UI now saves both exact paths and revalidates them
+before launch. Selecting Terminal.app or iTerm2 does not enable an
+unqualified Open Copilot adapter. Full guided onboarding remains later work.
 
 ## Menu bar panel
 

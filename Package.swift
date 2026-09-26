@@ -17,6 +17,7 @@ let package = Package(
                 .product(name: "CopilotMicroBridge", package: "CopilotMicroKit"),
                 .product(name: "CopilotMicroCore", package: "CopilotMicroKit"),
                 .product(name: "CopilotMicroDevice", package: "CopilotMicroKit"),
+                .product(name: "CopilotMicroStorage", package: "CopilotMicroKit"),
                 .product(name: "CopilotMicroTerminal", package: "CopilotMicroKit"),
             ],
             path: "App/Sources"

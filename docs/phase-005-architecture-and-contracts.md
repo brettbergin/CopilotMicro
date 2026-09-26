@@ -276,6 +276,12 @@ UI-context and argument-vector launch contracts. The contract does not claim
 that an adapter has established exact focus: `.applicationOnly`, wrong-surface,
 unavailable and unknown evidence remain distinct from `.exact`.
 
+The manager now wires explicit terminal/CLI discovery and manual selection to
+the protected local configuration store. It shows absent or moved selections
+without choosing an alternative, and Open Copilot revalidates both saved
+paths before constructing a Ghostty launch. Selection does not install the
+extension, launch the CLI or authorize session actions.
+
 The Ghostty `1.3.1` adapter implements that boundary with the application's
 documented AppleScript dictionary. A bounded `/usr/bin/osascript` transport
 uses static script source, separate arguments, a minimal environment, private

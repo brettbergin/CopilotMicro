@@ -358,6 +358,8 @@ private struct DiagnosticsView: View {
                 subtitle: "Bounded in-memory device status and normalized input events."
             )
 
+            TerminalSelectionView(bridgeStore: bridgeStore)
+
             GroupBox("Device details") {
                 VStack(spacing: 12) {
                     LabeledContent("Connection", value: store.connectionState.label)
@@ -412,7 +414,7 @@ private struct DiagnosticsView: View {
                     reviewBridgeInstallation()
                 }
                 .disabled(!bridgeStore.installationState.canInstall)
-                Button("Open Copilot in Ghostty...") {
+                Button("Open Copilot in selected Ghostty...") {
                     chooseProjectAndOpenCopilot()
                 }
                 .disabled(!bridgeStore.canOpenCopilot)
@@ -463,6 +465,113 @@ private struct DiagnosticsView: View {
         bridgeStore.openCopilot(
             projectDirectoryURL: projectDirectoryURL.standardizedFileURL
         )
+    }
+}
+
+private struct TerminalSelectionView: View {
+    @ObservedObject var bridgeStore: LiveBridgeStore
+
+    var body: some View {
+        GroupBox("Terminal and Copilot CLI selection") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Choose exact installations before opening Copilot. Discovery never selects one for you.")
+                    .foregroundStyle(.secondary)
+                if let issue = bridgeStore.terminalSelectionIssue {
+                    Text(issue)
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Selection error: \(issue)")
+                }
+                LabeledContent("Preferred terminal", value: terminalStatus)
+                ForEach(bridgeStore.terminalInstallations, id: \.applicationURL) { installation in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(installation.terminal.displayName)
+                            Text(installation.applicationURL.path)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        Spacer()
+                        Button("Use terminal") {
+                            bridgeStore.selectTerminal(at: installation.applicationURL)
+                        }
+                        .disabled(bridgeStore.terminalSelectionBusy)
+                        .accessibilityLabel(
+                            "Use \(installation.terminal.displayName) at \(installation.applicationURL.path)")
+                    }
+                }
+                Button("Choose another terminal...") {
+                    let panel = NSOpenPanel()
+                    panel.title = "Select a supported terminal application"
+                    panel.canChooseDirectories = false
+                    panel.canChooseFiles = true
+                    panel.allowsMultipleSelection = false
+                    if panel.runModal() == .OK, let url = panel.url {
+                        bridgeStore.selectTerminal(at: url)
+                    }
+                }
+                .disabled(bridgeStore.terminalSelectionBusy)
+
+                Divider()
+                LabeledContent("Copilot CLI", value: cliStatus)
+                ForEach(bridgeStore.cliInstallations, id: \.candidateURL) { executable in
+                    HStack {
+                        Text(executable.candidateURL.path)
+                            .font(.caption)
+                            .textSelection(.enabled)
+                        Spacer()
+                        Button("Use CLI") {
+                            bridgeStore.selectCLI(at: executable.candidateURL)
+                        }
+                        .disabled(bridgeStore.terminalSelectionBusy)
+                        .accessibilityLabel("Use Copilot CLI at \(executable.candidateURL.path)")
+                    }
+                }
+                Button("Choose another Copilot CLI...") {
+                    let panel = NSOpenPanel()
+                    panel.title = "Select the Copilot CLI executable"
+                    panel.canChooseDirectories = false
+                    panel.canChooseFiles = true
+                    panel.allowsMultipleSelection = false
+                    if panel.runModal() == .OK, let url = panel.url {
+                        bridgeStore.selectCLI(at: url)
+                    }
+                }
+                .disabled(bridgeStore.terminalSelectionBusy)
+                Button("Refresh installations") {
+                    bridgeStore.refreshTerminalChoices()
+                }
+                .disabled(bridgeStore.terminalSelectionBusy)
+                Text("Only Ghostty has a qualified Open Copilot adapter. CLI session actions remain disabled.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
+        }
+    }
+
+    private var terminalStatus: String {
+        switch bridgeStore.terminalSelection {
+        case .notSelected:
+            "Not selected"
+        case .available(let installation):
+            installation.terminal == .ghostty
+                ? "\(installation.terminal.displayName): \(installation.applicationURL.path)"
+                : "\(installation.terminal.displayName) selected; Open Copilot is not qualified"
+        case .missing(let preference, _):
+            "Missing or changed: \(preference.applicationPath). Select again."
+        }
+    }
+
+    private var cliStatus: String {
+        switch bridgeStore.cliSelection {
+        case .notSelected:
+            "Not selected"
+        case .available(let executable):
+            executable.candidateURL.path
+        case .missing(let preference, _):
+            "Missing or changed: \(preference.executablePath). Select again."
+        }
     }
 }
 
