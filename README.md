@@ -37,7 +37,12 @@ token reassignment. Live qualification proved exact child environment
 inheritance and cleanup. Automatic association of an already running Copilot
 CLI instance remains disabled because Ghostty exposes neither the terminal
 child PID nor TTY. The packaged installation and launch flow has not yet been
-used to claim a real Copilot CLI registration.
+used to claim a real Copilot CLI registration. The manager and menu can now
+show qualified, authenticated read-only session status for an exactly
+associated CLI lifetime. A newer host event invalidates that display until
+a newer snapshot arrives, and disconnect clears it. Headless bridge tests
+cover the state transport; live status lighting and stateful actions remain
+disabled.
 
 ## Developer setup
 

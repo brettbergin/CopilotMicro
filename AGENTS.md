@@ -26,7 +26,9 @@ environment inheritance is live-qualified. The manager requires an explicit
 persisted terminal and CLI executable selection, revalidated before launch;
 only Ghostty has a qualified Open Copilot adapter. The app can explicitly open
 a new Ghostty Copilot window after a project is selected, but this packaged
-path has not yet received a real registration.
+path has not yet received a real registration. Qualified read-only snapshots
+are visible in the manager/menu only for an associated CLI lifetime; no
+session state currently drives physical LEDs.
 Do not reintroduce simulated device state or widen CLI authority.
 
 Use Swift 6 with SwiftUI/AppKit, Swift Package Manager and a local Swift

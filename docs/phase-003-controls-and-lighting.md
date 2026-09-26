@@ -9,7 +9,9 @@ USB firmware `0.6.2` has physical evidence for all key contacts, both dial
 directions, native radial joystick cardinals and steady
 white/blue/purple/amber/green/red/off output. The production app owns the USB
 device service and renders real controls while driving matching key/ambient
-colors. Host-driven blink/pulse, Bluetooth, sleep/wake and event-to-light
+colors. Qualified read-only CLI session state can be displayed for an exactly
+associated extension, but it does not yet drive the device LEDs.
+Host-driven blink/pulse, Bluetooth, sleep/wake and event-to-light
 latency remain unqualified.
 
 ## Physical model

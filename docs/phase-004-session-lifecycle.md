@@ -55,6 +55,13 @@ read-only mode/model surfaces are not permission to call their mutating RPCs,
 and unavailable session, composer, voice and permission operations have no
 fallback command or keystroke implementation.
 
+The app now surfaces reconciled mode/activity/attention text from the
+authenticated observer only when its CLI registration is associated with an
+app-created Ghostty surface. A newer event invalidates the display until a
+newer snapshot arrives; disconnect, session replacement and incompatible
+builds do not retain stale selected-session status. This headless-tested
+display is not live registration qualification or permission to route actions.
+
 Opening Copilot is an explicit action using the validated preferred terminal
 and chosen local directory. Preserve ordinary CLI login/trust prompts. Do not
 add allow-all flags, change global CLI settings, install a new CLI build

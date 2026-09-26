@@ -159,6 +159,12 @@ Pending permission snapshots carry counts only, not request IDs. Capability
 snapshots advertise no supported stateful action, and the native reconciler
 rejects any production snapshot that does.
 
+The running native bridge now emits in-memory read-only observations after
+authenticated frames, including unknown-first and invalidation transitions.
+The app displays them only for an exactly associated, qualified CLI lifetime,
+and clears them on disconnect or replacement. Nothing in this projection
+authorizes a device input action or host-driven physical lighting.
+
 The native app now owns this server lifecycle and exposes bounded
 listener/connection status. Production source is never installed under the
 development repository's `.github/extensions/`. The packaged app can install
